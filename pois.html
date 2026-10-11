@@ -1,0 +1,3064 @@
+<!DOCTYPE html>
+<!-- Safari Assistant pois.html v2026-10-05-2 -->
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Safari Assistant Karte">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Safari Assistant · Karte</title>
+<link rel="icon" type="image/png" href="icon.png">   <!-- 2026-10-04-2: Favicon = App-Icon (icon.png, 1024 px; STATIK_DATEIEN) -->
+<!-- 2026-10-04-1: Oberfläche in vier Sprachen — i18n.js übersetzt zur Laufzeit (Deutsch bleibt die Quelle), lädt i18n/<sprache>.js -->
+<script src="i18n.js"></script>
+<!-- 2026-09-27: keine Google Fonts mehr (IP-Adresse an Google bei jedem Aufruf) — System-Schriften, siehe --mono/--serif -->
+<!-- Bug 8: Offline-fest — lokale Bibliotheken zuerst (vendor/, lädt deploy.sh Schritt 0), CDN nur Fallback -->
+<!-- 2026-09-05-1: CDN-CSS nur noch als onerror-Fallback, wenn die vendor-Datei fehlt — offline keine hängenden Requests mehr, online kein Doppel-Download -->
+<link rel="stylesheet" href="vendor/leaflet.css" onerror="this.onerror=null;this.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'">
+<link rel="stylesheet" href="vendor/MarkerCluster.css" onerror="this.onerror=null;this.href='https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css'">
+<link rel="stylesheet" href="vendor/MarkerCluster.Default.css" onerror="this.onerror=null;this.href='https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css'">
+<link rel="stylesheet" href="vendor/maplibre-gl-4.7.1.css" onerror="this.onerror=null;this.href='https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css'">
+<style>
+  .maplibregl-map { height: 100%; width: 100%; }
+  .maplibregl-ctrl-attrib { font-size: 9px !important; }
+</style>
+<style>
+  :root {
+    --bg: #0f0e0c; --surface: #1a1916; --surface2: #232220;
+    --border: #2e2c29; --border2: #3d3b37;
+    --text: #e8e4dc; --text2: #9a9589; --text3: #8a857a;  /* 2026-09-05-1: text3 von 2.4:1 auf ≈4.6:1 Kontrast — im Sonnenlicht sonst unlesbar */
+    --accent: #c8a95a; --green: #8fb87a; --red: #e07a5f; --blue: #7eb8c9;
+    --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace; --serif: 'Fraunces', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-top: env(safe-area-inset-top, 0px);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overflow: hidden; background: var(--bg); font-family: var(--mono); color: var(--text); }
+  body { display: flex; flex-direction: column; }
+
+  .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: calc(var(--safe-top) + 10px) 14px 10px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .header-title { font-family: var(--serif); font-size: 15px; font-weight: 300; font-style: italic; flex: 1; }
+  .hbtn { height: 32px; padding: 0 12px; background: transparent; border: 1px solid var(--border2); border-radius: 6px; color: var(--text2); font-family: var(--mono); font-size: 11px; cursor: pointer; white-space: nowrap; }
+  .hbtn.primary { background: var(--accent); color: #0f0e0c; border-color: var(--accent); font-weight: 500; }
+  .hbtn:active { opacity: 0.75; }
+
+  .tabs { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .tab { flex: 1; padding: 10px; text-align: center; font-size: 11px; color: var(--text3); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .view { flex: 1; overflow: hidden; display: none; flex-direction: column; }
+  .view.active { display: flex; }
+
+  /* MAP VIEW */
+  #map { flex: 1; width: 100%; min-height: 300px; height: 100%; }
+  .map-controls { position: absolute; top: 10px; right: 10px; z-index: 1000; display: flex; flex-direction: column; gap: 6px; }
+  .map-btn { width: 44px; height: 44px; background: var(--surface); border: 1px solid var(--border2); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; font-size: 15px; line-height: 1; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.4); color: var(--text); font-family: var(--mono); padding: 0; }
+  .map-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .map-btn-label { font-size: 8px; letter-spacing: -0.04em; color: var(--text2); max-width: 42px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }  /* 2026-10-04-1: längere Beschriftungen (fr/es) laufen nicht aus dem Knopf; 2026-10-04-3: enger gesetzt, damit 9 Zeichen („Ubicación") ganz passen */  /* 2026-09-05-1: Icon-Buttons beschriftet — Erstnutzer raten sonst */
+  .map-wrap { flex: 1; position: relative; display: flex; flex-direction: column; min-height: 0; }
+  /* 2026-10-04-3: Popups gehen vor — der Kartenhinweis verdeckte sonst ihre Kopfzeile (z-index hilft nicht:
+     Leaflets Popups liegen im Stapelkontext der Karten-Ebene). Zwei Regeln: ohne :has() fällt nur eine weg. */
+  #map:has(.leaflet-popup) #karten-hinweis { visibility: hidden; }
+  #map:has(.maplibregl-popup) #karten-hinweis { visibility: hidden; }
+
+  .filter-bar { padding: 8px 12px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; flex-shrink: 0; }
+  .filter-bar::-webkit-scrollbar { display: none; }
+  .filter-chip { flex-shrink: 0; font-size: 11px; padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border2); background: transparent; color: var(--text2); cursor: pointer; font-family: var(--mono); transition: all 0.12s; }
+  .filter-chip.active { border-color: var(--accent); color: var(--accent); background: rgba(200,169,90,0.08); }
+
+  /* LIST VIEW */
+  .list-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .list-item { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; }
+  .list-item:active { background: var(--surface2); }
+  .poi-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .list-content { flex: 1; min-width: 0; }
+  .list-name { font-size: 13px; color: var(--text); margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .list-meta { font-size: 11px; color: var(--text3); }
+  .list-dist { font-size: 11px; color: var(--text2); flex-shrink: 0; margin-top: 2px; }
+  .empty-state { text-align: center; padding: 3rem 1rem; color: var(--text3); font-size: 12px; line-height: 2; }
+
+  /* DETAIL SHEET */
+  .sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 2000; display: none; }
+  .sheet-overlay.open { display: block; }
+  .sheet { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-radius: 16px 16px 0 0; border-top: 1px solid var(--border2); z-index: 2001; transform: translateY(100%); transition: transform 0.3s ease; padding-bottom: var(--safe-bottom); max-height: 50vh; overflow-y: auto; }
+  .sheet.open { transform: translateY(0); }
+  .sheet-handle { width: 36px; height: 4px; background: var(--border2); border-radius: 2px; margin: 10px auto 0; }
+  .sheet-content { padding: 16px 18px 24px; }
+  .sheet-icon-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .sheet-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+  .sheet-title { font-size: 16px; font-weight: 500; color: var(--text); }
+  .sheet-type { font-size: 11px; color: var(--text3); margin-top: 3px; }
+  .sheet-desc { font-size: 13px; color: var(--text2); line-height: 1.7; margin-bottom: 16px; padding: 10px 12px; background: var(--surface2); border-radius: 8px; }
+  .sheet-meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+  .sheet-meta-card { background: var(--surface2); border-radius: 8px; padding: 10px; }
+  .sheet-meta-label { font-size: 10px; color: var(--text3); margin-bottom: 3px; }
+  .sheet-meta-val { font-size: 13px; color: var(--text); }
+  .sheet-actions { display: flex; gap: 8px; }
+  .sheet-action { flex: 1; padding: 11px; border-radius: 10px; border: 1px solid var(--border2); background: transparent; color: var(--text2); font-family: var(--mono); font-size: 12px; cursor: pointer; text-align: center; }
+  .sheet-action.primary { background: var(--accent); color: #0f0e0c; border-color: var(--accent); font-weight: 500; }
+  .sheet-action:active { opacity: 0.75; }
+
+  /* IMPORT VIEW */
+  .import-area { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; gap: 1rem; }
+  .import-drop { width: 100%; max-width: 340px; border: 2px dashed var(--border2); border-radius: 16px; padding: 2.5rem 1.5rem; text-align: center; cursor: pointer; transition: border-color 0.15s; }
+  .import-drop:hover, .import-drop.drag { border-color: var(--accent); background: rgba(200,169,90,0.06); }
+  .import-drop-icon { font-size: 36px; margin-bottom: 12px; }
+  .import-drop-title { font-size: 14px; color: var(--text); margin-bottom: 6px; }
+  .import-drop-sub { font-size: 11px; color: var(--text3); line-height: 1.6; }
+  .import-presets { width: 100%; max-width: 340px; }
+  .preset-title { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; }
+  .preset-btn { width: 100%; padding: 11px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--text2); font-family: var(--mono); font-size: 12px; cursor: pointer; text-align: left; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+  .preset-btn:active { background: var(--surface2); }
+  .preset-count { font-size: 10px; color: var(--text3); }
+
+  /* CLUSTER */
+  .marker-cluster-small, .marker-cluster-medium, .marker-cluster-large { background: rgba(200,169,90,0.25) !important; }
+  .marker-cluster-small div, .marker-cluster-medium div, .marker-cluster-large div { background: rgba(200,169,90,0.7) !important; color: #0f0e0c !important; font-family: var(--mono) !important; font-size: 11px !important; font-weight: 500 !important; }
+
+  /* LAYER PANEL */
+  .layer-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; }
+  .layer-toggle { width: 36px; height: 20px; border-radius: 10px; border: none; cursor: pointer; flex-shrink: 0; transition: all 0.2s; position: relative; }
+  .layer-toggle.on { background: var(--accent); }
+  .layer-toggle.off { background: var(--border2); }
+  .layer-toggle::after { content:''; position: absolute; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: white; transition: left 0.2s; }
+  .layer-toggle.on::after { left: 18px; }
+  .layer-toggle.off::after { left: 2px; }
+  .layer-info { flex: 1; min-width: 0; }
+  .layer-name { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .layer-meta { font-size: 10px; color: var(--text3); margin-top: 2px; }
+  .layer-color { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .layer-delete { font-size: 13px; color: var(--text3); background: none; border: none; cursor: pointer; padding: 4px; flex-shrink: 0; }
+  .layer-delete:hover { color: var(--red); }
+  .custom-marker { width: 32px; height: 32px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; }
+  .custom-marker span { transform: rotate(45deg); font-size: 14px; }
+
+  /* REGENZEIT-ZEITLEISTE (unten auf der Karte, nur bei eingeschalteter 🌧️-Ebene) */
+  #zeitleiste { position: absolute; left: 10px; right: 64px; bottom: 34px; z-index: 1000; background: rgba(26,25,22,0.94); border: 1px solid var(--border2); border-radius: 10px; padding: 6px 10px 5px; box-shadow: 0 4px 16px rgba(0,0,0,0.5); font-size: 11px; }
+  .zl-kopf { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+  .zl-btn { height: 28px; min-width: 28px; padding: 0 8px; background: var(--surface2); border: 1px solid var(--border2); border-radius: 6px; color: var(--text); font-family: var(--mono); font-size: 11px; cursor: pointer; flex-shrink: 0; }
+  .zl-btn:active { opacity: 0.75; }
+  .zl-heute { color: var(--accent); border-color: var(--accent); font-weight: 500; }
+  .zl-datum { flex: 1; text-align: center; font-size: 12px; color: var(--text); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  #zl-slider { width: 100%; margin: 4px 0 0; height: 24px; accent-color: var(--blue); cursor: pointer; }
+  .zl-monate { position: relative; height: 13px; font-size: 9px; color: var(--text3); margin: 0 8px; }
+  .zl-monate span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
+  .zl-monate i { position: absolute; top: -2px; width: 2px; height: 12px; background: var(--accent); transform: translateX(-50%); }
+  .zl-legende { display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: 9px; color: var(--text3); margin-top: 3px; line-height: 1.4; }
+  .zl-legende b { display: inline-block; width: 9px; height: 9px; border-radius: 2px; vertical-align: -1px; margin-right: 3px; }
+  #regen-panel { display: none; position: absolute; top: 10px; left: 10px; z-index: 1001; width: min(320px, calc(100% - 84px)); max-height: calc(100% - 150px); background: var(--surface); border: 1px solid var(--border2); border-radius: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.5); overflow: hidden; flex-direction: column; }
+  #regen-panel-body { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 8px 10px 10px; font-size: 11px; line-height: 1.5; color: var(--text2); }
+  .regen-live-tab { width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 4px; }
+  .regen-live-tab td { padding: 2px 4px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  @media (max-width: 640px) {   /* iPhone: Datum in eigener Zeile, sonst wird es zwischen den Knöpfen abgeschnitten */
+    .zl-kopf { flex-wrap: wrap; justify-content: center; }
+    .zl-datum { flex-basis: 100%; order: -1; margin-bottom: 2px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-title">Karte <span id="poi-version" style="font-size:9px;color:var(--text3);font-style:normal;font-family:var(--mono)"></span></div>
+  <button class="hbtn" onclick="showTab('import')">+ Import</button>
+  <button class="hbtn" onclick="zurueckZumAssistenten()">← Assistent</button>
+  <select class="hbtn" id="ui-lang-select" data-i18n-skip aria-label="Sprache / Language / Langue / Idioma" onchange="DARK_I18N.set(this.value)" style="padding-right:4px">
+    <option value="de">DE</option><option value="en">EN</option><option value="fr">FR</option><option value="es">ES</option>
+  </select>
+  <button class="hbtn" onclick="oeffneHilfe()" style="font-weight:700" title="Anleitung öffnen (README in der gewählten Sprache)" aria-label="Hilfe">?</button>
+</div>
+<script>
+  // 2026-10-04-1: Sprachwahl + Anleitung (README in der Sprache der Oberfläche, vom eigenen Server gerendert)
+  (function () { var s = document.getElementById('ui-lang-select'); if (s && window.DARK_I18N) s.value = DARK_I18N.lang; })();
+  function oeffneHilfe() {
+    var l = (window.DARK_I18N && DARK_I18N.lang) || 'de';
+    location.href = 'hilfe?lang=' + encodeURIComponent(l) + '&from=/pois.html';
+  }
+</script>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('map')">Karte</div>
+  <div class="tab" onclick="showTab('list')">Liste</div>
+  <div class="tab" onclick="showTab('favorites')">⭐ Listen</div>
+  <div class="tab" onclick="showTab('import')">Import</div>
+</div>
+
+<!-- MAP VIEW -->
+<div class="view active" id="view-map">
+  <div class="filter-bar" id="filter-bar">
+    <button class="filter-chip active" data-filter="all" onclick="setFilter(this)">Alle</button>
+    <button class="filter-chip" data-filter="water" onclick="setFilter(this)">💧 Wasser</button>
+    <button class="filter-chip" data-filter="camp" onclick="setFilter(this)">⛺ Camp</button>
+    <button class="filter-chip" data-filter="fuel" onclick="setFilter(this)">⛽ Treibstoff</button>
+    <button class="filter-chip" data-filter="mechanic" onclick="setFilter(this)">🔧 Mechaniker</button>
+    <button class="filter-chip" data-filter="vet" onclick="setFilter(this)">🐾 Tierarzt</button>
+    <button class="filter-chip" data-filter="hospital" onclick="setFilter(this)">🏥 Krankenhaus</button>
+    <button class="filter-chip" data-filter="border" onclick="setFilter(this)">🛂 Grenze</button>
+    <button class="filter-chip" data-filter="danger" onclick="setFilter(this)">⚠️ Warnung</button>
+    <button class="filter-chip" data-filter="custom" onclick="setFilter(this)">📍 Eigene</button>
+  </div>
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div class="map-controls">
+      <button class="map-btn" onclick="locateMe()" oncontextmenu="event.preventDefault();kopiereStandort()" title="Mein Standort (lang drücken = Position kopieren)" aria-label="Mein Standort">📍<span class="map-btn-label">Standort</span></button>
+      <button class="map-btn" onclick="nearestSearch()" title="Nächster POI von meiner Position" aria-label="Nächster POI">🧭<span class="map-btn-label">Nächster</span></button>
+      <button class="map-btn" onclick="addCustomPOI()" title="POI hinzufügen" aria-label="POI hinzufügen">+<span class="map-btn-label">Neu</span></button>
+      <button class="map-btn" id="tile-toggle-btn" onclick="toggleTileSource()" title="Karte wechseln (online ↔ offline)" aria-label="Karte wechseln">🗺️<span class="map-btn-label">Karte</span></button>
+      <button class="map-btn" id="gefahren-toggle-btn" onclick="toggleGefahren()" title="Gefahrenzonen ein/ausblenden (Malaria/Tsetse/Big Game/Krokodil)" aria-label="Gefahrenzonen">🦟<span class="map-btn-label">Gefahren</span></button>
+      <button class="map-btn" id="reisewarn-toggle-btn" onclick="toggleReisewarnung()" title="Amtliche Reisewarnungen ein/ausblenden (Auswärtiges Amt — Land antippen zeigt den Warntext)" aria-label="Reisewarnungen">🛑<span class="map-btn-label">Warnung</span></button>
+      <button class="map-btn" id="regen-toggle-btn" onclick="toggleRegenzeit()" title="Regenzeiten ein/ausblenden — Zeitleiste unten: Datum wählen, „Heute“ springt zurück; Zelle antippen zeigt Monatswerte (Klimatologie NASA POWER, keine Vorhersage)" aria-label="Regenzeiten">🌧️<span class="map-btn-label">Regen</span></button>
+      <button class="map-btn" onclick="toggleLayerPanel()" title="Layer ein/ausblenden" id="layer-panel-btn" aria-label="Layer">☰<span class="map-btn-label">Layer</span></button>
+    </div>
+
+    <!-- Regenzeit-Zeitleiste: Tag-genau, 3 Monate zurück bis 15 Monate voraus. Sichtbar nur mit 🌧️-Ebene UND Daten. -->
+    <div id="zeitleiste" style="display:none" role="group" aria-label="Zeitleiste Regenzeiten">
+      <div class="zl-kopf">
+        <button class="zl-btn" onclick="zeitleisteSchritt(-30)" title="Einen Monat zurück" aria-label="Einen Monat zurück">«</button>
+        <button class="zl-btn" onclick="zeitleisteSchritt(-7)" title="Eine Woche zurück" aria-label="Eine Woche zurück">◀</button>
+        <div id="zl-datum" class="zl-datum" onclick="regenInfoOeffnen()" title="Wetter-Info zur Position öffnen"></div>
+        <button class="zl-btn" onclick="zeitleisteSchritt(7)" title="Eine Woche vor" aria-label="Eine Woche vor">▶</button>
+        <button class="zl-btn" onclick="zeitleisteSchritt(30)" title="Einen Monat vor" aria-label="Einen Monat vor">»</button>
+        <button class="zl-btn zl-heute" onclick="zeitleisteHeute()" title="Auf heute springen und den heutigen Stand zur Position zeigen">Heute</button>
+        <button class="zl-btn" onclick="regenInfoOeffnen()" title="Wetter-Info zur Position (Klimatologie + Live-Vorhersage, wenn online)" aria-label="Wetter-Info">ℹ️</button>
+      </div>
+      <input type="range" id="zl-slider" min="-90" max="456" value="0" step="1" oninput="zeitleisteSetzen(+this.value)" aria-label="Datum wählen (Tage relativ zu heute)">
+      <div id="zl-monate" class="zl-monate"></div>
+      <div id="zl-legende" class="zl-legende"></div>
+    </div>
+
+    <!-- Wetter-Info-Panel: Klimatologie zur Position für das gewählte Datum + Live-Vorhersage (online) -->
+    <div id="regen-panel">
+      <div style="padding:10px 12px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-shrink:0">
+        <span style="font-size:11px; font-weight:500; color:var(--text)">🌧️ Wetter &amp; Regenzeit</span>
+        <button onclick="regenInfoSchliessen()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0" aria-label="Schließen">✕</button>
+      </div>
+      <div id="regen-panel-body"></div>
+    </div>
+
+    <!-- Kartensuche: offline Orte (GeoNames-Index über server.py) · Enter = zusätzlich Straßen online (Nominatim) -->
+    <!-- 2026-10-04-3: links/rechts 58 px frei (Knopfleiste rechts — am iPhone lag das Feld darüber), kurzer Platzhalter, der in allen Sprachen ganz sichtbar ist; die lange Erklärung steht im title -->
+    <div id="karten-suche" style="position:absolute; top:10px; left:58px; right:58px; margin:0 auto; max-width:340px; z-index:1050">
+      <input id="suche-input" placeholder="🔍 Ort suchen (⏎ = auch Straßen)" title="Orte offline suchen · Enter ⏎ = zusätzlich Straßen (online)" aria-label="Ort suchen" autocomplete="off"
+        oninput="sucheOrteLive()" onkeydown="sucheTaste(event)"
+        style="width:100%; padding:8px 12px; background:var(--surface); border:1px solid var(--border2); border-radius:8px; color:var(--text); font-family:monospace; font-size:12px; box-shadow:0 2px 8px rgba(0,0,0,0.4)">
+      <div id="suche-ergebnisse" style="display:none; margin-top:4px; background:var(--surface); border:1px solid var(--border2); border-radius:8px; max-height:260px; overflow-y:auto; box-shadow:0 4px 16px rgba(0,0,0,0.5)"></div>
+    </div>
+
+    <!-- Layer-Panel auf der Karte -->
+    <div id="map-layer-panel" style="display:none; position:absolute; top:10px; left:10px; z-index:1000; width:220px; background:var(--surface); border:1px solid var(--border2); border-radius:10px; box-shadow:0 4px 16px rgba(0,0,0,0.5); overflow:hidden;">
+      <div style="padding:10px 12px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">
+        <span style="font-size:11px; font-weight:500; color:var(--text)">Layer</span>
+        <button onclick="toggleLayerPanel()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0">✕</button>
+      </div>
+      <div id="map-layer-list" style="max-height:300px; overflow-y:auto; padding:8px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- LIST VIEW -->
+<div class="view" id="view-list">
+  <div class="filter-bar">
+    <button class="filter-chip active" data-filter="all" onclick="setFilterList(this)">Alle</button>
+    <button class="filter-chip" data-filter="water" onclick="setFilterList(this)">💧 Wasser</button>
+    <button class="filter-chip" data-filter="camp" onclick="setFilterList(this)">⛺ Camp</button>
+    <button class="filter-chip" data-filter="fuel" onclick="setFilterList(this)">⛽ Treibstoff</button>
+    <button class="filter-chip" data-filter="mechanic" onclick="setFilterList(this)">🔧 Mechaniker</button>
+    <button class="filter-chip" data-filter="vet" onclick="setFilterList(this)">🐾 Tierarzt</button>
+    <button class="filter-chip" data-filter="hospital" onclick="setFilterList(this)">🏥 Krankenhaus</button>
+    <button class="filter-chip" data-filter="border" onclick="setFilterList(this)">🛂 Grenze</button>
+    <button class="filter-chip" data-filter="danger" onclick="setFilterList(this)">⚠️ Warnung</button>
+    <button class="filter-chip" data-filter="custom" onclick="setFilterList(this)">📍 Eigene</button>
+  </div>
+  <div class="list-scroll" id="poi-list"></div>
+</div>
+
+<!-- FAVORITES VIEW -->
+<div class="view" id="view-favorites">
+  <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;background:var(--surface);flex-shrink:0">
+    <select id="fav-list-select" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none" onchange="renderFavorites()"></select>
+    <button class="hbtn" onclick="newFavList()">+ Liste</button>
+    <button class="hbtn" onclick="deleteFavList()" style="color:var(--red)">🗑</button>
+  </div>
+  <div class="list-scroll" id="fav-list"></div>
+</div>
+
+<!-- IMPORT VIEW -->
+<div class="view" id="view-import">
+  <div class="import-area" style="overflow-y:auto; align-items:stretch; padding: 1rem;">
+
+    <!-- Upload Zone -->
+    <div class="import-drop" onclick="document.getElementById('gpx-file').click()" style="margin-bottom:1rem"
+         ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')"
+         ondrop="event.preventDefault();this.classList.remove('drag');importDateien(event.dataTransfer.files)">
+      <div class="import-drop-icon">📂</div>
+      <div class="import-drop-title">GPX / KML / Overpass-JSON importieren</div>
+      <div class="import-drop-sub">iOverlander · OsmAnd · OSM-Export (Overpass) · Eigene Dateien</div>
+    </div>
+    <input type="file" id="gpx-file" accept=".gpx,.kml,.json,.geojson" multiple style="display:none" onchange="importFile(event)">
+
+    <!-- OSM-Import pro Land (Overpass) — zuhause vorbereiten, offline nutzen -->
+    <div id="overpass-hint" style="margin-bottom:1rem;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:10px">
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px">OSM-Import pro Land (Overpass, zuhause vorbereiten)</div>
+      <div style="font-size:11px;color:var(--text2);line-height:1.8">
+        <b>Automatisch (empfohlen):</b> im Projektordner <code style="font-size:10px;color:var(--accent)">python3 fetch-pois.py</code> ausführen
+        — schreibt pro Land <b>POIs/&lt;Land&gt;-osm.json</b> mit allen Kategorien
+        (🏥 Medizin, 🐾 Tierarzt, ⛽ Tanken, 💧 Wasser, 🏕️ Camps, 🔧 Werkstätten, 🛂 Grenzposten).<br>
+        <b>Manuell:</b> <b>overpass-turbo.eu</b> öffnen, Query pro Land:<br>
+        <code style="font-size:10px;color:var(--accent);display:block;padding:6px 8px;background:var(--surface2);border-radius:6px;margin:4px 0;white-space:pre-wrap">[out:json][timeout:120];
+{{geocodeArea:Namibia}}->.a;
+(
+  nwr(area.a)[amenity~"hospital|clinic|doctors|pharmacy|veterinary|fuel|drinking_water"];
+  nwr(area.a)[shop~"car_repair|car_parts"];
+  nwr(area.a)[tourism~"camp_site|caravan_site"];
+);
+out center;</code>
+        dann Export → Rohdaten (JSON) → Datei speichern (z.B. <b>namibia-osm.json</b>)<br>
+        Zum Schluss hier importieren — eine Datei = ein Layer pro Land, Distanzsuche über 🧭 auf der Karte
+      </div>
+    </div>
+
+    <!-- Layer-Verwaltung -->
+    <div style="margin-bottom:0.5rem">
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px">
+        Layer — importierte Dateien
+      </div>
+      <div id="layer-list">
+        <div style="font-size:11px;color:var(--text3);text-align:center;padding:1rem">
+          Noch keine Dateien importiert
+        </div>
+      </div>
+    </div>
+
+    <!-- Presets & Aktionen -->
+    <div class="import-presets">
+      <div class="preset-title">Demo-Daten</div>
+      <button class="preset-btn" onclick="loadPreset('southern')">
+        <span>Südliches Afrika</span><span class="preset-count">12 Punkte</span>
+      </button>
+      <button class="preset-btn" onclick="loadPreset('east')">
+        <span>Ostafrika</span><span class="preset-count">8 Punkte</span>
+      </button>
+      <button class="preset-btn" onclick="clearAll()" style="color:var(--red);border-color:var(--red)">
+        <span>Alle POIs & Layer löschen</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL SHEET -->
+<div class="sheet-overlay" id="sheet-overlay" onclick="closeSheet()"></div>
+<div class="sheet" id="detail-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-content" id="sheet-body"></div>
+</div>
+
+<script src="vendor/leaflet.js"></script>
+<script>/* Bug 8: CDN-Fallback nur wenn vendor/ fehlt (z.B. vor dem ersten deploy.sh-Lauf) */
+if (typeof L === 'undefined') document.write('<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>');</script>
+<script src="vendor/leaflet.markercluster.js"></script>
+<script>if (typeof L !== 'undefined' && typeof L.markerClusterGroup !== 'function') document.write('<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"><\/script>');</script>
+<script>
+const APP_VERSION = 'v2026-10-05-2'; // Muss mit Versionsmarker in Zeile 2 übereinstimmen
+const TYPES = {
+  water:    { icon:'💧', color:'#7eb8c9', bg:'#182027', label:'Wasserstelle' },
+  camp:     { icon:'⛺', color:'#8fb87a', bg:'#1a2318', label:'Campingplatz' },
+  fuel:     { icon:'⛽', color:'#c8a95a', bg:'#2a2318', label:'Treibstoff' },
+  mechanic: { icon:'🔧', color:'#c8a95a', bg:'#2a2318', label:'Mechaniker' },
+  vet:      { icon:'🐾', color:'#8fb87a', bg:'#1d231a', label:'Tierarzt' },
+  hospital: { icon:'🏥', color:'#e07a5f', bg:'#271d1d', label:'Krankenhaus' },
+  border:   { icon:'🛂', color:'#9a9589', bg:'#1a1a1a', label:'Grenzübergang' },
+  danger:   { icon:'⚠️', color:'#e07a5f', bg:'#271818', label:'Warnung' },
+  custom:   { icon:'📍', color:'#c47eb5', bg:'#27182a', label:'Eigener POI' }
+};
+
+let pois = [];
+let layers = JSON.parse(localStorage.getItem('safari-layers') || '{}');
+let markers = [];
+let clusterGroups = {};
+let currentFilter = 'all', listFilter = 'all';
+let map;
+let userPos = null;
+let currentDetailPoi = null; // Aktuell angezeigter POI — sicher für onclick-Attribute
+let sheetJustOpened = false; // Verhindert sofortiges Schließen nach Öffnen
+
+// Layer-Farben (rollierend)
+const LAYER_COLORS = ['#c8a95a','#8fb87a','#7eb8c9','#c47eb5','#e07a5f','#9a9589','#639922','#4a90d9'];
+let colorIdx = Object.keys(JSON.parse(localStorage.getItem('safari-layers') || '{}')).length % LAYER_COLORS.length;
+function nextColor() { return LAYER_COLORS[colorIdx++ % LAYER_COLORS.length]; }
+
+// ── IndexedDB ──────────────────────────────────────────────────────
+let db = null;
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('safari-pois-db', 2); // v2: + 'routen' (GPX-Tracks/-Routen als Linien)
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('pois')) {
+        d.createObjectStore('pois', { keyPath: 'id' });
+      }
+      if (!d.objectStoreNames.contains('routen')) {
+        d.createObjectStore('routen', { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = e => { db = e.target.result; resolve(db); };
+    req.onerror = e => reject(e);
+  });
+}
+
+// ── Routen-Store (GPX trk/rte → Linien auf der Karte) ──
+function dbRoutenAlle() {
+  return new Promise((resolve, reject) => {
+    const req = db.transaction('routen', 'readonly').objectStore('routen').getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = e => reject(e);
+  });
+}
+function dbRoutePut(r) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('routen', 'readwrite');
+    tx.objectStore('routen').put(r);
+    tx.oncomplete = resolve;
+    tx.onerror = e => reject(e);
+  });
+}
+function dbRouteDel(id) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('routen', 'readwrite');
+    tx.objectStore('routen').delete(id);
+    tx.oncomplete = resolve;
+    tx.onerror = e => reject(e);
+  });
+}
+
+function dbGetAll() {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('pois', 'readonly');
+    const req = tx.objectStore('pois').getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = e => reject(e);
+  });
+}
+
+function dbPutAll(items) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('pois', 'readwrite');
+    const store = tx.objectStore('pois');
+    items.forEach(item => store.put(item));
+    tx.oncomplete = resolve;
+    tx.onerror = e => reject(e);
+  });
+}
+
+function dbDeleteByLayer(layerKey) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('pois', 'readwrite');
+    const store = tx.objectStore('pois');
+    const req = store.getAll();
+    req.onsuccess = () => {
+      req.result.forEach(p => {
+        if ((p.layer || 'manuell') === layerKey) store.delete(p.id);
+      });
+      tx.oncomplete = resolve;
+    };
+    req.onerror = e => reject(e);
+  });
+}
+
+function dbClear() {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('pois', 'readwrite');
+    tx.objectStore('pois').clear();
+    tx.oncomplete = resolve;
+    tx.onerror = e => reject(e);
+  });
+}
+
+function saveLayers() {
+  localStorage.setItem('safari-layers', JSON.stringify(layers));
+}
+
+function savePois() {
+  // POIs werden direkt per dbPutAll gespeichert — hier nur layers
+  saveLayers();
+}
+
+function getVisiblePois() {
+  return pois.filter(p => {
+    const layerKey = p.layer || 'manuell';
+    return layers[layerKey]?.visible !== false;
+  });
+}
+
+// ── Bug 10: verwaiste POIs sichtbar halten ─────────────────────────
+// POIs liegen in IndexedDB (safari-pois-db), die Layer-Definitionen aber in
+// localStorage (safari-layers) — ZWEI getrennte Speicher. Verliert/leert Safari
+// den localStorage (ITP räumt ihn nach ~7 Tagen ohne Interaktion, IndexedDB
+// überlebt länger), fehlt der Layer-Key. rebuildAllClusters() iteriert über
+// Object.keys(layers) und rendert solche POIs dann NICHT — sie erscheinen zwar
+// noch in der Liste (dort gilt „Layer fehlt" = sichtbar), aber nicht auf der Karte.
+// Fix: fehlende Layer vor jedem Rendern aus den vorhandenen POIs rekonstruieren.
+function ensureLayersForPois() {
+  let created = false;
+  pois.forEach(p => {
+    const key = p.layer || 'manuell';
+    if (!layers[key]) {
+      layers[key] = { visible: true, color: nextColor(), name: key };
+      created = true;
+    }
+  });
+  if (created) saveLayers();
+  return created;
+}
+
+function makeClusterGroup(layerColor) {
+  if (typeof L.markerClusterGroup !== 'function') return null;
+  return L.markerClusterGroup({
+    chunkedLoading: true,
+    maxClusterRadius: 40,
+    disableClusteringAtZoom: 11,
+    spiderfyOnMaxZoom: false,
+    showCoverageOnHover: false,
+    iconCreateFunction: cluster => {
+      const count = cluster.getChildCount();
+      return L.divIcon({
+        html: `<div style="width:36px;height:36px;border-radius:50%;background:rgba(200,169,90,0.85);display:flex;align-items:center;justify-content:center;font-family:monospace;font-size:12px;font-weight:700;color:#0f0e0c;border:2px solid ${layerColor};box-shadow:0 2px 6px rgba(0,0,0,0.4)">${count}</div>`,
+        iconSize: [36, 36], className: ''
+      });
+    }
+  });
+}
+
+// Alle Cluster-Groups komplett neu aufbauen (nur beim Start oder nach Import)
+function rebuildAllClusters() {
+  ensureLayersForPois(); // Bug 10: verwaiste POIs (Layer-Key fehlt) sonst unsichtbar
+  // Bug 10: Im Vektor-Modus ist die Leaflet-Instanz `map` null (setTileSource entfernt sie).
+  // Der map-Guard darunter riss diese Zeile bisher mit → Import/Filter zeichneten die
+  // MapLibre-Marker NICHT neu (importierte POIs blieben bis zum Reload unsichtbar).
+  // Darum den MapLibre-Zweig VOR dem map-Guard behandeln.
+  if (mapType === 'maplibre') { if (mlMap) renderMarkersMaplibre(); return; }
+  if (!map) return; // Bug 8: Karte konnte nicht initialisiert werden (Banner erklärt es)
+
+  // Alte Groups entfernen
+  Object.values(clusterGroups).forEach(g => { try { map.removeLayer(g); } catch(e){} });
+  markers.forEach(m => { try { map.removeLayer(m); } catch(e){} });
+  clusterGroups = {}; markers = [];
+
+  const useCluster = typeof L.markerClusterGroup === 'function';
+
+  // Pro Layer eine Group anlegen
+  Object.keys(layers).forEach(key => {
+    const layerPois = pois.filter(p => (p.layer || 'manuell') === key);
+    const layerColor = layers[key]?.color || '#c8a95a';
+    const group = useCluster ? makeClusterGroup(layerColor) : null;
+    clusterGroups[key] = group;
+
+    const filtered = currentFilter === 'all'
+      ? layerPois
+      : layerPois.filter(p => p.type === currentFilter);
+
+    filtered.forEach(poi => {
+      const t = TYPES[poi.type] || TYPES.custom;
+      const icon = L.divIcon({
+        html: `<div style="width:32px;height:32px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${t.bg};border:2px solid ${layerColor};display:flex;align-items:center;justify-content:center;cursor:pointer"><span style="transform:rotate(45deg);font-size:13px;pointer-events:none">${t.icon}</span></div>`,
+        iconSize: [32, 32], iconAnchor: [16, 32], className: ''
+      });
+      const m = L.marker([poi.lat, poi.lng], { icon });
+      m._poi = poi;
+      // Click direkt am Marker — zuverlässiger als group.on('click') in MarkerCluster 1.5.3
+      m.on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+        showDetail(poi);
+      });
+      m.on('contextmenu', (e) => {
+        L.DomEvent.stopPropagation(e);
+        quickAddFavorite(poi);
+      });
+      if (group) group.addLayer(m);
+      else {
+        m.addTo(map);
+        markers.push(m);
+      }
+    });
+
+    // Nur sichtbare Layer zur Karte hinzufügen
+    if (layers[key]?.visible !== false) {
+      if (group) map.addLayer(group);
+    }
+  });
+}
+
+// Nur Sichtbarkeit umschalten — KEIN Neuaufbau
+function renderMarkers() {
+  rebuildAllClusters();
+}
+
+// Bug 10: Nach einem Import auf die neuen POIs springen. loadPreset() macht das
+// via map.setView(), der Datei-Import bisher NICHT — lagen die importierten POIs
+// außerhalb des Sichtfelds, wirkten sie „verschwunden". Funktioniert in beiden
+// Karten-Modi (Leaflet + MapLibre).
+function focusPois(list) {
+  if (!list || !list.length) return;
+  const lats = list.map(p => p.lat), lngs = list.map(p => p.lng);
+  // 2026-09-05-1: Schleife statt Math.min(...lats) — bei > ~65 000 Punkten (ganz Südafrika) sprengt der Spread den Aufruf-Stack (Safari)
+  let minLat = Infinity, minLng = Infinity, maxLat = -Infinity, maxLng = -Infinity;
+  for (let i = 0; i < list.length; i++) { const la = lats[i], ln = lngs[i]; if (la < minLat) minLat = la; if (la > maxLat) maxLat = la; if (ln < minLng) minLng = ln; if (ln > maxLng) maxLng = ln; }
+  const sw = [minLat, minLng];
+  const ne = [maxLat, maxLng];
+  if (mapType === 'maplibre' && mlMap) {
+    if (list.length === 1) mlMap.flyTo({ center: [lngs[0], lats[0]], zoom: 12 });
+    else mlMap.fitBounds([[sw[1], sw[0]], [ne[1], ne[0]]], { padding: 60, maxZoom: 12, duration: 800 });
+  } else if (map) {
+    if (list.length === 1) map.setView([lats[0], lngs[0]], 12);
+    else map.fitBounds([sw, ne], { padding: [40, 40], maxZoom: 12 });
+  }
+}
+
+function setFilter(el) {
+  document.querySelectorAll('#filter-bar .filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  currentFilter = el.dataset.filter;
+  renderMarkers();
+}
+
+function setFilterList(el) {
+  el.closest('.filter-bar').querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  listFilter = el.dataset.filter;
+  renderList();
+}
+
+let listPage = 0;
+const LIST_PAGE_SIZE = 150;
+
+function renderList(append = false) {
+  const el = document.getElementById('poi-list');
+  const filtered = (listFilter === 'all' ? pois : pois.filter(p => p.type === listFilter))
+    .filter(p => layers[p.layer || 'manuell']?.visible !== false);
+
+  if (filtered.length === 0) {
+    el.innerHTML = '<div class="empty-state">Noch keine POIs geladen.<br>Importiere eine GPX-Datei<br>oder lade Demo-Daten.</div>';
+    return;
+  }
+
+  if (!append) {
+    listPage = 0;
+    el.innerHTML = '';
+  }
+
+  // Sortieren nach Distanz falls GPS verfügbar
+  if (!append && userPos) {
+    filtered.sort((a,b) => dist(userPos, a) - dist(userPos, b));
+  }
+
+  const start = listPage * LIST_PAGE_SIZE;
+  const slice = filtered.slice(start, start + LIST_PAGE_SIZE);
+  listPage++;
+
+  // "Mehr laden" Button entfernen falls vorhanden
+  const existingMore = document.getElementById('list-load-more');
+  if (existingMore) existingMore.remove();
+
+  const fragment = document.createDocumentFragment();
+  slice.forEach(p => {
+    const t = TYPES[p.type] || TYPES.custom;
+    const d = userPos ? formatDist(dist(userPos, p)) : '';
+    const div = document.createElement('div');
+    div.className = 'list-item';
+    div.innerHTML = `
+      <div class="poi-icon" style="background:${t.bg}">${t.icon}</div>
+      <div class="list-content">
+        <div class="list-name">${esc(p.name)}</div>
+        <div class="list-meta">${t.label}${p.country ? ' · '+esc(p.country) : ''}</div>
+      </div>
+      ${d ? `<div class="list-dist">${d}</div>` : ''}`;
+    div.onclick = () => showDetail(p);
+    fragment.appendChild(div);
+  });
+  el.appendChild(fragment);
+
+  // "Mehr laden" Button wenn noch mehr vorhanden
+  if (start + LIST_PAGE_SIZE < filtered.length) {
+    const remaining = filtered.length - (start + LIST_PAGE_SIZE);
+    const btn = document.createElement('div');
+    btn.id = 'list-load-more';
+    btn.style.cssText = 'text-align:center;padding:14px;font-size:11px;color:var(--accent);cursor:pointer;border-top:1px solid var(--border)';
+    btn.textContent = `↓ Weitere ${Math.min(remaining, LIST_PAGE_SIZE)} von ${remaining} laden`;
+    btn.onclick = () => renderList(true);
+    el.appendChild(btn);
+  } else {
+    const info = document.createElement('div');
+    info.style.cssText = 'text-align:center;padding:10px;font-size:10px;color:var(--text3)';
+    info.textContent = `${filtered.length} POIs gesamt`;
+    el.appendChild(info);
+  }
+}
+
+function showDetailById(id) {
+  const poi = pois.find(p => p.id === id);
+  if (poi) showDetail(poi);
+}
+
+// Favoriten-Einträge liegen als Kopien in den Listen (nicht zwingend in pois[]) — daher über Index
+// der aktuell gewählten Liste, statt den POI als JSON in ein onclick-Attribut zu schreiben (XSS-Fix 2026-09-05-1).
+function showFavDetail(idx) {
+  const sel = document.getElementById('fav-list-select');
+  const lists = getFavLists();   // 2026-09-12 (H7): hier stand ein nie definierter Funktionsname — das Detail-Sheet der Favoriten öffnete nie
+  const items = sel && lists[sel.value] ? lists[sel.value] : [];
+  if (items[idx]) showDetail(items[idx]);
+}
+
+async function kopierePoiPosition() {
+  if (!currentDetailPoi) return;
+  showToast(await kopiereText(positionText(Number(currentDetailPoi.lat), Number(currentDetailPoi.lng), currentDetailPoi.name + ':'), '📋 Position kopiert (DD · DMS · Plus Code)'));
+}
+
+function quickAddFavoriteById(id) {
+  const poi = pois.find(p => p.id === id);
+  if (poi) quickAddFavorite(poi);
+}
+
+function showDetail(poi) {
+  currentDetailPoi = poi;
+  const pf = positionFormate(Number(poi.lat), Number(poi.lng)) || { dd: '–', dms: '–', plus: '–' };
+  sheetJustOpened = true;
+  setTimeout(() => { sheetJustOpened = false; }, 350);
+  const t = TYPES[poi.type] || TYPES.custom;
+  const d = userPos ? formatDist(dist(userPos, poi)) : 'unbekannt';
+  const favLists = getFavLists();
+  const listNames = Object.keys(favLists);
+
+  let favHtml;
+  if (listNames.length === 0) {
+    favHtml = `<button class="sheet-action" style="width:100%;margin-top:4px" onclick="newFavListAndAdd(currentDetailPoi)">⭐ Neue Liste erstellen &amp; speichern</button>`;
+  } else {
+    favHtml = `
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px">⭐ In Favoritenliste speichern</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="fav-select-inline" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none">
+          ${listNames.map(n=>`<option>${esc(n)}</option>`).join('')}
+        </select>
+        <button class="sheet-action primary" style="flex-shrink:0" onclick="addToFavInline(currentDetailPoi)">⭐ Speichern</button>
+      </div>`;
+  }
+
+  document.getElementById('sheet-body').innerHTML = `
+    <div class="sheet-icon-row">
+      <div class="sheet-icon" style="background:${t.bg}">${t.icon}</div>
+      <div><div class="sheet-title">${esc(poi.name)}</div><div class="sheet-type">${t.label}</div></div>
+    </div>
+    ${poi.desc ? `<div class="sheet-desc">${esc(poi.desc)}</div>` : ''}
+    <div class="sheet-meta-grid">
+      <div class="sheet-meta-card" style="grid-column:1 / -1"><div class="sheet-meta-label">Koordinaten · antippen = kopieren (für Funk/SMS)</div>
+        <div class="sheet-meta-val" style="font-size:12px;cursor:pointer;line-height:1.6" onclick="kopierePoiPosition()" title="Alle drei Formate kopieren">${esc(pf.dd)}<br><span style="color:var(--text2)">${esc(pf.dms)}</span><br><span style="color:var(--text2)">Plus Code ${esc(pf.plus)}</span></div></div>
+      <div class="sheet-meta-card"><div class="sheet-meta-label">Entfernung</div><div class="sheet-meta-val">${d}</div></div>
+      ${poi.country ? `<div class="sheet-meta-card"><div class="sheet-meta-label">Land</div><div class="sheet-meta-val">${esc(poi.country)}</div></div>` : ''}
+      ${poi.source ? `<div class="sheet-meta-card"><div class="sheet-meta-label">Quelle</div><div class="sheet-meta-val">${esc(poi.source)}</div></div>` : ''}
+    </div>
+    <div class="sheet-actions">
+      <button class="sheet-action" onclick="flyTo(currentDetailPoi.lat, currentDetailPoi.lng)">Auf Karte</button>
+      <button class="sheet-action" onclick="askAssistant(currentDetailPoi.name, currentDetailPoi.type)">KI fragen ↗</button>
+      <button class="sheet-action primary" onclick="openInOsmAnd(currentDetailPoi.lat, currentDetailPoi.lng)">OsmAnd</button>
+    </div>
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">${favHtml}</div>`;
+  document.getElementById('sheet-overlay').classList.add('open');
+  document.getElementById('detail-sheet').classList.add('open');
+}
+
+function closeSheet() {
+  if (sheetJustOpened) return; // Sofortiges Schließen verhindern
+  document.getElementById('sheet-overlay').classList.remove('open');
+  document.getElementById('detail-sheet').classList.remove('open');
+}
+
+function flyTo(lat, lng) {
+  closeSheet();
+  showTab('map');
+  if (mapType === 'maplibre' && mlMap) {
+    mlMap.flyTo({ center: [lng, lat], zoom: 13 });
+  } else if (map) {
+    map.flyTo([lat, lng], 13, { duration: 1 });
+  }
+}
+
+function openInOsmAnd(lat, lng) {
+  window.location = `osmand.geo:${lat},${lng}?z=14`;
+}
+
+function askAssistant(name, type) {
+  closeSheet();
+  const questions = {
+    water: `Ich bin an einer Wasserstelle namens "${name}". Was muss ich beim Auffüllen von Trinkwasser in Afrika beachten? Wie filtere und desinfiziere ich das Wasser sicher?`,
+    camp: `Wir campen heute bei "${name}". Welche Sicherheitschecks sollte ich beim Aufstellen des Camps in Südafrika durchführen? Worauf bei Wildtieren achten?`,
+    mechanic: `Ich bin beim Mechaniker "${name}" in Afrika. Welche Servicearbeiten sollte ich am Toyota HZJ78 jetzt durchführen lassen? Was ist typisch für diese Region?`,
+    vet: `Wir sind beim Tierarzt "${name}" in Afrika und reisen mit Hund durchs südliche und östliche Afrika. Welche Checks und Mittel sind hier sinnvoll (Herzwurm-Prophylaxe, Zecken/Babesiose, Tollwut-Titer-Dokumente)? Welche Fragen sollte ich dem Tierarzt stellen?`,
+    hospital: `Wir sind am Krankenhaus/der Klinik "${name}". Worauf sollte ich bei medizinischer Behandlung in dieser Region achten (Malaria-Schnelltest aktiv einfordern, Hygiene-Standards, Bezahlung/Versicherungsnachweis, wann an Evakuierung denken)?`,
+    border: `Wir nähern uns dem Grenzübergang "${name}". Was brauchen wir typischerweise an Dokumenten und worauf sollten wir achten?`,
+    fuel: `Wir tanken bei "${name}". Welche Kraftstoffqualität gibt es in dieser Region und muss ich etwas am HZJ78 beachten?`,
+    danger: `Wir passieren eine markierte Gefahrenstelle "${name}". Was könnten typische Gefahren in dieser Region sein und wie verhält man sich richtig?`
+  };
+  const q = questions[type] || `Wir sind bei "${name}". Was sollten wir hier wissen?`;
+  localStorage.setItem('safari-nav-question', q);
+  window.location = 'index.html?nav=1';
+}
+
+// ── NÄCHSTER-POI-SUCHE (Distanz von meiner Position) ───────────────
+function nearestSearch() {
+  const run = (pos, posLabel) => {
+    const typeKeys = Object.keys(TYPES);
+    const labels = typeKeys.map((k,i) => `${i+1}: ${TYPES[k].icon} ${TYPES[k].label}`).join('\n');
+    const input = prompt(`🧭 Nächster POI (von ${posLabel}):\n\n${labels}\n\nNummer:`);
+    if (!input) return;
+    const type = typeKeys[parseInt(input) - 1];
+    if (!type) return;
+    const candidates = getVisiblePois().filter(p => p.type === type);
+    if (candidates.length === 0) {
+      alert(`Keine POIs vom Typ „${TYPES[type].label}" geladen.\nErst importieren (GPX/KML/Overpass) oder Demo-Daten laden.`);
+      return;
+    }
+    candidates.sort((a,b) => dist(pos,a) - dist(pos,b));
+    const top = candidates.slice(0, 5);
+    const list = top.map((p,i) => `${i+1}: ${p.name} — ${formatDist(dist(pos,p))}${p.country ? ' ('+p.country+')' : ''}`).join('\n');
+    const pick = prompt(`🧭 ${TYPES[type].icon} ${TYPES[type].label} — nächste von ${posLabel}:\n\n${list}\n\nNummer (Enter = 1):`) || '1';
+    const chosen = top[parseInt(pick) - 1] || top[0];
+    flyTo(chosen.lat, chosen.lng);
+    setTimeout(() => showDetail(chosen), 450);
+  };
+  if (userPos) { run(userPos, 'GPS-Position'); return; }
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      p => { userPos = { lat: p.coords.latitude, lng: p.coords.longitude }; run(userPos, 'GPS-Position'); },
+      () => { // iOS blockiert GPS über http:// — Kartenmitte als Fallback, NIE still scheitern
+        const c = mapCenter();
+        if (c) { showToast('⚠️ Kein GPS — Kartenmitte als Position'); run(c, 'Kartenmitte'); }
+        else alert('GPS nicht verfügbar und keine Karte geladen.');
+      }
+    );
+  } else {
+    const c = mapCenter();
+    if (c) { showToast('⚠️ Kein GPS — Kartenmitte als Position'); run(c, 'Kartenmitte'); }
+    else alert('GPS nicht verfügbar.');
+  }
+}
+
+function mapCenter() {
+  if (mapType === 'maplibre' && mlMap) { const c = mlMap.getCenter(); return { lat: c.lat, lng: c.lng }; }
+  if (map) { const c = map.getCenter(); return { lat: c.lat, lng: c.lng }; }
+  return null;
+}
+
+let posMarker = null, posKreis = null, posMarkerMl = null;  // genau EIN Standort-Marker (2026-09-05-1)
+function zeigeStandort(lat, lng, acc) {
+  if (mapType === 'maplibre' && mlMap) {
+    if (!posMarkerMl) posMarkerMl = new maplibregl.Marker({ color: '#7eb8c9' });
+    posMarkerMl.setLngLat([lng, lat]).addTo(mlMap);
+  } else if (map) {
+    if (posMarker) { posMarker.setLatLng([lat, lng]); } else { posMarker = L.circleMarker([lat, lng], { radius: 8, fillColor: '#7eb8c9', fillOpacity: 1, color: '#fff', weight: 2 }).addTo(map); }
+    posMarker.bindPopup(`Du bist hier<br><span style="font-size:11px">${esc(positionText(lat, lng))}</span>`);
+    if (acc && acc > 25) { if (posKreis) { posKreis.setLatLng([lat, lng]).setRadius(acc); } else { posKreis = L.circle([lat, lng], { radius: acc, color: '#7eb8c9', weight: 1, fillOpacity: 0.08 }).addTo(map); } }
+    else if (posKreis) { map.removeLayer(posKreis); posKreis = null; }
+  }
+}
+function locateMe() {
+  if (!navigator.geolocation) { showToast('⚠️ GPS nicht verfügbar (Browser ohne Standortdienst)'); return; }
+  showToast('🛰 Position wird ermittelt …');
+  navigator.geolocation.getCurrentPosition(pos => {
+    userPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    const acc = Math.round(pos.coords.accuracy || 0);
+    if (mapType === 'maplibre' && mlMap) mlMap.flyTo({ center: [userPos.lng, userPos.lat], zoom: 12 });
+    else if (map) map.flyTo([userPos.lat, userPos.lng], 12);
+    zeigeStandort(userPos.lat, userPos.lng, acc);
+    renderList();
+    showToast(`📍 ${formatDD(userPos.lat, userPos.lng)}${acc ? ` · ±${acc} m` : ''} · Plus Code ${plusCode(userPos.lat, userPos.lng)} — 📍-Button lang drücken = kopieren`);
+    zeigeWarnlage(acc);
+  }, err => {
+    const grund = err && err.code === 1 ? 'Zugriff verweigert — Standortfreigabe im Browser erlauben (über http:// blockt Safari GPS oft; localhost geht)'
+      : err && err.code === 3 ? 'Zeitüberschreitung — freie Sicht zum Himmel?' : 'kein Fix';
+    showToast('⚠️ GPS: ' + grund);
+  }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 });
+}
+async function kopiereStandort() {
+  if (!userPos) { showToast('Noch keine Position — erst 📍 antippen'); return; }
+  showToast(await kopiereText(positionText(userPos.lat, userPos.lng, 'Mein Standort:'), '📋 Standort kopiert (DD · DMS · Plus Code)'));
+}
+
+async function createPoiAtLocation(latlng) {
+  const name = prompt(`📍 Neuer POI\nKoordinaten: ${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}\n\nName:`);
+  if (!name) return;
+  const desc = prompt('Beschreibung (optional):') || '';
+  const typeLabels = Object.entries(TYPES).map(([k,v],i) => `${i+1}: ${v.icon} ${v.label}`).join('\n');
+  const t = prompt(`Typ:\n${typeLabels}\n\nNummer:`);
+  const typeKeys = Object.keys(TYPES);
+  const type = typeKeys[(parseInt(t)||1) - 1] || 'custom';
+
+  if (!layers['manuell']) layers['manuell'] = { visible: true, color: '#9a9589', name: 'manuell' };
+  const poi = { id: Date.now(), name, desc, type, lat: latlng.lat, lng: latlng.lng, source: 'Manuell', layer: 'manuell' };
+  await dbPutAll([poi]);
+  pois.push(poi);
+  saveLayers();
+  rebuildAllClusters();
+  renderList();
+  showToast(`✅ "${name}" gespeichert`);
+}
+
+
+async function addCustomPOI() {
+  const name = prompt('Name des POI:');
+  if (!name) return;
+  const desc = prompt('Beschreibung (optional):') || '';
+  const types = Object.keys(TYPES).map((k,i) => `${i+1}: ${TYPES[k].label}`).join('\n');
+  const t = prompt('Typ:\n' + types + '\n\nNummer eingeben:');
+  const typeKeys = Object.keys(TYPES);
+  const type = typeKeys[parseInt(t)-1] || 'custom';
+  if (!layers['manuell']) layers['manuell'] = { visible: true, color: '#9a9589', name: 'manuell' };
+  const speichern = async (lat, lng) => {
+    const poi = { id: Date.now(), name, desc, type, lat, lng, source: 'Manuell', layer: 'manuell' };
+    await dbPutAll([poi]);
+    pois.push(poi);
+    saveLayers();
+    rebuildAllClusters();
+    renderList();
+    showToast(`✅ "${name}" gespeichert (${formatDD(lat, lng)})`);
+  };
+  // 2026-09-05-1: Position wahlweise sofort vom GPS (im Fahrzeug der Normalfall) — sonst Karte antippen.
+  // Vorher: map.once() warf im Vektor-Modus (map = null), der Hinweis danach erschien nie.
+  if (userPos && confirm(`"${name}" an meiner aktuellen Position speichern?\n(${formatDD(userPos.lat, userPos.lng)})\n\nAbbrechen = Punkt auf der Karte antippen`)) {
+    await speichern(userPos.lat, userPos.lng);
+    return;
+  }
+  if (mapType === 'maplibre' && mlMap) {
+    mlMap.once('click', async e => { await speichern(e.lngLat.lat, e.lngLat.lng); });
+  } else if (map) {
+    map.once('click', async e => { await speichern(e.latlng.lat, e.latlng.lng); });
+  } else {
+    showToast('⚠️ Keine Karte geladen — POI kann nicht platziert werden'); return;
+  }
+  showToast('👆 Auf die Karte tippen, um den POI zu platzieren');
+}
+
+// ── FAVORITEN ──────────────────────────────────────────────────
+function getFavLists() { return JSON.parse(localStorage.getItem('safari-fav-lists') || '{}'); }
+function saveFavLists(lists) { localStorage.setItem('safari-fav-lists', JSON.stringify(lists)); }
+
+function quickAddFavorite(poi) {
+  const lists = getFavLists();
+  const listNames = Object.keys(lists);
+
+  if (listNames.length === 0) {
+    const name = prompt(`⭐ "${poi.name}"\nKeine Listen vorhanden. Neue Liste erstellen:`);
+    if (!name) return;
+    lists[name] = [poi];
+    saveFavLists(lists);
+    showToast(`⭐ In neue Liste "${name}" gespeichert`);
+    return;
+  }
+
+  if (listNames.length === 1) {
+    // Nur eine Liste — direkt speichern
+    const name = listNames[0];
+    if (!lists[name].find(p => p.id === poi.id)) {
+      lists[name].push(poi);
+      saveFavLists(lists);
+    }
+    showToast(`⭐ In "${name}" gespeichert`);
+    return;
+  }
+
+  // Mehrere Listen — kurzes Auswahlmenü
+  const choice = listNames.map((n, i) => `${i+1}: ${n}`).join('\n');
+  const input = prompt(`⭐ "${poi.name}" speichern in:\n\n${choice}\n\nNummer eingeben:`);
+  if (!input) return;
+  const idx = parseInt(input) - 1;
+  if (idx >= 0 && idx < listNames.length) {
+    const name = listNames[idx];
+    if (!lists[name].find(p => p.id === poi.id)) {
+      lists[name].push(poi);
+      saveFavLists(lists);
+    }
+    showToast(`⭐ In "${name}" gespeichert`);
+  }
+}
+
+function showToast(msg) {
+  let toast = document.getElementById('poi-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'poi-toast';
+    toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--accent);color:var(--text);font-family:var(--mono);font-size:12px;padding:10px 20px;border-radius:20px;z-index:2000;box-shadow:0 4px 16px rgba(0,0,0,0.5);pointer-events:none;transition:opacity 0.3s';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.opacity = '1';
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => { toast.style.opacity = '0'; }, 2000);
+}
+
+
+function newFavList() {
+  const name = prompt('Name der Liste (z.B. "Namibia Pflichthalte", "Notfall-Wasserstellen"):');
+  if (!name) return;
+  const lists = getFavLists();
+  if (!lists[name]) lists[name] = [];
+  saveFavLists(lists);
+  renderFavorites();
+}
+
+function deleteFavList() {
+  const sel = document.getElementById('fav-list-select');
+  const name = sel?.value;
+  if (!name) return;
+  if (!confirm(`Liste "${name}" löschen?`)) return;
+  const lists = getFavLists();
+  delete lists[name];
+  saveFavLists(lists);
+  renderFavorites();
+}
+
+function addToFavInline(poi) {
+  const sel = document.getElementById('fav-select-inline');
+  const listName = sel?.value;
+  if (!listName) return;
+  const lists = getFavLists();
+  if (!lists[listName]) lists[listName] = [];
+  if (!lists[listName].find(p => p.id === poi.id)) {
+    lists[listName].push(poi);
+    saveFavLists(lists);
+    const btn = sel.nextElementSibling;
+    if (btn) { btn.textContent = '✓ Gespeichert'; setTimeout(() => { btn.textContent = '⭐ Speichern'; }, 1500); }
+  }
+}
+
+function newFavListAndAdd(poi) {
+  const name = prompt('Name der neuen Liste:');
+  if (!name) return;
+  const lists = getFavLists();
+  if (!lists[name]) lists[name] = [];
+  if (!lists[name].find(p => p.id === poi.id)) lists[name].push(poi);
+  saveFavLists(lists);
+  alert(`POI in neue Liste "${name}" gespeichert.`);
+}
+
+function removeFromFav(listName, poiId) {
+  const lists = getFavLists();
+  if (lists[listName]) lists[listName] = lists[listName].filter(p => String(p.id) !== String(poiId));
+  saveFavLists(lists);
+  renderFavorites();
+}
+
+function renderFavorites() {
+  const lists = getFavLists();
+  const listNames = Object.keys(lists);
+  const sel = document.getElementById('fav-list-select');
+  const listEl = document.getElementById('fav-list');
+  if (!sel || !listEl) return;
+
+  // Dropdown aktualisieren
+  const current = sel.value;
+  sel.innerHTML = listNames.length === 0
+    ? '<option value="">— Keine Listen —</option>'
+    : listNames.map(n => `<option ${n===current?'selected':''}>${esc(n)}</option>`).join('');
+
+  const selected = sel.value;
+  if (!selected || !lists[selected]) {
+    listEl.innerHTML = '<div class="empty-state">Keine Liste ausgewählt.<br>Mit "+ Liste" eine neue erstellen.</div>';
+    return;
+  }
+  const items = lists[selected];
+  if (items.length === 0) {
+    listEl.innerHTML = '<div class="empty-state">Noch keine POIs in dieser Liste.<br>POI antippen → ⭐ Speichern</div>';
+    return;
+  }
+  listEl.innerHTML = items.map((p, idx) => {
+    const t = TYPES[p.type] || TYPES.custom;
+    const d = userPos ? formatDist(dist(userPos, p)) : '';
+    return `<div class="list-item">
+      <div class="poi-icon" style="background:${t.bg}" onclick="showFavDetail(${idx})">${t.icon}</div>
+      <div class="list-content" onclick="showFavDetail(${idx})" style="cursor:pointer">
+        <div class="list-name">${esc(p.name)}</div>
+        <div class="list-meta">${t.label}${p.country ? ' · '+esc(p.country) : ''}</div>
+      </div>
+      ${d ? `<div class="list-dist">${d}</div>` : ''}
+      <button data-list="${esc(selected)}" data-id="${esc(String(p.id))}" onclick="removeFromFav(this.dataset.list, this.dataset.id)" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:4px;flex-shrink:0">✕</button>
+    </div>`;
+  }).join('');
+}
+
+// 2026-09-05-1: Drag & Drop + Mehrfachauswahl laufen über denselben Pfad wie der Datei-Dialog
+function importDateien(files) {
+  for (const f of Array.from(files || [])) importFile({ target: { files: [f] } });
+}
+function importFile(e) {
+  const files = e.target.files || [];
+  if (files.length > 1) { importDateien(files); try { e.target.value = ''; } catch (_) {} return; }   // 2026-09-12 (N7): Mehrfachauswahl im Dialog
+  const file = files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async ev => {
+    const text = ev.target.result;
+    let imported = [], routenNeu = [];
+    const ext = file.name.toLowerCase();  // 2026-09-05-1: Garmin schreibt TRACK.GPX — Großbuchstaben wurden vorher still ignoriert
+    try {
+      if (ext.endsWith('.gpx')) { imported = parseGPX(text, file.name); routenNeu = parseGPXRouten(text, file.name); }
+      else if (ext.endsWith('.kml')) imported = parseKML(text, file.name);
+      else if (ext.endsWith('.json') || ext.endsWith('.geojson')) imported = parseOverpass(text, file.name);
+      else { showToast(`⚠️ "${file.name}": unbekanntes Format — erwartet .gpx, .kml, .json oder .geojson`); return; }
+    } catch (err) {
+      showToast('⚠️ Import fehlgeschlagen: ' + (err && err.message ? err.message : err));
+      return;
+    }
+    if (!imported.length && !routenNeu.length) { showToast(`⚠️ "${file.name}": keine Wegpunkte/Tracks gefunden — Datei leer oder anderes Schema?`); return; }
+    // GPX-Tracks/-Routen als Linien übernehmen (reine Track-Dateien haben 0 Wegpunkte)
+    if (routenNeu.length) {
+      for (const r of routenNeu) await dbRoutePut(r);
+      routen = [...routen, ...routenNeu];
+      renderRouten();
+    }
+    // Layer anlegen falls neu
+    if (!layers[file.name]) {
+      layers[file.name] = { visible: true, color: nextColor(), name: file.name };
+    }
+    // In IndexedDB speichern
+    await dbPutAll(imported);
+    pois = [...pois, ...imported];
+    layers[file.name].count = pois.filter(p => p.layer === file.name).length;
+    saveLayers();
+    rebuildAllClusters();
+    renderList();
+    renderLayerList();
+    showTab('map');
+    if (imported.length) focusPois(imported); // Bug 10: zu den frisch importierten POIs springen
+    else if (routenNeu.length) routeZoom(routenNeu[0].id);
+    const ohneName = imported.filter(p => /^Wegpunkt \d+$|^POI \d+$|^Ort \d+$/.test(p.name || '')).length;
+    showToast(`✅ ${imported.length} POIs${ohneName ? ` (${ohneName} ohne Namen)` : ''}${routenNeu.length ? ` + ${routenNeu.length} Route(n)/Track(s) (${routenNeu.map(r => r.dist + ' km').join(', ')})` : ''} aus "${file.name}" importiert`);
+  };
+  reader.onerror = () => showToast(`⚠️ "${file.name}" konnte nicht gelesen werden`);
+  reader.readAsText(file);
+  document.getElementById('gpx-file').value = '';
+}
+
+function xmlOderFehler(text) {
+  const doc = new DOMParser().parseFromString(text, 'text/xml');
+  const pe = doc.querySelector('parsererror');
+  if (pe) throw new Error('XML ungültig — ' + (pe.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 140));
+  return doc;
+}
+
+// 2026-09-12 (Re-Audit H5): IDs waren Date.now()+i — zwei Dateien mit je 500 Punkten in derselben Sekunde
+// überschrieben sich in IndexedDB (put = Upsert): 489 von 1000 Kliniken verschwanden nach dem Reload.
+function neueId() { return (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2, 10); }
+function parseGPX(text, layerName) {
+  const doc = xmlOderFehler(text);
+  const wpts = [...doc.querySelectorAll('wpt')];
+  return wpts.map((w, i) => ({
+    id: neueId(),
+    name: w.querySelector('name')?.textContent || 'Wegpunkt ' + (i+1),
+    desc: w.querySelector('desc')?.textContent || '',
+    lat: parseFloat(w.getAttribute('lat')),
+    lng: parseFloat(w.getAttribute('lon')),
+    type: guessType(w.querySelector('name')?.textContent || '', w.querySelector('desc')?.textContent || ''),
+    source: 'GPX Import',
+    layer: layerName || 'manuell'
+  })).filter(p => !isNaN(p.lat) && !isNaN(p.lng));
+}
+
+function parseKML(text, layerName) {
+  const parser = { parseFromString: t => xmlOderFehler(t) };
+  const doc = parser.parseFromString(text, 'text/xml');
+  const placemarks = [...doc.querySelectorAll('Placemark')];
+  return placemarks.map((p, i) => {
+    const coords = p.querySelector('coordinates')?.textContent?.trim().split(',');
+    if (!coords || coords.length < 2) return null;
+    return {
+      id: neueId(),
+      name: p.querySelector('name')?.textContent || 'Ort ' + (i+1),
+      desc: p.querySelector('description')?.textContent || '',
+      lat: parseFloat(coords[1]), lng: parseFloat(coords[0]),
+      type: guessType(p.querySelector('name')?.textContent || '', ''),
+      source: 'KML Import',
+      layer: layerName || 'manuell'
+    };
+  }).filter(Boolean).filter(p => !isNaN(p.lat) && !isNaN(p.lng));
+}
+
+// ═══ GPX-ROUTEN/TRACKS (Etappenplanung: Linien statt Navi — fürs Routing sind
+// Organic Maps/OsmAnd/Tracks4Africa zuständig, das hier ist die Planungsansicht) ═══
+function parseGPXRouten(text, dateiName) {
+  const doc = new DOMParser().parseFromString(text, 'text/xml');
+  const routenNeu = [];
+  const sammle = (el, punkteSel, idx, art) => {
+    const pts = [...el.querySelectorAll(punkteSel)]
+      .map(p => [parseFloat(p.getAttribute('lat')), parseFloat(p.getAttribute('lon'))])
+      .filter(p => !isNaN(p[0]) && !isNaN(p[1]));
+    if (pts.length < 2) return;
+    routenNeu.push({
+      id: Date.now() + routenNeu.length,
+      name: el.querySelector('name')?.textContent || `${art} ${idx + 1} (${dateiName})`,
+      punkte: routenAusduennen(pts, 2000), // Bug-11-Lektion: Render-Budget, Distanz vorher voll berechnet
+      dist: routenDistanz(pts),
+      sichtbar: true
+    });
+  };
+  [...doc.querySelectorAll('trk')].forEach((t, i) => sammle(t, 'trkpt', i, 'Track'));
+  [...doc.querySelectorAll('rte')].forEach((r, i) => sammle(r, 'rtept', i, 'Route'));
+  return routenNeu;
+}
+
+function routenDistanz(pts) {
+  let d = 0;
+  for (let i = 1; i < pts.length; i++) d += dist({ lat: pts[i - 1][0], lng: pts[i - 1][1] }, { lat: pts[i][0], lng: pts[i][1] });
+  return Math.round(d * 10) / 10;
+}
+
+function routenAusduennen(pts, max) {
+  if (pts.length <= max) return pts;
+  const schritt = Math.ceil(pts.length / max);
+  const aus = pts.filter((_, i) => i % schritt === 0);
+  if (aus[aus.length - 1][0] !== pts[pts.length - 1][0] || aus[aus.length - 1][1] !== pts[pts.length - 1][1]) aus.push(pts[pts.length - 1]);
+  return aus;
+}
+
+let routen = [];
+let routenLeafletLayers = [];
+const ROUTEN_FARBEN = ['#e0842f', '#5a9bd6', '#8e6bd6', '#3a9d6b', '#e24b4a', '#c9a227'];
+
+function routenLeaflet() {
+  routenLeafletLayers.forEach(l => { try { map.removeLayer(l); } catch (e) {} });
+  routenLeafletLayers = [];
+  if (!map) return;
+  routen.forEach((r, i) => {
+    if (!r.sichtbar) return;
+    const pl = L.polyline(r.punkte, { color: ROUTEN_FARBEN[i % ROUTEN_FARBEN.length], weight: 3, opacity: 0.85 })
+      .bindPopup(`<b>🛤 ${esc(r.name)}</b><br>${r.dist} km`).addTo(map);
+    routenLeafletLayers.push(pl);
+  });
+}
+
+function routenMaplibre() {
+  if (!mlMap || !mlMap.isStyleLoaded()) return;
+  try {
+    if (mlMap.getLayer('routen-line')) mlMap.removeLayer('routen-line');
+    if (mlMap.getSource('routen-src')) mlMap.removeSource('routen-src');
+  } catch (e) {}
+  const feats = routen.filter(r => r.sichtbar).map((r, i) => ({
+    type: 'Feature',
+    properties: { name: r.name, dist: r.dist, color: ROUTEN_FARBEN[routen.indexOf(r) % ROUTEN_FARBEN.length] },
+    geometry: { type: 'LineString', coordinates: r.punkte.map(p => [p[1], p[0]]) }
+  }));
+  if (!feats.length) return;
+  mlMap.addSource('routen-src', { type: 'geojson', data: { type: 'FeatureCollection', features: feats } });
+  mlMap.addLayer({ id: 'routen-line', type: 'line', source: 'routen-src', paint: { 'line-color': ['get', 'color'], 'line-width': 3, 'line-opacity': 0.85 } });
+  if (!mlMap.__routenClickBound) {
+    mlMap.__routenClickBound = true;
+    mlMap.on('click', 'routen-line', e => {
+      const p = e.features[0].properties;
+      new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>🛤 ${esc(p.name)}</b><br>${p.dist} km`).addTo(mlMap);
+    });
+  }
+}
+
+function renderRouten() {
+  if (mapType === 'maplibre') routenMaplibre();
+  else routenLeaflet();
+}
+
+function routeToggle(id) {
+  const r = routen.find(x => x.id === id);
+  if (!r) return;
+  r.sichtbar = !r.sichtbar;
+  dbRoutePut(r);
+  renderRouten();
+  renderMapLayerList();
+}
+
+function routeZoom(id) {
+  const r = routen.find(x => x.id === id);
+  if (!r || !r.punkte.length) return;
+  let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+  r.punkte.forEach(p => {
+    if (p[0] < minLat) minLat = p[0]; if (p[0] > maxLat) maxLat = p[0];
+    if (p[1] < minLng) minLng = p[1]; if (p[1] > maxLng) maxLng = p[1];
+  });
+  if (mapType === 'maplibre' && mlMap) mlMap.fitBounds([[minLng, minLat], [maxLng, maxLat]], { padding: 60 });
+  else if (map) map.fitBounds([[minLat, minLng], [maxLat, maxLng]], { padding: [40, 40] });
+}
+
+async function routeLoeschen(id) {
+  const r = routen.find(x => x.id === id);
+  if (!r || !confirm(`Route "${r.name}" löschen?`)) return;
+  await dbRouteDel(id);
+  routen = routen.filter(x => x.id !== id);
+  renderRouten();
+  renderMapLayerList();
+}
+
+// ── OSM/OVERPASS-IMPORT (JSON-Export pro Land → IndexedDB) ─────────
+function osmType(tags) {
+  const a = tags.amenity || '', s = tags.shop || '', t = tags.tourism || '',
+        m = tags.man_made || '', h = tags.healthcare || '', e = tags.emergency || '';
+  if (a === 'veterinary' || h === 'veterinary') return 'vet';
+  if (a === 'hospital' || a === 'clinic' || a === 'doctors' || a === 'pharmacy' || h) return 'hospital';
+  if (a === 'fuel') return 'fuel';
+  if (a === 'drinking_water' || a === 'water_point' || e === 'drinking_water'
+      || m === 'water_well' || m === 'water_tower' || m === 'borehole') return 'water';
+  if (t === 'camp_site' || t === 'caravan_site') return 'camp';
+  if (s === 'car_repair' || s === 'car_parts' || a === 'car_repair') return 'mechanic';
+  if (a === 'border_control' || tags.barrier === 'border_control') return 'border';
+  return guessType(tags.name || '', '');
+}
+
+function parseOverpass(text, layerName) {
+  let json;
+  try { json = JSON.parse(text); } catch(e) { alert('Datei ist kein gültiges JSON (Overpass: Export → „Rohdaten").'); return []; }
+  const base = Date.now();
+  const out = [];
+  if (Array.isArray(json.elements)) {
+    // Overpass-API-Export ([out:json]; ... out center;) — ways/relations liefern el.center
+    json.elements.forEach((el, i) => {
+      const lat = el.lat != null ? el.lat : (el.center ? el.center.lat : null);
+      const lng = el.lon != null ? el.lon : (el.center ? el.center.lon : null);
+      if (lat == null || lng == null) return;
+      const tags = el.tags || {};
+      out.push({
+        id: neueId(),
+        name: tags.name || tags['name:en'] || tags.operator || tags.amenity || tags.shop || tags.tourism || 'OSM-Punkt',
+        desc: [tags.operator, tags.opening_hours, tags.phone].filter(Boolean).join(' · '),
+        lat, lng,
+        type: osmType(tags),
+        source: 'OSM/Overpass',
+        layer: layerName || 'manuell'
+      });
+    });
+  } else if (json.type === 'FeatureCollection' && Array.isArray(json.features)) {
+    // GeoJSON (overpass-turbo Standard-Export)
+    json.features.forEach((f, i) => {
+      if (!f.geometry || f.geometry.type !== 'Point') return;
+      const lng = f.geometry.coordinates[0], lat = f.geometry.coordinates[1];
+      const tags = f.properties || {};
+      out.push({
+        id: neueId(),
+        name: tags.name || tags['name:en'] || 'OSM-Punkt',
+        desc: [tags.operator, tags.opening_hours, tags.phone].filter(Boolean).join(' · '),
+        lat, lng,
+        type: osmType(tags),
+        source: 'OSM/GeoJSON',
+        layer: layerName || 'manuell'
+      });
+    });
+  } else {
+    alert('Unbekanntes JSON-Format — erwartet Overpass-Export (elements) oder GeoJSON (FeatureCollection).');
+  }
+  return out.filter(p => !isNaN(p.lat) && !isNaN(p.lng));
+}
+
+function guessType(name, desc) {
+  const s = (name + ' ' + desc).toLowerCase();
+  if (s.match(/veterin|tierarzt|\bvet\b/)) return 'vet';
+  if (s.match(/hospital|krankenhaus|clinic|klinik|doctor|arzt|pharmac|apotheke|medical/)) return 'hospital';
+  if (s.match(/water|wasser|borehole|bore|well|spring|quelle|pump/)) return 'water';
+  if (s.match(/camp|campsite|camping|lager|stellplatz|bush camp/)) return 'camp';
+  if (s.match(/fuel|petrol|diesel|tanke|treibstoff|gas station/)) return 'fuel';
+  if (s.match(/mechanic|workshop|werkstatt|repair|toyota/)) return 'mechanic';
+  if (s.match(/border|grenze|crossing|immigration|zoll/)) return 'border';
+  if (s.match(/danger|warning|warnung|gefahr|risk|hazard/)) return 'danger';
+  return 'custom';
+}
+
+async function loadPreset(region) {
+  // 2026-09-27 (Review S9): erfundene Beispielpunkte — nicht mehr als iOverlander/OSM/„Official" ausgegeben
+  const southern = [
+    { id:1, name:'Borehole Nxai Pan', type:'water', lat:-19.95, lng:24.76, desc:'DEMO — Funktioniert ganzjährig. Wasser vor Gebrauch filtern.', country:'Botswana', source:'Demo (fiktiv)' },
+    { id:2, name:'Bush Camp Makgadikgadi', type:'camp', lat:-20.45, lng:25.20, desc:'DEMO — Wildcamping möglich. Keine Einrichtungen.', country:'Botswana', source:'Demo (fiktiv)' },
+    { id:3, name:'Kasane Fuel Station', type:'fuel', lat:-17.80, lng:25.15, desc:'DEMO — Diesel verfügbar. Oft Schlange.', country:'Botswana', source:'Demo (fiktiv)' },
+    { id:4, name:'Elephant Crossing Point', type:'danger', lat:-18.60, lng:24.01, desc:'DEMO — Häufige Elefantenquerung bei Nacht!', country:'Botswana', source:'Demo (fiktiv)' },
+    { id:5, name:'Toyota Workshop Maun', type:'mechanic', lat:-19.98, lng:23.42, desc:'DEMO — Zuverlässige Toyota Werkstatt. Ersatzteile vorhanden.', country:'Botswana', source:'Demo (fiktiv)' },
+    { id:6, name:'Chobe Border Kasane', type:'border', lat:-17.79, lng:25.16, desc:'DEMO — Grenze ZA/BW. Mo-So 6-22h. Carnet benötigt.', country:'Botswana', source:'Demo (fiktiv)' },
+    { id:7, name:'Spitzkoppe Campsite', type:'camp', lat:-21.83, lng:15.19, desc:'DEMO — Wunderschöner Campplatz. Basis vorhanden.', country:'Namibia', source:'Demo (fiktiv)' },
+    { id:8, name:'Waterhole Etosha East', type:'water', lat:-18.87, lng:16.32, desc:'DEMO — Naturwasserstelle. Kein Trinkwasser!', country:'Namibia', source:'Demo (fiktiv)' },
+    { id:9, name:'Windhoek Toyota Dealer', type:'mechanic', lat:-22.56, lng:17.08, desc:'DEMO — Offizielle Toyota Namibia. Alle Ersatzteile.', country:'Namibia', source:'Demo (fiktiv)' },
+    { id:10, name:'Grosfontein Water Point', type:'water', lat:-20.54, lng:18.01, desc:'DEMO — Gemeindewasser. Bezahlung erforderlich.', country:'Namibia', source:'Demo (fiktiv)' },
+    { id:11, name:'Vic Falls Border ZW/ZM', type:'border', lat:-17.92, lng:25.84, desc:'DEMO — KAZA Univisa möglich. Wartezeiten variieren.', country:'Zimbabwe', source:'Demo (fiktiv)' },
+    { id:12, name:'Okavango Bush Camp', type:'camp', lat:-18.27, lng:22.10, desc:'DEMO — Privates Wildcamping. Vorabgenehmigung nötig.', country:'Botswana', source:'Demo (fiktiv)' },
+  ];
+  const east = [
+    { id:20, name:'Ngorongoro Gate Water', type:'water', lat:-3.22, lng:35.51, desc:'DEMO — Sauberes Wasser am Eingang.', country:'Tansania', source:'Demo (fiktiv)' },
+    { id:21, name:'Serengeti Bush Camp', type:'camp', lat:-2.45, lng:34.83, desc:'DEMO — Nur mit Permit. Löwen in der Nacht möglich!', country:'Tansania', source:'Demo (fiktiv)' },
+    { id:22, name:'Namanga Border KE/TZ', type:'border', lat:-2.55, lng:36.79, desc:'DEMO — Hauptgrenze Kenia/Tansania. 24h offen.', country:'Tansania', source:'Demo (fiktiv)' },
+    { id:23, name:'Arusha Toyota Workshop', type:'mechanic', lat:-3.37, lng:36.68, desc:'DEMO — Gut ausgestattete Toyota Werkstatt.', country:'Tansania', source:'Demo (fiktiv)' },
+    { id:24, name:'Fuel Moshi', type:'fuel', lat:-3.34, lng:37.33, desc:'DEMO — Total Station. Diesel meist verfügbar.', country:'Tansania', source:'Demo (fiktiv)' },
+    { id:25, name:'Masai Mara Waterhole', type:'water', lat:-1.51, lng:35.14, desc:'DEMO — Naturwasserstelle. Kein Trinkwasser.', country:'Kenia', source:'Demo (fiktiv)' },
+    { id:26, name:'Tsavo Warning Zone', type:'danger', lat:-3.01, lng:38.52, desc:'DEMO — Schlechte Pisten. 4WD zwingend erforderlich.', country:'Kenia', source:'Demo (fiktiv)' },
+    { id:27, name:'Nairobi Vehicle Help', type:'mechanic', lat:-1.29, lng:36.82, desc:'DEMO — Spezialist für alte Toyotas. Englisch.', country:'Kenia', source:'Demo (fiktiv)' },
+  ];
+  const data = region === 'southern' ? southern : east;
+  const layerKey = region === 'southern' ? 'Demo Südliches Afrika' : 'Demo Ostafrika';
+  if (!layers[layerKey]) layers[layerKey] = { visible: true, color: nextColor(), name: layerKey };
+  const tagged = data.map(d => ({ ...d, layer: layerKey }));
+  const newPois = tagged.filter(d => !pois.find(p => p.id === d.id));
+  await dbPutAll(newPois);
+  pois = [...pois, ...newPois];
+  layers[layerKey].count = pois.filter(p => p.layer === layerKey).length;
+  saveLayers();
+  rebuildAllClusters();
+  renderList();
+  renderLayerList();
+  showTab('map');
+  const [vLat, vLng, vZoom] = region === 'southern' ? [-20, 24, 5] : [-2.5, 36, 6];
+  if (mapType === 'maplibre' && mlMap) mlMap.jumpTo({ center: [vLng, vLat], zoom: vZoom });  // 2026-09-05-1: Vektor-Modus hat kein `map`
+  else if (map) map.setView([vLat, vLng], vZoom);
+  showToast(`${data.length} Demo-POIs geladen`);
+}
+
+async function clearAll() {
+  if (!confirm('Alle POIs und Layer löschen?')) return;
+  await dbClear();
+  pois = []; layers = {};
+  saveLayers();
+  Object.values(clusterGroups).forEach(g => { try { map.removeLayer(g); } catch(e){} });
+  clusterGroups = {};
+  markers.forEach(m => { try { map.removeLayer(m); } catch(e){} });
+  markers = [];
+  renderList();
+  renderLayerList();
+  renderMapLayerList();
+}
+
+function toggleLayerPanel() {
+  const panel = document.getElementById('map-layer-panel');
+  const btn = document.getElementById('layer-panel-btn');
+  const isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'block';
+  btn.style.borderColor = isOpen ? '' : 'var(--accent)';
+  if (!isOpen) { renderMapLayerList(); regenInfoSchliessen(); }   // nur ein Panel links oben
+}
+
+// 🛤 Routen-Sektion fürs Layer-Panel (GPX-Tracks/-Routen: Zoom, Toggle, Löschen)
+function routenPanelHtml() {
+  if (!routen.length) return '';
+  return '<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;padding:8px 4px 2px">🛤 Routen (GPX)</div>'
+    + routen.map((r, i) => {
+      const on = r.sichtbar;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid var(--border)">
+      <div style="width:8px;height:3px;border-radius:2px;background:${ROUTEN_FARBEN[i % ROUTEN_FARBEN.length]};flex-shrink:0"></div>
+      <div style="flex:1;min-width:0;cursor:pointer" onclick="routeZoom(${r.id})" title="Zur Route zoomen">
+        <div style="font-size:11px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.name)}</div>
+        <div style="font-size:9px;color:var(--text3)">${r.dist} km · ${r.punkte.length} Punkte</div>
+      </div>
+      <button onclick="routeToggle(${r.id})"
+        style="width:34px;height:18px;border-radius:9px;border:none;cursor:pointer;flex-shrink:0;position:relative;background:${on ? 'var(--accent)' : 'var(--border2)'}">
+        <div style="position:absolute;top:2px;width:14px;height:14px;border-radius:50%;background:white;transition:left 0.15s;${on ? 'left:18px' : 'left:2px'}"></div>
+      </button>
+      <button onclick="routeLoeschen(${r.id})"
+        style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:2px;flex-shrink:0" title="Route löschen">🗑</button>
+    </div>`;
+    }).join('');
+}
+
+function renderMapLayerList() {
+  const el = document.getElementById('map-layer-list');
+  if (!el) return;
+  const keys = Object.keys(layers);
+  if (keys.length === 0) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--text3);text-align:center;padding:8px">Keine Layer — GPX importieren</div>' + routenPanelHtml();
+    return;
+  }
+  el.innerHTML = routenPanelHtml() + keys.map(key => {
+    const l = layers[key];
+    const count = pois.filter(p => (p.layer || 'manuell') === key).length;
+    const on = l.visible !== false;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid var(--border)">
+      <div style="width:8px;height:8px;border-radius:50%;background:${l.color};flex-shrink:0"></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:11px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(key)}</div>
+        <div style="font-size:9px;color:var(--text3)">${count} POIs</div>
+      </div>
+      <button data-key="${esc(key)}" onclick="toggleLayer(this.dataset.key);renderMapLayerList()"
+        style="width:34px;height:18px;border-radius:9px;border:none;cursor:pointer;flex-shrink:0;position:relative;background:${on ? 'var(--accent)' : 'var(--border2)'}">
+        <div style="position:absolute;top:2px;width:14px;height:14px;border-radius:50%;background:white;transition:left 0.15s;${on ? 'left:18px' : 'left:2px'}"></div>
+      </button>
+      <button data-key="${esc(key)}" onclick="deleteLayer(this.dataset.key);renderMapLayerList()"
+        style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:2px;flex-shrink:0" title="Layer löschen">🗑</button>
+    </div>`;
+  }).join('');
+}
+
+function renderLayerList() {
+  // Import-Tab Liste
+  const el = document.getElementById('layer-list');
+  if (!el) return;
+  const keys = Object.keys(layers);
+  if (keys.length === 0) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--text3);text-align:center;padding:1rem">Noch keine Dateien importiert</div>';
+    return;
+  }
+  el.innerHTML = keys.map(key => {
+    const l = layers[key];
+    const count = pois.filter(p => (p.layer || 'manuell') === key).length;
+    return `<div class="layer-item">
+      <div class="layer-color" style="background:${l.color}"></div>
+      <div class="layer-info">
+        <div class="layer-name">${esc(key)}</div>
+        <div class="layer-meta">${count} POIs</div>
+      </div>
+      <button class="layer-toggle ${l.visible !== false ? 'on' : 'off'}"
+        data-key="${esc(key)}" onclick="toggleLayer(this.dataset.key)"></button>
+      <button class="layer-delete" data-key="${esc(key)}" onclick="deleteLayer(this.dataset.key)" title="Layer löschen" aria-label="Layer löschen">🗑</button>
+    </div>`;
+  }).join('');
+  // Auch Karten-Panel aktualisieren falls offen
+  renderMapLayerList();
+}
+
+function toggleLayer(key) {
+  if (!layers[key]) return;
+  layers[key].visible = layers[key].visible === false ? true : false;
+  saveLayers();
+  // Instant: nur diesen Layer ein/ausblenden
+  // 2026-09-05-1: Im Vektor-Modus (Standard, sobald karte.mbtiles da ist) ist `map` null und
+  // clusterGroups gehören zur alten Leaflet-Instanz → map.addLayer warf, der Toggle wirkte erst
+  // nach dem nächsten Verschieben der Karte. Jetzt: MapLibre-Marker direkt neu zeichnen.
+  if (mapType === 'maplibre') { if (mlMap) renderMarkersMaplibre(); renderLayerList(); renderMapLayerList(); return; }
+  const group = clusterGroups[key];
+  if (group && map) {
+    if (layers[key].visible) map.addLayer(group);
+    else map.removeLayer(group);
+  }
+  renderLayerList();
+  renderMapLayerList();
+}
+
+async function deleteLayer(key) {
+  const count = pois.filter(p => (p.layer || 'manuell') === key).length;
+  if (!confirm(`Layer "${key}" und alle ${count} POIs löschen?`)) return;
+  // Cluster-Group von der Karte entfernen
+  const group = clusterGroups[key];
+  if (group) { try { map.removeLayer(group); } catch(e){} }
+  delete clusterGroups[key];
+  // Aus IndexedDB löschen
+  await dbDeleteByLayer(key);
+  pois = pois.filter(p => (p.layer || 'manuell') !== key);
+  delete layers[key];
+  saveLayers();
+  renderList();
+  renderLayerList();
+  renderMapLayerList();
+}
+
+function dist(a, b) {
+  const R = 6371;
+  const dLat = (b.lat - a.lat) * Math.PI/180;
+  const dLon = (b.lng - a.lng) * Math.PI/180;
+  const x = Math.sin(dLat/2)**2 + Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
+}
+
+function formatDist(km) {
+  return km < 1 ? Math.round(km*1000)+'m' : (km < 100 ? km.toFixed(1)+'km' : Math.round(km)+'km');
+}
+
+// ── REISEWARNUNGEN (BYTEIDENTISCH in index.html, mobile.html und pois.html) ──
+// Der Server holt die amtlichen Warnungen (Auswärtiges Amt = maßgeblich, UK FCDO, US State
+// Department), sobald Netz da ist, und legt sie ab. Die Seiten lesen nur den gespeicherten Stand und
+// halten eine Kopie im localStorage — so bleiben die Warnungen auch ohne laufenden Server sichtbar.
+// Die Texte werden WÖRTLICH angezeigt, nie zusammengefasst; Stand-Datum und Quelle stehen immer dabei.
+const REISEWARN_KEY = 'safari-reisewarnungen';
+const REISEWARN_QUELLEN = { aa: 'Auswärtiges Amt', fcdo: 'UK FCDO', usa: 'US State Department' };
+function reisewarnCache() {
+  try { const c = JSON.parse(localStorage.getItem(REISEWARN_KEY) || 'null'); return (c && c.laender && typeof c.laender === 'object') ? c : null; } catch (e) { return null; }
+}
+function reisewarnLand(land) { const c = reisewarnCache(); return (c && c.laender[land]) || null; }
+// Einstufung allein aus den amtlichen Kennzeichen des AA — nie aus dem Text geraten.
+function reisewarnStufe(land) {
+  const e = reisewarnLand(land), k = e && e.aa && e.aa.kennzeichen;
+  if (!k) return { rang: 0, text: 'kein Stand', farbe: '#6b6b6b' };
+  if (k.warning || k.situationWarning) return { rang: 3, text: 'Reisewarnung', farbe: '#e24b4a' };
+  if (k.partialWarning || k.situationPartWarning) return { rang: 2, text: 'Teilreisewarnung', farbe: '#e0842f' };
+  return { rang: 1, text: 'keine Warnung', farbe: '#3a9d6b' };
+}
+// Eine Zeile für Statusanzeigen und Prompts: Stufe, Stand, danach der amtliche Text (gekürzt nur,
+// wenn maxZeichen gesetzt ist — die Kürzung wird mit […] sichtbar gemacht).
+function reisewarnZeile(land, maxZeichen) {
+  const e = reisewarnLand(land);
+  if (!e || !e.aa) return '';
+  const t = String(e.aa.warntext || '').replace(/\s+/g, ' ').trim();
+  const kurz = (maxZeichen && t.length > maxZeichen) ? t.slice(0, maxZeichen).trim() + ' […]' : t;
+  return `${e.aa.stufe || 'Stufe unbekannt'} (Auswärtiges Amt, Stand ${e.aa.stand || 'unbekannt'})` + (kurz ? ': ' + kurz : '');
+}
+async function ladeReisewarnungen(serverUrl) {
+  const res = await fetch(serverUrl + '/api/reisewarnungen', { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const j = await res.json();
+  const c = { laender: (j && j.laender) || {}, status: (j && j.status) || {}, hinweis: (j && j.hinweis) || '', gespeichert: Date.now() };
+  try { localStorage.setItem(REISEWARN_KEY, JSON.stringify(c)); } catch (e) {}
+  return c;
+}
+
+// ── WARNGEBIETE (BYTEIDENTISCH in index.html, mobile.html und pois.html) ──
+// Die Flächen der gewarnten Gebiete kommen aus data/warnzonen.geojson (fetch-warnzonen.py holt sie
+// einmalig aus OpenStreetMap). Damit lässt sich die Frage beantworten, auf die es unterwegs ankommt:
+// Liegt meine Position in einem Gebiet, vor dem gewarnt wird — und wenn nicht, wie weit ist das
+// nächste entfernt? Maßgeblich bleibt der amtliche Text; die Fläche ist nur seine Darstellung.
+let WARNZONEN = null;
+const WARN_FARBEN = { 3: '#e24b4a', 2: '#e0842f', 1: '#c9a227' };
+function warnFarbe(stufe) { return WARN_FARBEN[stufe] || '#c9a227'; }
+async function ladeWarnzonen(basis) {
+  try {
+    const res = await fetch(basis + '/data/warnzonen.geojson', { cache: 'no-store' });
+    if (!res.ok) return null;
+    const gj = await res.json();
+    WARNZONEN = (gj && Array.isArray(gj.features)) ? gj : null;
+    return WARNZONEN;
+  } catch (e) { return null; }   // Datei fehlt: die Karte bleibt bei Landesflächen
+}
+// Entfernung in km, ebene Näherung (für „ca. 180 km" völlig ausreichend, offline und schnell)
+function kmAbstand(lat1, lng1, lat2, lng2) {
+  const rad = Math.PI / 180, R = 6371;
+  const x = (lng2 - lng1) * rad * Math.cos((lat1 + lat2) / 2 * rad), y = (lat2 - lat1) * rad;
+  return Math.sqrt(x * x + y * y) * R;
+}
+function kmZuStrecke(lat, lng, a, b) {
+  const rad = Math.PI / 180, R = 6371, k = Math.cos(lat * rad);
+  const px = lng * rad * k, py = lat * rad;
+  const ax = a[0] * rad * k, ay = a[1] * rad, bx = b[0] * rad * k, by = b[1] * rad;
+  const dx = bx - ax, dy = by - ay, laenge = dx * dx + dy * dy;
+  let t = laenge ? ((px - ax) * dx + (py - ay) * dy) / laenge : 0;
+  t = Math.max(0, Math.min(1, t));
+  const ex = ax + t * dx, ey = ay + t * dy;
+  return Math.sqrt((px - ex) ** 2 + (py - ey) ** 2) * R;
+}
+function punktInRing(lat, lng, ring) {   // Strahlenverfahren; Ring ist [lng, lat]
+  let drin = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+    if ((yi > lat) !== (yj > lat) && lng < (xj - xi) * (lat - yi) / (yj - yi) + xi) drin = !drin;
+  }
+  return drin;
+}
+function ringeVon(geometrie) {
+  if (!geometrie) return [];
+  if (geometrie.type === 'Polygon') return geometrie.coordinates.slice(0, 1);
+  if (geometrie.type === 'MultiPolygon') return geometrie.coordinates.map(p => p[0]).filter(Boolean);
+  return [];
+}
+// Liefert { drin: [Gebiete], naechstes: {…, km}, gepruefte } — oder null, wenn keine Flächen da sind.
+function warnlageZurPosition(lat, lng) {
+  const feats = (WARNZONEN && WARNZONEN.features) || [];
+  if (!feats.length || !isFinite(lat) || !isFinite(lng)) return null;
+  const drin = [];
+  let naechstes = null;
+  for (const f of feats) {
+    const ringe = ringeVon(f.geometry);
+    if (ringe.some(r => punktInRing(lat, lng, r))) { drin.push(f.properties); continue; }
+    let km = Infinity;
+    for (const ring of ringe) {
+      for (let i = 1; i < ring.length; i++) km = Math.min(km, kmZuStrecke(lat, lng, ring[i - 1], ring[i]));
+    }
+    if (!naechstes || km < naechstes.km) naechstes = Object.assign({}, f.properties, { km: km });
+  }
+  drin.sort((a, b) => b.stufe - a.stufe);
+  return { drin: drin, naechstes: naechstes, gepruefte: feats.length };
+}
+// Ein Satz für Karte, Panel und Notruf-Sheet — überall derselbe Wortlaut.
+function warnlageSatz(lat, lng) {
+  const lage = warnlageZurPosition(lat, lng);
+  if (!lage) return '';
+  if (lage.drin.length) {
+    const g = lage.drin[0];
+    return `⚠️ Deine Position liegt in ${g.name} (${g.land}) — ${g.stufe_text}.`
+      + (lage.drin.length > 1 ? ` Zusätzlich: ${lage.drin.slice(1).map(x => x.name).join(', ')}.` : '');
+  }
+  if (lage.naechstes) {
+    const n = lage.naechstes;
+    return `Kein gewarntes Gebiet an deiner Position. Nächstes: ${n.name} (${n.land}, ${n.stufe_text}), ca. ${n.km < 10 ? n.km.toFixed(1) : Math.round(n.km)} km.`;
+  }
+  return '';
+}
+
+// ── POSITION-FORMATE (BYTEIDENTISCH in index.html, mobile.html, pois.html — Regel wie LAENDER_GEO) ──
+// Für Funk, Satelliten-Messenger und Rettungsdienst: Dezimalgrad (5 Stellen ≈ 1 m), Grad/Minuten/
+// Sekunden und Plus Code (Open Location Code: offener Standard, offline berechenbar, keine
+// verwechselbaren Wörter). Der Plus-Code-Encoder folgt der Referenzimplementierung (10 Zeichen,
+// Zellgröße ≈ 14 × 14 m) und ist in test-app.js gegen die offiziellen Testvektoren abgesichert.
+function formatDD(lat, lng) { return lat.toFixed(5) + ', ' + lng.toFixed(5); }
+function toDMS(lat, lng) {
+  const f = (v, pos, neg) => { const a = Math.abs(v), d = Math.floor(a), m = Math.floor((a - d) * 60), s = ((a - d) * 3600 - m * 60); return `${d}°${String(m).padStart(2,'0')}'${s.toFixed(1).padStart(4,'0')}"${v < 0 ? neg : pos}`; };
+  return f(lat, 'N', 'S') + ' ' + f(lng, 'E', 'W');
+}
+function plusCode(lat, lng) {
+  const A = '23456789CFGHJMPQRVWX';
+  lat = Math.min(90, Math.max(-90, lat));
+  lng = ((lng + 180) % 360 + 360) % 360 - 180;
+  let latV = Math.floor(Math.round((lat + 90) * 8000 * 1e6) / 1e6);
+  let lngV = Math.floor(Math.round((lng + 180) * 8000 * 1e6) / 1e6);
+  if (latV >= 180 * 8000) latV = 180 * 8000 - 1;
+  let code = '';
+  for (let i = 0; i < 5; i++) { code = A[latV % 20] + A[lngV % 20] + code; latV = Math.floor(latV / 20); lngV = Math.floor(lngV / 20); }
+  return code.slice(0, 8) + '+' + code.slice(8);
+}
+function positionFormate(lat, lng) {
+  if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) return null;
+  return { dd: formatDD(lat, lng), dms: toDMS(lat, lng), plus: plusCode(lat, lng) };
+}
+// Position für Funk/SMS/Satelliten-Messenger als Klartext — alle drei Formate, damit die Gegenstelle
+// nimmt, was ihr System versteht. Kopieren statt vorlesen: Zahlendreher am Funk sind ein echtes Risiko.
+function positionText(lat, lng, praefix) {
+  const p = positionFormate(lat, lng);
+  if (!p) return '';
+  return (praefix ? praefix + ' ' : '') + p.dd + ' | ' + p.dms + ' | Plus Code ' + p.plus;
+}
+async function kopiereText(text, okMeldung) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); }
+    else { const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+    return okMeldung || 'Kopiert';
+  } catch (e) { return 'Kopieren nicht möglich — bitte markieren und manuell kopieren'; }
+}
+
+// 2026-09-27 (Review P1-5): vom iPhone geöffnet (Zugangscode ?t= oder schmaler Schirm) → zurück zur
+// Handy-Seite; vorher landete man auf der Mac-Seite, die bei 390 px nicht bedienbar ist.
+function zurueckZumAssistenten() {
+  const t = new URLSearchParams(location.search).get('t');
+  const handy = !!t || window.matchMedia('(max-width: 700px)').matches;
+  window.location = handy ? 'mobile.html' + (t ? '?t=' + encodeURIComponent(t) : '') : 'index.html';
+}
+// 2026-09-27 (Audit F2): Links aus gespeicherten Daten nur mit http(s) — esc() ließ „javascript:" durch
+function sicherLink(u) { u = String(u || '').trim(); return /^https?:\/\//i.test(u) ? u : ''; }
+function esc(t) { return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }  // 2026-09-05-1: auch ' — POI-Namen landen in Attributen
+
+function showTab(tab) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['map','list','favorites','import'][i]===tab));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-'+tab).classList.add('active');
+  if (tab === 'map') {
+    setTimeout(() => {
+      if (mapType === 'leaflet' && map) map.invalidateSize();
+      else if (mapType === 'maplibre' && mlMap) mlMap.resize();
+      if (regenAn && klimaDaten) { zeitleisteMonate(); regenPanelLayout(); }   // Maße waren 0, solange der Tab verborgen war
+    }, 100);
+  }
+  if (tab === 'list') renderList();
+  if (tab === 'favorites') renderFavorites();
+  if (tab === 'import') renderLayerList();
+}
+
+// OFFLINE KARTEN
+// Gleicher Origin wie die geladene Seite — die .app serviert z. B. auf :8766, ein Browser-Tab auf :8765.
+// NIE einen festen Port annehmen (sonst zeigen Kacheln/Fonts/RAG auf einen Server, der evtl. gar nicht läuft →
+// cross-origin/"Load failed"). Nur bei file:// (kein http-Origin) auf localhost:8765 zurückfallen. Wie mobile.html.
+const SERVER_BASE = (location.origin && location.origin.indexOf('http') === 0) ? location.origin : 'http://localhost:8765';
+// ═══ BUG 8: OFFLINE-ORIENTIERUNG ═══
+// Länderumrisse der 16 Reiseländer — MUSS byteidentisch mit index.html/mobile.html bleiben.
+// Ohne Internet (keine OSM-Kacheln) sind sie der einzige Kartenhintergrund.
+const LAENDER_GEO = [
+  // Reihenfolge = Priorität: kleine Länder & Enklaven zuerst (First-Match),
+  // Südafrika als LETZTES, damit die Enklaven Lesotho/Eswatini gewinnen.
+  { name: 'Lesotho', poly: [[27.0,-29.6],[27.5,-28.9],[28.6,-28.57],[29.3,-29.1],[29.45,-29.5],[28.9,-30.2],[28.1,-30.65],[27.4,-30.4],[27.0,-30.0]] },
+  { name: 'Eswatini', poly: [[30.8,-26.85],[30.8,-25.9],[31.4,-25.72],[32.0,-25.9],[32.13,-26.5],[31.95,-27.3],[31.1,-27.2]] },
+  { name: 'Ruanda', poly: [[29.1,-1.7],[29.6,-1.39],[30.5,-1.06],[30.85,-1.7],[30.55,-2.4],[29.9,-2.85],[29.0,-2.75],[28.86,-2.4]] },
+  { name: 'Burundi', poly: [[29.0,-2.75],[29.9,-2.85],[30.55,-2.4],[30.85,-2.97],[30.5,-3.5],[30.4,-4.1],[29.4,-4.47],[29.2,-3.8],[29.0,-3.2]] },
+  { name: 'Namibia', poly: [[11.75,-17.25],[14.2,-17.39],[18.4,-17.39],[20.9,-17.9],[23.3,-17.55],[24.3,-17.48],[25.26,-17.79],[24.7,-18.06],[23.4,-18.3],[20.99,-18.31],[20.99,-22.0],[20.0,-22.0],[20.0,-28.4],[19.2,-28.9],[17.4,-28.7],[16.45,-28.63],[15.1,-27.2],[14.5,-25.0],[14.4,-22.9],[13.1,-20.6],[11.75,-18.5]] },
+  { name: 'Botswana', poly: [[20.99,-18.31],[23.4,-18.25],[24.7,-18.06],[25.26,-17.79],[25.9,-18.8],[26.7,-19.7],[27.5,-20.3],[27.7,-21.1],[28.6,-21.6],[29.05,-22.2],[27.9,-23.1],[26.9,-24.3],[25.9,-24.75],[25.6,-25.5],[24.2,-25.75],[23.0,-25.3],[22.6,-26.1],[21.8,-26.7],[20.8,-26.85],[20.0,-26.9],[20.0,-22.0],[20.99,-22.0]] },
+  { name: 'Sambia', poly: [[25.26,-17.79],[24.3,-17.48],[23.3,-17.55],[22.2,-16.5],[22.0,-13.0],[24.0,-13.0],[24.0,-11.0],[25.3,-11.2],[26.6,-11.9],[27.6,-12.3],[28.35,-12.45],[28.65,-11.7],[28.5,-10.5],[28.6,-9.5],[28.95,-8.45],[30.2,-8.3],[30.8,-8.3],[31.7,-8.9],[32.9,-9.4],[33.2,-9.6],[33.3,-10.8],[33.4,-12.3],[32.8,-13.8],[32.0,-14.3],[30.4,-14.9],[30.4,-15.62],[28.85,-16.4],[27.0,-16.6],[26.2,-17.9]] },
+  { name: 'Zimbabwe', poly: [[25.26,-17.79],[26.2,-17.9],[27.0,-16.6],[28.85,-16.4],[30.4,-15.62],[31.3,-16.0],[32.0,-16.45],[32.95,-16.7],[32.95,-17.3],[33.05,-18.4],[32.7,-19.5],[32.5,-20.5],[32.4,-21.3],[31.3,-22.4],[30.0,-22.3],[29.05,-22.2],[28.6,-21.6],[27.7,-21.1],[27.5,-20.3],[26.7,-19.7],[25.9,-18.8]] },
+  { name: 'Mosambik', poly: [[40.4,-10.5],[40.6,-12.7],[40.5,-14.2],[39.9,-16.2],[36.9,-17.9],[36.2,-18.8],[34.9,-19.9],[35.5,-22.1],[35.4,-23.8],[32.6,-25.9],[32.9,-26.85],[32.0,-26.8],[31.3,-25.7],[31.9,-24.3],[31.3,-22.4],[32.4,-21.3],[32.5,-20.5],[32.7,-19.5],[33.05,-18.4],[32.95,-17.3],[32.95,-16.7],[32.0,-16.45],[31.3,-16.0],[30.4,-15.62],[30.4,-14.9],[32.0,-14.3],[32.8,-13.8],[33.7,-14.5],[34.55,-14.6],[34.4,-15.3],[34.6,-16.2],[35.28,-17.13],[35.8,-16.5],[36.0,-15.5],[35.5,-14.4],[35.85,-13.0],[35.6,-11.6],[36.2,-11.7],[37.5,-11.7],[38.5,-11.4]] },
+  { name: 'Malawi', poly: [[33.2,-9.6],[33.9,-9.7],[34.7,-11.3],[35.6,-11.6],[35.85,-13.0],[35.5,-14.4],[36.0,-15.5],[35.8,-16.5],[35.28,-17.13],[34.6,-16.2],[34.4,-15.3],[34.55,-14.6],[33.7,-14.5],[32.8,-13.8],[33.4,-12.3],[33.3,-10.8]] },
+  { name: 'Tansania', poly: [[39.2,-4.65],[38.0,-3.7],[37.6,-3.0],[35.9,-1.6],[33.9,-1.0],[31.7,-1.0],[30.8,-1.6],[30.4,-2.4],[29.6,-4.4],[30.2,-6.8],[30.8,-8.3],[31.7,-8.9],[32.9,-9.4],[33.2,-9.6],[33.9,-9.7],[34.7,-11.3],[35.6,-11.6],[36.2,-11.7],[37.5,-11.7],[38.5,-11.4],[40.4,-10.5],[39.7,-8.0],[39.3,-6.8],[38.8,-6.0]] },
+  { name: 'Kenia', poly: [[39.2,-4.65],[39.75,-4.4],[40.2,-3.0],[41.55,-1.65],[41.0,2.8],[41.9,3.98],[40.8,4.3],[39.5,3.5],[38.1,3.6],[36.9,4.45],[35.5,5.0],[35.0,4.6],[34.4,3.7],[34.2,1.6],[34.0,0.4],[33.9,-1.0],[35.9,-1.6],[37.6,-3.0],[38.0,-3.7]] },
+  { name: 'Uganda', poly: [[33.9,-1.0],[31.7,-1.0],[30.7,-1.35],[29.6,-1.39],[29.6,-0.6],[29.95,0.6],[30.3,1.2],[30.9,2.4],[31.3,3.0],[31.8,3.6],[33.0,4.2],[34.0,4.2],[34.4,3.7],[34.2,1.6],[34.0,0.4]] },
+  { name: 'Äthiopien', poly: [[35.5,5.0],[34.5,6.7],[33.2,7.8],[33.0,8.4],[34.1,9.5],[34.3,10.9],[35.6,12.6],[36.4,14.4],[37.9,14.85],[39.1,14.5],[40.2,14.4],[40.2,13.1],[41.8,12.7],[42.4,12.5],[41.8,11.0],[42.9,10.9],[43.4,9.9],[44.9,9.0],[46.9,8.0],[47.9,8.0],[45.0,5.0],[43.6,4.9],[41.9,3.98],[40.8,4.3],[39.5,3.5],[38.1,3.6],[36.9,4.45]] },
+  { name: 'Angola', poly: [[12.3,-6.1],[16.0,-5.9],[16.7,-7.2],[17.6,-8.1],[19.4,-8.0],[19.5,-7.0],[20.6,-7.3],[21.8,-7.3],[21.8,-9.6],[22.2,-11.0],[24.0,-11.0],[24.0,-13.0],[22.0,-13.0],[22.2,-16.5],[23.3,-17.55],[20.9,-17.9],[18.4,-17.39],[14.2,-17.39],[11.75,-17.25],[12.5,-13.6],[13.8,-11.0],[13.2,-8.8],[13.4,-8.0]] },
+  { name: 'Südafrika', poly: [[16.45,-28.63],[17.4,-28.7],[19.2,-28.9],[20.0,-28.4],[20.0,-26.9],[20.8,-26.85],[21.8,-26.7],[22.6,-26.1],[23.0,-25.3],[24.2,-25.75],[25.6,-25.5],[25.9,-24.75],[26.9,-24.3],[27.9,-23.1],[29.05,-22.2],[30.0,-22.3],[31.3,-22.4],[31.9,-24.3],[32.0,-25.9],[31.4,-25.72],[30.8,-25.9],[30.8,-26.85],[31.1,-27.2],[31.95,-27.3],[32.13,-26.5],[32.9,-26.85],[32.5,-28.5],[31.0,-29.9],[30.0,-31.0],[28.0,-32.7],[27.0,-33.3],[26.0,-33.75],[25.6,-34.05],[23.0,-34.1],[20.0,-34.83],[18.5,-34.35],[18.3,-33.9],[18.0,-32.7],[17.8,-31.0],[16.9,-29.5]] }
+];
+
+// ═══ REGIONALE GEFAHREN-EBENE (für das Gefahren-Overlay) ═══
+// MUSS byteidentisch mit index.html + mobile.html bleiben (Single Source of Truth: Overlay UND GPS→Region-Injektion).
+const GEFAHREN_REGIONAL = {
+  'Südafrika': [
+    { r:'Nordost-Lowveld (Kruger, Limpopo/Mpumalanga, N-KwaZulu-Natal/Maputaland)', b:[29.8,-28.6,32.95,-22.1], g:'Big Five aktiv; Flusspferd + Nilkrokodil in Fluessen; MALARIA saisonal Sep-Mai (Peak Jan-Apr) -> Prophylaxe + Mueckenschutz' },
+    { r:'Limpopo-Nord (Mapungubwe, Musina, Vhembe)', b:[28.5,-23.2,31.3,-22.0], g:'MALARIA saisonal Sep-Mai (Peak Jan-Apr) — Vhembe ist Malariagebiet (CDC); Elefant/Krokodil am Limpopo; Schwarze Mamba/Puffotter' },
+    { r:'Kap-Region + Kueste (West-/Ostkap, Garden Route)', b:[17.3,-35.0,27.5,-31.0], g:'malariafrei; Kap-Kobra/Puffotter/Boomslang; Weisser Hai + Kap-Pelzrobbe an der Kueste; Grosswild nur in Reservaten' },
+    { r:'Binnenland-Hochveld (Gauteng, Free State, Kalahari, Karoo)', b:[19.0,-31.0,31.0,-22.0], g:'malariafrei; Puffotter/Kap-Kobra/Boomslang; Zecken (Zeckenbissfieber); Grosswild v. a. in umzaeunten Reservaten' },
+  ],
+  'Namibia': [
+    { r:'Sambesi-Streifen (Ex-Caprivi) + Kavango (Rundu)', b:[17.6,-18.6,25.3,-17.3], g:'MALARIA ganzjaehrig hoch; Flusspferd + Nilkrokodil (Sambesi/Kwando/Okavango, viele Zwischenfaelle); Elefant/Bueffel/Loewe; Tsetse moeglich' },
+    { r:'Nord-Namibia (Ovamboland, Etosha, Kaokoveld)', b:[13.0,-20.0,17.6,-17.3], g:'MALARIA saisonal Sep-Mai (Peak Dez-Apr; 2025/26 starker Anstieg der Faelle im Norden); Etosha: Loewe/Elefant/Nashorn/Leopard; wuestenangepasste Elefanten/Loewen; Puffotter/Speikobra' },
+    { r:'Zentral- + Sued-Namibia (Windhoek, Namib, Kalahari)', b:[14.0,-28.9,20.0,-20.0], g:'trocken, Malaria gering; Gepard/Oryx; Puffotter, Zebra-/Speikobra, Horn-/Sandvipern (Wueste); Skorpione' },
+  ],
+  'Botswana': [
+    { r:'Norden (Okavango-Delta, Chobe, Linyanti, Ngamiland)', b:[22.0,-21.0,25.95,-17.8], g:'hoechste Wilddichte: Elefant (weltgroesste Population), Loewe, Leopard, Wildhund; Flusspferd + Nilkrokodil (viele Zwischenfaelle); MALARIA ganzjaehrig moeglich (Nord-Ngamiland/Chobe), Hochsaison Sep-Mai; TSETSE im Delta' },
+    { r:'Nordost (Makgadikgadi, Nxai, Boteti, Tutume)', b:[24.0,-21.6,29.4,-19.0], g:'MALARIA saisonal Sep-Mai; Loewe/Elefant saisonal; Flusspferd/Krokodil am Boteti; Puffotter/Speikobra' },
+    { r:'Kalahari-Sueden (Ghanzi, Kgalagadi, Gaborone)', b:[20.0,-26.9,28.0,-21.6], g:'trocken, Malaria gering (Ghanzi/Kgalagadi: geringes Restrisiko, nicht null — CDC); Wuestenloewe/Gepard (Kgalagadi); Puffotter/Kap-Kobra/Boomslang; Erdmaennchen' },
+  ],
+  'Sambia': [
+    { r:'Luangwa-Tal (South/North Luangwa, Ost-Sambia)', b:[30.0,-14.5,33.7,-11.0], g:'sehr hohe Flusspferd-Dichte + Nilkrokodil (viele Zwischenfaelle); Loewe/Leopard/Bueffel; TSETSE/Schlafkrankheit-Fokus (Mambwe/Chama/Mpika); MALARIA ganzjaehrig' },
+    { r:'Kafue + Unterer Sambesi (Zentral/Sued)', b:[24.5,-18.0,30.5,-14.5], g:'Loewe/Leopard/Elefant/Bueffel; Flusspferd + Krokodil (Sambesi/Kafue); TSETSE (Kafue-Oekosystem); MALARIA ganzjaehrig; Mamba/Puffotter/Boomslang' },
+    { r:'Nord + Copperbelt (Bangweulu, Kasanka, Nordwest)', b:[22.0,-13.0,33.5,-8.0], g:'MALARIA ganzjaehrig hoch; Flusspferd/Krokodil in Feuchtgebieten; TSETSE in praktisch allen Nationalparks (AA); Gabunviper in Waeldern; Sitatunga/Letschwe' },
+  ],
+  'Zimbabwe': [
+    { r:'Ost-Hochland (Nyanga, Vumba, Chimanimani, Honde-Tal)', b:[32.35,-20.5,33.05,-18.0], g:'MALARIA ganzjaehrig in den Taelern (Honde-Tal, Mutare — AA: Osten hoch), nur Hochlagen ueber ~1800 m geringer; GABUNVIPER in feuchten Waldtaelern (Honde-Tal); Waldvipern; wenig Grosswild' },
+    { r:'Victoriafaelle + Sambesi-Oberlauf (Vic Falls, Binga, Kariba-West)', b:[25.5,-18.2,27.9,-16.4], g:'MALARIA ganzjaehrig hoch (AA: auch Victoriafaelle); Elefant/Bueffel am Sambesi; Flusspferd + Nilkrokodil (Sambesi/Kariba); Puffotter/Speikobra' },
+    { r:'Sambesi-Tal + Kariba (Mana Pools, Hurungwe)', b:[25.5,-16.6,31.5,-15.6], g:'Big Five (Mana Pools); Flusspferd + Nilkrokodil (Sambesi/Kariba, viele Zwischenfaelle); MALARIA ganzjaehrig; TSETSE/Schlafkrankheit-Fokus (Hurungwe/Kariba)' },
+    { r:'Suedost-Lowveld (Gonarezhou, Save-/Runde-Tal)', b:[30.0,-22.4,32.5,-20.0], g:'Elefant/Loewe/Leopard; Krokodil/Flusspferd (Save/Runde); MALARIA saisonal Sep-Mai; Schwarze Mamba/Puffotter/Speikobra' },
+    { r:'Hwange + Nordwest (Hwange NP, Dete)', b:[25.5,-19.9,27.7,-18.2], g:'Big Five + grosse Elefantenherden; MALARIA saisonal Sep-Mai; Puffotter/Boomslang' },
+    { r:'Hochveld (Harare, Bulawayo, Matobo)', b:[25.5,-21.5,32.0,-17.3], g:'Malaria gering im Hochveld ueber ~1400 m (Harare/Bulawayo), in tieferen Lagen saisonal; Puffotter/Boomslang; Grosswild in Reservaten' },
+  ],
+  'Mosambik': [
+    { r:'Kueste + Inseln (Bazaruto, Quirimbas, Straende)', b:[32.5,-26.9,41.0,-10.5], g:'MALARIA ganzjaehrig; im Meer Haie, Steinfisch, Feuerquallen; Nilkrokodil in Kuestenlagunen/Flussmuendungen' },
+    { r:'Nord + Zentrum (Niassa, Gorongosa, Sambesi, Cahora Bassa)', b:[30.2,-19.5,40.5,-10.5], g:'MALARIA ganzjaehrig; Elefant/Loewe/Leopard/Wildhund/Bueffel; Flusspferd + Nilkrokodil (Sambesi); TSETSE in Waeldern; Mamba/Speikobra/Boomslang' },
+    { r:'Sued (Limpopo NP, Maputo, Inhambane)', b:[31.3,-26.9,35.6,-21.0], g:'MALARIA ganzjaehrig; Krokodil/Flusspferd (Limpopo/Incomati); Grosswild an der SA-Grenze; Mosambik-Speikobra/Puffotter' },
+  ],
+  'Malawi': [
+    { r:'Malawisee + Ufer (Cape Maclear, Nkhata Bay, Likoma)', b:[33.6,-14.5,35.3,-9.4], g:'MALARIA ganzjaehrig; BILHARZIOSE im ganzen See (auch klares Wasser und Straende — AA: nicht baden); Nilkrokodil/Flusspferd an Muendungen; Fischadler' },
+    { r:'Sued + Shire-Tal (Blantyre, Lower Shire, Majete)', b:[34.0,-17.2,35.9,-15.0], g:'MALARIA ganzjaehrig hoch; Flusspferd + Nilkrokodil (Shire - Haupt-Risiko); Schwarze Mamba/Speikobra/Boomslang' },
+    { r:'Zentrum + Wildparks (Lilongwe, Liwonde, Nkhotakota, Kasungu)', b:[33.0,-16.0,35.3,-12.0], g:'MALARIA ganzjaehrig (ganzes Land inkl. Staedte — AA); wieder Big Five (Majete/Liwonde): Elefant/Loewe/Leopard/Nashorn/Bueffel; Flusspferd + Krokodil (Shire); TSETSE (Kasungu/Vwaza, Nkhotakota, Liwonde/Mangochi, Rumphi — AA); Mamba/Puffotter' },
+  ],
+  'Tansania': [
+    { r:'Kilimandscharo (Bergmassiv ueber ~2500 m)', b:[37.0,-3.3,37.7,-2.8], g:'ueber ~2500 m malaria-arm (Kaelte/Hoehe als Hauptrisiko) — Moshi/Arusha am Fuss (900-1400 m) sind Malariagebiet; wenig Grosswild' },
+    { r:'Nord-Safari-Kreis (Serengeti, Ngorongoro, Tarangire, Manyara, Arusha, Moshi)', b:[34.0,-4.5,37.8,-1.0], g:'Big Cats/Elefant/Bueffel/Nashorn; Flusspferd + Nilkrokodil (Mara-Fluss, viele Zwischenfaelle); MALARIA ganzjaehrig unter ~1800 m (Serengeti/Tarangire/Manyara/Arusha/Moshi: ja; Ngorongoro-Kraterrand ~2300 m: geringer); TSETSE (Serengeti/Tarangire — AA)' },
+    { r:'Sued + West (Ruaha, Nyerere/Selous, Katavi)', b:[30.0,-11.0,38.5,-6.0], g:'Loewe/Leopard/Elefant/Wildhund; Flusspferd + Krokodil (Rufiji); TSETSE in Miombo/Selous, Tabora/Rukwa/Kigoma (Schlafkrankheit — AA); MALARIA ganzjaehrig' },
+    { r:'Kueste + Sansibar (Dar es Salaam, Zanzibar, Mafia)', b:[38.5,-11.0,40.5,-4.5], g:'MALARIA ganzjaehrig hoch (auch Sansibar/Pemba/Mafia — AA); Gruene Mamba/Gabunviper in Kuestenwaeldern; im Meer Haie/Steinfisch' },
+  ],
+  'Kenia': [
+    { r:'Kueste (Mombasa, Diani, Watamu, Lamu)', b:[38.5,-4.7,41.9,-1.6], g:'MALARIA ganzjaehrig hoch; Nilkrokodil in Flussmuendungen; Gruene Mamba/Gabunviper in Kuestenwaeldern; im Meer Haie/Steinfisch' },
+    { r:'Victoriasee-Becken + West (Kisumu, Masai Mara)', b:[33.9,-1.6,36.0,1.0], g:'MALARIA ganzjaehrig hoch; Masai Mara: Big Cats/Elefant/Bueffel; Flusspferd + Nilkrokodil (Mara-Fluss); Puffotter/Mamba' },
+    { r:'Zentral-Hochland (Nairobi, Mt. Kenya, Aberdares)', b:[36.0,-1.6,38.0,0.8], g:'MALARIA ganzjaehrig moeglich bis ~2500 m (CDC/AA: nur das Zentrum Nairobis gilt als gering — Vororte, Rift-Taeler, Naivasha: Risiko); Bueffel/Elefant in Bergwaeldern; Puffotter; Kaelte in Hoehe' },
+    { r:'Sued-Savanne + Nord (Amboseli, Tsavo, Samburu)', b:[36.0,-3.6,41.0,2.8], g:'Big Five (Amboseli/Tsavo); Elefant/Loewe; MALARIA ganzjaehrig (Amboseli/Tsavo/Samburu); Schwarze Mamba/Puffotter/Speikobra; trockene Hitze; Nord-Kenia (Turkana, Marsabit, Wajir/Mandera, Lamu-Hinterland): Teilreisewarnung AA pruefen' },
+  ],
+  'Uganda': [
+    { r:'West-Rift (Queen Elizabeth, Murchison, Kazinga-Kanal)', b:[29.5,-1.0,32.5,3.6], g:'MALARIA ganzjaehrig; Flusspferd + Nilkrokodil (Nil/Kazinga - Haupt-Risiko); Loewe/Elefant/Bueffel; TSETSE in Waeldern; Gabunviper/Mamba' },
+    { r:'Suedwest-Bergland (Bwindi, Mgahinga - Gorillas)', b:[29.5,-1.5,30.5,-0.6], g:'BERGGORILLAS (Trekking); MALARIA ganzjaehrig auch im Bergland (AA: ganzes Land, in der Hoehe seltener); kuehl/feucht; Waldvipern/Gabunviper; keine Ebenen-Raubtiere' },
+    { r:'Norden + Osten (Kidepo, Mt. Elgon, Nil-Norden)', b:[30.5,1.0,35.0,4.2], g:'MALARIA ganzjaehrig; TSETSE-/Schlafkrankheit-Foki (Nordwest); Loewe/Elefant (Kidepo); Krokodil im Nil; Puffotter/Mamba; Grenze DR Kongo (Semliki, 20-km-Streifen): Reisewarnung + Ebola-Lage pruefen (WHO DON)' },
+  ],
+  'Ruanda': [
+    { r:'Ost (Akagera NP, tiefere Lagen)', b:[30.3,-2.5,30.95,-1.0], g:'MALARIA ganzjaehrig hoch; Big Five (Akagera): Loewe/Nashorn/Elefant/Bueffel/Leopard; Flusspferd + Nilkrokodil (Seen); Puffotter/Jameson-Mamba' },
+    { r:'Nordwest-Vulkane (Volcanoes NP - Gorillas)', b:[29.3,-1.7,29.8,-1.3], g:'BERGGORILLAS (Trekking); MALARIA ganzjaehrig moeglich (AA/CDC: ganzes Land; in der Hoehe seltener); kuehl/feucht; wenig Grosswild; Vorsicht Kaelte/Hoehe' },
+    { r:'Zentrum + Sued (Kigali, Nyungwe, Kivu)', b:[28.8,-2.85,30.3,-1.3], g:'MALARIA ganzjaehrig, auch in Kigali (AA/CDC: ganzes Land inkl. Staedte); Nyungwe: Schimpansen, Waldschlangen; Flusspferd/Krokodil am Kivu-Ufer' },
+  ],
+  'Burundi': [
+    { r:'Tanganjika-Ufer + Rusizi (Bujumbura, Rusizi NP)', b:[29.0,-4.5,29.6,-2.8], g:'MALARIA ganzjaehrig; Flusspferd + Nilkrokodil (See/Rusizi - Haupt-Risiko am Wasser!); Speikobra/Puffotter' },
+    { r:'Bergland + Ruvubu (Zentrum/Ost)', b:[29.6,-4.5,30.9,-2.3], g:'MALARIA ganzjaehrig; Ruvubu: Bueffel/Antilopen; Kibira: Schimpansen; Gabunviper/Jameson-Mamba in Waeldern; Nord (Cibitoke, Bubanza, Kibira, RN4): Teilreisewarnung AA' },
+  ],
+  'Äthiopien': [
+    { r:'Addis Abeba (Stadtzentrum, 2300-2500 m)', b:[38.6,8.85,38.95,9.15], g:'Malaria gering im Stadtzentrum (CDC/AA); Umland, Rift und Tiefland: Risiko; Hoehe/Kaelte; Streifenhyaenen nachts am Stadtrand' },
+    { r:'Tiefland Sued/West (Omo, Mago, Gambella, unter 2500 m)', b:[33.0,3.4,38.0,9.5], g:'MALARIA ganzjaehrig (unter ~2500 m); Grenzstreifen zu Kenia (Moyale/Borena, Minen abseits der Hauptstrasse): Reisewarnung AA; Loewe/Leopard/Elefant/Bueffel; Flusspferd + Nilkrokodil (Omo/Baro); Schwarze Mamba/Puffotter' },
+    { r:'Rift-Seen + Awash (Ost/Zentral-Tiefland)', b:[38.3,7.0,42.5,12.0], g:'MALARIA ganzjaehrig (Rift-Seen ~1600-1900 m, Awash, Danakil); Krokodil/Flusspferd (Rift-Seen/Awash); Streifenhyaene; Puffotter/Kobras; grosse Hitze (Danakil); Afar/Somali: Teilreisewarnung AA' },
+    { r:'Hochland (Addis, Simien, Bale, Gondar, Tana-See)', b:[36.0,6.0,40.0,14.5], g:'MALARIA bis ~2500 m auch im Hochland (Bahir Dar 1800 m, Tana-See, Gondar 2100 m, Lalibela-Umland — CDC/AA); nur Addis-Zentrum und ueber ~2500 m (Simien, Bale, Entoto) praktisch kein Risiko; Endemiten: Dschelada, Aethiopischer Wolf, Walia-Steinbock; Kaelte/Hoehe als Hauptrisiko; AA: Reisewarnung fuer Amhara/Tigray und weitere Regionen — vor jeder Etappe pruefen' },
+  ],
+  'Angola': [
+    { r:'Suedost (Luengue-Luiana, KAZA, Cuando/Okavango-Quellen)', b:[19.0,-18.0,23.5,-13.0], g:'MALARIA ganzjaehrig; wachsende Bestaende: Elefant/Loewe/Leopard/Bueffel/Wildhund; Flusspferd + Nilkrokodil; TSETSE; Mamba/Puffotter/Boomslang' },
+    { r:'Kueste + Iona (Namibe, Luanda, Suedwest)', b:[11.7,-17.3,14.5,-6.0], g:'MALARIA ganzjaehrig hoch (Luanda und ganze Kueste — AA; nur Wuestensueden/Iona geringer); im Meer Haie; Krokodil in Flussmuendungen; Wuestenschlangen' },
+    { r:'Nord + Zentrum (Kwanza, Cangandala/Luando)', b:[13.0,-13.0,24.0,-4.0], g:'MALARIA ganzjaehrig hoch; Krokodil/Flusspferd (Kwanza); endemische Riesen-Rappenantilope; ACHTUNG Minen-Altlasten abseits der Pisten' },
+  ],
+  'Eswatini': [
+    { r:'Ost-Lowveld (Lubombo, Big Bend, Hlane, Mkhaya)', b:[31.4,-27.3,32.15,-25.7], g:'MALARIA saisonal Sep-Mai (Peak Dez-Apr), Restrisiko Jun-Aug; Big Five in Reservaten; Flusspferd + Nilkrokodil; Mamba/Speikobra/Puffotter' },
+    { r:'Highveld + Mbabane (West)', b:[30.8,-27.3,31.4,-25.7], g:'Mbabane/Highveld malaria-arm; kuehler; Puffotter/Boomslang; Grosswild v. a. in Reservaten' },
+  ],
+  'Lesotho': [
+    { r:'Ganzes Land (Hochgebirge 1400-3480 m)', b:[27.0,-30.7,29.5,-28.5], g:'KEINE Malaria (zu hoch/kalt); KEIN Grosswild; Hauptrisiken: Kaelte/Hoehe/Wetterumschwung, freilaufende Huetehunde; Berg-Puffotter/Rinkhals selten' },
+  ],
+};
+
+function drawLaenderUmrisse() {
+  LAENDER_GEO.forEach(l => {
+    L.polygon(l.poly.map(pt => [pt[1], pt[0]]), {
+      color: '#5a5750', weight: 1.2, dashArray: '4 3', fill: false, interactive: false
+    }).addTo(map);
+    let sx = 0, sy = 0;
+    l.poly.forEach(pt => { sx += pt[0]; sy += pt[1]; });
+    L.marker([sy / l.poly.length, sx / l.poly.length], {
+      icon: L.divIcon({ html: `<div style="font-family:monospace;font-size:10px;color:#9a9589;text-shadow:0 1px 3px #000;white-space:nowrap;transform:translate(-50%,-50%);pointer-events:none">${l.name}</div>`, className: '', iconSize: [0, 0] }),
+      interactive: false, keyboard: false
+    }).addTo(map);
+  });
+}
+
+// ═══ REISEWARNUNGS-EBENE (amtlich, offline aus dem Cache des Servers) ═══
+// Eingefärbt wird das LAND — mit der Landesgrenze aus LAENDER_GEO, die die App ohnehin hat.
+// Die gewarnten Regionen stehen als amtlicher TEXT im Popup: für sie gibt es offline keine
+// Grenzverläufe, und erfundene Flächen wären schlimmer als keine. Farbe = amtliche Einstufung.
+let reisewarnAn = localStorage.getItem('safari-reisewarn-layer') === '1';
+let reisewarnLeafletLayer = null;
+
+function reisewarnGeoJSON() {
+  // Wo Gebietsgrenzen vorliegen (data/warnzonen.geojson), werden DIE eingefärbt — sonst die
+  // Landesfläche. So verschwindet kein Land stillschweigend, nur weil seine Gebiete fehlen.
+  const feats = [];
+  const zonen = (WARNZONEN && WARNZONEN.features) || [];
+  const mitZonen = new Set();
+  zonen.forEach(f => {
+    const p = f.properties || {};
+    mitZonen.add(p.land);
+    feats.push({ type: 'Feature', geometry: f.geometry, properties: Object.assign({}, p,
+      { art: 'gebiet', color: warnFarbe(p.stufe) }) });
+  });
+  LAENDER_GEO.forEach(l => {
+    const e = reisewarnLand(l.name), st = reisewarnStufe(l.name);
+    if (!e || !e.aa || st.rang < 2 || mitZonen.has(l.name)) return;
+    feats.push({
+      type: 'Feature',
+      properties: { art: 'land', land: l.name, stufe: e.aa.stufe || st.text, stand: e.aa.stand || '',
+                    text: e.aa.warntext || '', url: e.aa.url || '', color: st.farbe },
+      geometry: { type: 'Polygon', coordinates: [l.poly.concat([l.poly[0]])] }
+    });
+  });
+  return { type: 'FeatureCollection', features: feats };
+}
+
+function reisewarnPopupHtml(p) {
+  if (p.art === 'gebiet') {
+    return `<div style="font-family:monospace;font-size:11px;max-width:280px;line-height:1.5">
+      <div style="font-weight:700;color:#e07a5f">🛑 ${esc(p.name)} — ${esc(p.stufe_text || '')}</div>
+      <div style="margin-top:3px;font-size:9px;color:#666">${esc(p.land)} · Auswärtiges Amt, Stand ${esc(p.stand || 'unbekannt')}</div>
+      <div style="margin-top:4px;color:#333;white-space:pre-wrap">${esc(p.satz || '')}</div>
+      ${p.einschraenkung ? '<div style="margin-top:4px;color:#a15;font-size:10px">⚑ Der Satz nennt Ausnahmen oder meint nur einen Teil des Gebiets — Wortlaut oben lesen.</div>' : ''}
+      <div style="margin-top:6px;font-size:9px;color:#888">Fläche: Verwaltungsgrenze aus OpenStreetMap (ODbL), Gebiet „${esc(p.osm_name || p.name)}". Maßgeblich ist der amtliche Text, nicht diese Fläche.</div>
+    </div>`;
+  }
+  return `<div style="font-family:monospace;font-size:11px;max-width:280px;line-height:1.5">
+    <div style="font-weight:700;color:#e07a5f">🛑 ${esc(p.land)} — ${esc(p.stufe)}</div>
+    <div style="margin-top:3px;font-size:9px;color:#666">Auswärtiges Amt · Stand ${esc(p.stand || 'unbekannt')}</div>
+    <div style="margin-top:4px;color:#333;white-space:pre-wrap;max-height:200px;overflow-y:auto">${esc(p.text)}</div>
+    <div style="margin-top:6px;font-size:9px;color:#888">Amtlicher Text, wörtlich. Für dieses Land liegen keine Gebietsgrenzen vor — die Landesfläche zeigt nur, DASS eine Warnung besteht. Grenzen holen: <code>python3 fetch-warnzonen.py</code>. Vor der Reiseentscheidung den Originaltext lesen${sicherLink(p.url) ? ': <a href="' + esc(sicherLink(p.url)) + '" target="_blank" rel="noopener">auswaertiges-amt.de ↗</a>' : ''}.</div>
+  </div>`;
+}
+
+function reisewarnLeaflet(an) {
+  if (reisewarnLeafletLayer) { try { map.removeLayer(reisewarnLeafletLayer); } catch (e) {} reisewarnLeafletLayer = null; }
+  if (!an || !map) return;
+  reisewarnLeafletLayer = L.geoJSON(reisewarnGeoJSON(), {
+    style: f => ({ color: f.properties.color, weight: f.properties.art === 'gebiet' ? 2 : 2,
+                   dashArray: f.properties.art === 'gebiet' ? null : '6 4',
+                   fillColor: f.properties.color, fillOpacity: f.properties.art === 'gebiet' ? 0.22 : 0.08 }),
+    onEachFeature: (f, layer) => layer.bindPopup(reisewarnPopupHtml(f.properties))
+  }).addTo(map);
+}
+
+function reisewarnMaplibre(an) {
+  if (!mlMap || !mlMap.isStyleLoaded()) return;
+  try {
+    if (mlMap.getLayer('reisewarn-fill')) mlMap.removeLayer('reisewarn-fill');
+    if (mlMap.getLayer('reisewarn-line')) mlMap.removeLayer('reisewarn-line');
+    if (mlMap.getSource('reisewarn-src')) mlMap.removeSource('reisewarn-src');
+  } catch (e) {}
+  if (!an) return;
+  mlMap.addSource('reisewarn-src', { type: 'geojson', data: reisewarnGeoJSON() });
+  mlMap.addLayer({ id: 'reisewarn-fill', type: 'fill', source: 'reisewarn-src', paint: { 'fill-color': ['get', 'color'],
+    'fill-opacity': ['case', ['==', ['get', 'art'], 'gebiet'], 0.22, 0.08] } });
+  mlMap.addLayer({ id: 'reisewarn-line', type: 'line', source: 'reisewarn-src', paint: { 'line-color': ['get', 'color'], 'line-width': 2, 'line-dasharray': [3, 2] } });
+  if (!mlMap.__reisewarnClickBound) {
+    mlMap.__reisewarnClickBound = true;
+    mlMap.on('click', 'reisewarn-fill', e => {
+      if (mlMap.getLayer('parks-fill') && mlMap.queryRenderedFeatures(e.point, { layers: ['parks-fill'] }).length) return;
+      if (mlMap.getLayer('gefahren-fill') && mlMap.queryRenderedFeatures(e.point, { layers: ['gefahren-fill'] }).length) return;
+      new maplibregl.Popup().setLngLat(e.lngLat).setHTML(reisewarnPopupHtml(e.features[0].properties)).addTo(mlMap);
+    });
+  }
+}
+
+function renderReisewarnEbene() {
+  const btn = document.getElementById('reisewarn-toggle-btn');
+  if (btn) { btn.classList.toggle('active', reisewarnAn); btn.style.borderColor = reisewarnAn ? '#e24b4a' : ''; }   // 2026-10-05-2: sichtbar an/aus wie Regen und Gefahren
+  reisewarnLeaflet(reisewarnAn);
+  reisewarnMaplibre(reisewarnAn);
+}
+
+function toggleReisewarnung() {
+  reisewarnAn = !reisewarnAn;
+  localStorage.setItem('safari-reisewarn-layer', reisewarnAn ? '1' : '0');
+  renderReisewarnEbene();
+  if (!reisewarnAn) return;
+  const c = reisewarnCache(), gj = reisewarnGeoJSON();
+  const gebiete = gj.features.filter(f => f.properties.art === 'gebiet').length;
+  const laender = gj.features.length - gebiete;
+  const stand = c && c.status && c.status.geholt ? new Date(c.status.geholt * 1000).toLocaleDateString('de-DE') : null;
+  if (!c) { zeigeKartenHinweis('🛑 Noch kein Abruf der Reisewarnungen — der Assistent holt sie automatisch, sobald Internet da ist (⚙️ Reisewarnungen → „Jetzt holen").'); return; }
+  if (!gj.features.length) { zeigeKartenHinweis(`🛑 Keines der Routen-Länder hat derzeit eine (Teil-)Reisewarnung (Stand ${stand}).`); return; }
+  if (zeigeWarnlage()) return;   // Position bekannt: die Lage dazu ist die wichtigere Meldung
+  zeigeKartenHinweis(`🛑 ${gebiete} gewarnte Gebiete als Fläche${laender ? `, ${laender} Länder nur als Landesfläche (Grenzen fehlen: python3 fetch-warnzonen.py)` : ''}, Stand ${stand} — Fläche antippen zeigt den amtlichen Satz.`);
+}
+
+async function ladeReisewarnEbene() {
+  try { await ladeReisewarnungen(SERVER_BASE); } catch (e) { /* offline — gespeicherter Stand gilt */ }
+  await ladeWarnzonen(SERVER_BASE);
+  renderReisewarnEbene();
+}
+// Lage zur eigenen Position: die eigentliche Frage unterwegs. Wird beim Einschalten der Ebene und
+// nach jedem 📍 gezeigt — mit der GPS-Genauigkeit daneben, damit „knapp außerhalb" nicht als
+// Entwarnung missverstanden wird.
+function zeigeWarnlage(genauigkeitM) {
+  if (!userPos) return '';
+  const satz = warnlageSatz(userPos.lat, userPos.lng);
+  if (!satz) return '';
+  const zusatz = genauigkeitM ? ` (GPS ±${Math.round(genauigkeitM)} m)` : '';
+  zeigeKartenHinweis(esc(satz) + zusatz, true);
+  return satz;
+}
+
+// ═══ GEFAHRENZONEN-OVERLAY (aus GEFAHREN_REGIONAL, offline, toggelbar) ═══
+// Rendert die web-verifizierten Regionsboxen als Flächen in BEIDEN Kartenmodi (Leaflet + MapLibre).
+// Farbe = grobe Gefahren-Kategorie; Klick zeigt den vollständigen Gefahren-Text der Region.
+// Quelle = dieselbe wie die GPS→Region-Injektion in index/mobile (Single Source of Truth).
+let gefahrenAn = localStorage.getItem('safari-gefahren-layer') === '1';
+let gefahrenLeafletLayer = null;
+
+function gefahrenKategorie(g) {
+  if (/ganzjaehrig/i.test(g) && /malaria/i.test(g)) return { key: 'malaria-hoch', color: '#e24b4a', label: 'Malaria ganzjährig' };
+  if (/malaria/i.test(g) && /saisonal|Nov-|Sep-|Peak/i.test(g)) return { key: 'malaria-saison', color: '#e0842f', label: 'Malaria saisonal' };
+  if (/tsetse/i.test(g)) return { key: 'tsetse', color: '#8e6bd6', label: 'Tsetse/Schlafkrankheit' };
+  if (/malariafrei/i.test(g) || /KEINE Malaria/i.test(g) || /malaria gering/i.test(g) || /malaria-arm/i.test(g)) return { key: 'gering', color: '#3a9d6b', label: 'Malaria gering/frei' };
+  return { key: 'sonstige', color: '#c9a227', label: 'Big Game / Krokodil / Fluss' };
+}
+
+function gefahrenGeoJSON() {
+  const feats = [];
+  for (const land in GEFAHREN_REGIONAL) {
+    GEFAHREN_REGIONAL[land].forEach(reg => {
+      if (!reg.b) return;
+      const w = reg.b[0], s = reg.b[1], e = reg.b[2], n = reg.b[3];
+      const kat = gefahrenKategorie(reg.g);
+      feats.push({
+        type: 'Feature',
+        properties: { land: land, r: reg.r, g: reg.g, color: kat.color, kat: kat.label },
+        geometry: { type: 'Polygon', coordinates: [[[w, s], [e, s], [e, n], [w, n], [w, s]]] }
+      });
+    });
+  }
+  return { type: 'FeatureCollection', features: feats };
+}
+
+function gefahrenPopupHtml(p) {
+  return `<div style="font-family:monospace;font-size:11px;max-width:240px;line-height:1.5">
+    <div style="font-weight:700;color:#e07a5f">🦟 ${esc(p.land)} — ${esc(p.r)}</div>
+    <div style="margin-top:3px;font-size:9px;color:#b06">${esc(p.kat)}</div>
+    <div style="margin-top:4px;color:#333">${esc(p.g)}</div>
+    <div style="margin-top:6px;font-size:9px;color:#888">Grobe Orientierungszone (Stand 07/2026) — keine Grenze, keine Garantie.</div>
+  </div>`;
+}
+
+function gefahrenLeaflet(an) {
+  if (gefahrenLeafletLayer) { try { map.removeLayer(gefahrenLeafletLayer); } catch (e) {} gefahrenLeafletLayer = null; }
+  if (!an || !map) return;
+  gefahrenLeafletLayer = L.geoJSON(gefahrenGeoJSON(), {
+    style: f => ({ color: f.properties.color, weight: 1, fillColor: f.properties.color, fillOpacity: 0.14 }),
+    onEachFeature: (f, layer) => layer.bindPopup(gefahrenPopupHtml(f.properties))
+  }).addTo(map);
+}
+
+function gefahrenMaplibre(an) {
+  if (!mlMap || !mlMap.isStyleLoaded()) return;
+  try {
+    if (mlMap.getLayer('gefahren-fill')) mlMap.removeLayer('gefahren-fill');
+    if (mlMap.getLayer('gefahren-line')) mlMap.removeLayer('gefahren-line');
+    if (mlMap.getSource('gefahren-src')) mlMap.removeSource('gefahren-src');
+  } catch (e) {}
+  if (!an) return;
+  mlMap.addSource('gefahren-src', { type: 'geojson', data: gefahrenGeoJSON() });
+  mlMap.addLayer({ id: 'gefahren-fill', type: 'fill', source: 'gefahren-src', paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.14 } });
+  mlMap.addLayer({ id: 'gefahren-line', type: 'line', source: 'gefahren-src', paint: { 'line-color': ['get', 'color'], 'line-width': 1 } });
+  if (!mlMap.__gefahrenClickBound) {
+    mlMap.__gefahrenClickBound = true;
+    mlMap.on('click', 'gefahren-fill', e => {
+      // Liegt ein Park unter dem Klick, hat dessen Popup Vorrang (sonst zwei Popups übereinander)
+      if (mlMap.getLayer('parks-fill') && mlMap.queryRenderedFeatures(e.point, { layers: ['parks-fill'] }).length) return;
+      const p = e.features[0].properties;
+      new maplibregl.Popup().setLngLat(e.lngLat).setHTML(gefahrenPopupHtml(p)).addTo(mlMap);
+    });
+  }
+}
+
+// ═══ PARK-POLYGONE (Verfeinerung: echte OSM-Grenzen statt nur grober Boxen) ═══
+// data/parks.geojson erzeugt fetch-parks.py (einmalig mit Internet; © OpenStreetMap/ODbL).
+// Fehlt die Datei, bleibt das Overlay bei den Regionsboxen — der Toggle-Hinweis sagt das
+// sichtbar (Projektregel: nie still scheitern). Gefahren-TEXT bleibt aus GEFAHREN_REGIONAL
+// (Single Source of Truth): jeder Park erbt beim Laden den Text seiner Region (BBox-Mitte).
+let parksGeo = null;
+let parksLeafletLayer = null;
+
+async function ladeParks() {
+  try {
+    const res = await fetch(SERVER_BASE + '/data/parks.geojson');
+    if (!res.ok) return;
+    const gj = await res.json();
+    if (gj && gj.type === 'FeatureCollection' && Array.isArray(gj.features) && gj.features.length) {
+      gj.features.forEach(f => {
+        const reg = parkRegion(f);
+        f.properties.region = reg ? reg.r : '';
+        f.properties.gefahr = reg ? reg.g : '';
+      });
+      parksGeo = gj;
+      if (gefahrenAn) renderGefahren(); // Layer war schon an → Parks nachziehen
+    }
+  } catch (e) { /* Datei fehlt / file:// — Boxen-Fallback, Hinweis kommt beim Toggle */ }
+}
+
+function parkRegion(f) {
+  // BBox-Mittelpunkt des Parks → passende GEFAHREN_REGIONAL-Box desselben Landes
+  if (!f.__c) {
+    let minx = 1e9, miny = 1e9, maxx = -1e9, maxy = -1e9;
+    const scan = ring => ring.forEach(pt => {
+      if (pt[0] < minx) minx = pt[0]; if (pt[0] > maxx) maxx = pt[0];
+      if (pt[1] < miny) miny = pt[1]; if (pt[1] > maxy) maxy = pt[1];
+    });
+    const g = f.geometry;
+    (g.type === 'Polygon' ? [g.coordinates] : g.coordinates).forEach(poly => poly.forEach(scan));
+    f.__c = [(minx + maxx) / 2, (miny + maxy) / 2];
+  }
+  const regs = GEFAHREN_REGIONAL[f.properties.land] || [];
+  return regs.find(r => r.b && f.__c[0] >= r.b[0] && f.__c[1] >= r.b[1] && f.__c[0] <= r.b[2] && f.__c[1] <= r.b[3]) || null;
+}
+
+function parkPopupHtml(p) {
+  return `<div style="font-family:monospace;font-size:11px;max-width:240px;line-height:1.5">
+    <div style="font-weight:700;color:#3a9d6b">🏞️ ${esc(p.name)}</div>
+    <div style="margin-top:3px;font-size:9px;color:#b06">${esc(p.typ)} — ${esc(p.land)}${p.region ? ' · ' + esc(p.region) : ''}</div>
+    ${p.gefahr ? `<div style="margin-top:4px;color:#333">${esc(p.gefahr)}</div>` : ''}
+    <div style="margin-top:6px;font-size:9px;color:#888">Grenze © OpenStreetMap (ODbL), vereinfacht — Orientierung, keine Garantie.</div>
+  </div>`;
+}
+
+function parksLeaflet(an) {
+  if (parksLeafletLayer) { try { map.removeLayer(parksLeafletLayer); } catch (e) {} parksLeafletLayer = null; }
+  if (!an || !map || !parksGeo) return;
+  // Helleres Grün + kräftigere Linie als die Regionsboxen — sonst gehen die Parks
+  // zwischen den grünen "Malaria gering"-Boxen unter (Nutzer-Feedback 20.07.)
+  parksLeafletLayer = L.geoJSON(parksGeo, {
+    style: { color: '#5fd99f', weight: 2, fillColor: '#5fd99f', fillOpacity: 0.16 },
+    onEachFeature: (f, layer) => layer.bindPopup(parkPopupHtml(f.properties))
+  }).addTo(map);
+}
+
+function parksMaplibre(an) {
+  if (!mlMap || !mlMap.isStyleLoaded()) return;
+  try {
+    if (mlMap.getLayer('parks-fill')) mlMap.removeLayer('parks-fill');
+    if (mlMap.getLayer('parks-line')) mlMap.removeLayer('parks-line');
+    if (mlMap.getSource('parks-src')) mlMap.removeSource('parks-src');
+  } catch (e) {}
+  if (!an || !parksGeo) return;
+  mlMap.addSource('parks-src', { type: 'geojson', data: parksGeo });
+  mlMap.addLayer({ id: 'parks-fill', type: 'fill', source: 'parks-src', paint: { 'fill-color': '#5fd99f', 'fill-opacity': 0.16 } });
+  mlMap.addLayer({ id: 'parks-line', type: 'line', source: 'parks-src', paint: { 'line-color': '#5fd99f', 'line-width': 2 } });
+  if (!mlMap.__parksClickBound) {
+    mlMap.__parksClickBound = true;
+    mlMap.on('click', 'parks-fill', e => {
+      new maplibregl.Popup().setLngLat(e.lngLat).setHTML(parkPopupHtml(e.features[0].properties)).addTo(mlMap);
+    });
+  }
+}
+
+// Zentraler Re-Render — nach Karten-Load, Moduswechsel und Toggle aufrufen.
+function renderGefahren() {
+  if (mapType === 'maplibre') { gefahrenMaplibre(gefahrenAn); parksMaplibre(gefahrenAn); }
+  else { gefahrenLeaflet(gefahrenAn); parksLeaflet(gefahrenAn); }
+  renderRouten(); // GPX-Routen hängen am selben Re-Render-Zyklus (Karten-Load/Moduswechsel)
+  const btn = document.getElementById('gefahren-toggle-btn');
+  if (btn) btn.style.borderColor = gefahrenAn ? 'var(--accent)' : '';
+}
+
+function toggleGefahren() {
+  gefahrenAn = !gefahrenAn;
+  localStorage.setItem('safari-gefahren-layer', gefahrenAn ? '1' : '0');
+  renderGefahren();
+  renderReisewarnEbene();
+  if (gefahrenAn) zeigeKartenHinweis(parksGeo
+    ? '🦟 Gefahrenzonen + ' + parksGeo.features.length + ' Parkgrenzen (© OSM) eingeblendet — Fläche antippen zeigt Details. Orientierung, keine Garantie.'
+    : '🦟 Gefahrenzonen eingeblendet (grobe Regionsboxen) — Parkgrenzen fehlen noch: einmalig python3 fetch-parks.py ausführen. Fläche antippen zeigt Details.');
+}
+
+// Oberkante für Kartenhinweise: knapp unter dem Suchfeld (Pixel relativ zu #map)
+function kartenHinweisOben() {
+  const suche = document.getElementById('suche-input'), karte = document.getElementById('map');
+  if (!suche || !karte || !suche.offsetHeight) return 52;
+  return Math.max(10, Math.round(suche.getBoundingClientRect().bottom - karte.getBoundingClientRect().top + 6));
+}
+
+// Sichtbarer Hinweis statt stillem Scheitern (Projektregel: nie still scheitern)
+function zeigeKartenHinweis(text, vorrang) {
+  const vorhanden = document.getElementById('karten-hinweis');
+  // Normalerweise gilt der erste Hinweis. Eine Reisewarnung zur eigenen Position verdrängt aber
+  // einen Kachel-Hinweis — sonst verschluckt eine Nebensächlichkeit die wichtigste Meldung.
+  if (vorhanden && !vorrang) return;
+  if (vorhanden) vorhanden.remove();
+  const d = document.createElement('div');
+  d.id = 'karten-hinweis';
+  // 2026-09-27 (Review P1-6): ✕ als 44-px-Ziel, einfache Hinweise verschwinden nach 12 s von selbst.
+  // 2026-10-04-3: UNTER dem Suchfeld (vorher top:10px — das Suchfeld lag auf der ersten Zeile), links/rechts
+  // Abstand für die Knopfleiste. z-index allein hält den Hinweis nicht unter Popups (die liegen in Leaflets
+  // Karten-Ebene mit eigenem Stapelkontext) — deshalb blendet CSS ihn aus, solange ein Popup offen ist
+  // (#map:has(.leaflet-popup) #karten-hinweis), und Popups halten per autoPan Abstand zum Suchfeld.
+  d.style.cssText = 'position:absolute;top:' + kartenHinweisOben() + 'px;left:58px;right:58px;margin:0 auto;width:fit-content;max-width:600px;z-index:650;background:rgba(39,24,24,0.95);border:1px solid #e07a5f;border-radius:8px;padding:8px 4px 8px 14px;font-family:monospace;font-size:11px;color:#e8e4dc;text-align:center;display:flex;align-items:center;gap:4px;box-sizing:border-box';
+  d.innerHTML = '<span style="flex:1">' + text + '</span><button type="button" aria-label="Hinweis schließen" style="min-width:44px;min-height:44px;background:none;border:none;color:#9a9589;font-size:14px;cursor:pointer" onclick="this.parentElement.remove()">✕</button>';
+  document.getElementById('map').appendChild(d);
+  if (!vorrang) setTimeout(() => { if (d.isConnected) d.remove(); }, 12000);
+}
+
+// ═══ REGENZEIT-EBENE mit ZEITLEISTE (Klimatologie aus data/klima.json — fetch-klima.py, NASA POWER) ═══
+// Je 1°-Rasterzelle der typische Monatsniederschlag für ein wählbares Datum: Schieber unten (tag-
+// genau, 3 Monate zurück bis 15 Monate voraus — der Planungszeitraum), „Heute“ springt zurück. Farbe =
+// Einteilung nach mm/Monat (eigene Faustregel für Pisten, KEINE amtliche Definition von „Regenzeit“).
+// Zelle antippen → Monatsdiagramm, Temperatur, Feuchte, Wind, Solar-Ertrag, Zyklon- und Malaria-
+// Hinweis (Malaria aus GEFAHREN_REGIONAL — Single Source of Truth). Rendert in BEIDEN Kartenmodi.
+// Fehlt die Datei, sagt der Toggle das sichtbar (nie still scheitern). Alles ist KLIMATOLOGIE
+// (langjähriges Mittel), keine Vorhersage — eine echte 7-Tage-Vorhersage gibt es online im ℹ️-Panel.
+let klimaDaten = null, klimaIndex = null;
+let regenAn = localStorage.getItem('safari-regen-layer') === '1';
+let regenTag = 0;                    // Stellung der Zeitleiste: Tage relativ zu heute
+let regenLeafletLayer = null, regenRenderer = null;   // Renderer gehört zur Ebene: Leaflet entfernt ihn NICHT mit dem Layer
+let regenRenderTimer = null;
+let regenPanelPos = null;            // Bezugspunkt des ℹ️-Panels {lat, lng, quelle}
+const REGEN_TAGE_MIN = -90, REGEN_TAGE_MAX = 456;
+const REGEN_MKURZ = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+const REGEN_KLASSEN = [   // Schwellen in mm/Monat; Reihenfolge aufsteigend
+  { bis: 20,  key: 'trocken',  color: '#c8a95a', label: 'trocken (< 20 mm)',          kurz: 'trocken <20',
+    fahr: 'Trockenzeit — Pisten meist gut befahrbar; Staub, Wasser knapp, Wild sammelt sich an Wasserstellen.' },
+  { bis: 60,  key: 'wenig',    color: '#8fc7d6', label: 'wenig Regen (20–60 mm)',     kurz: 'wenig 20–60',
+    fahr: 'Übergangszeit — einzelne Schauer und Gewitter, Pisten meist befahrbar; Furten nach Regen prüfen.' },
+  { bis: 120, key: 'regen',    color: '#4d9fd6', label: 'Regenzeit (60–120 mm)',      kurz: 'Regenzeit 60–120',
+    fahr: 'Regenzeit — Schlamm, Furten und Black-Cotton-Böden können Pisten sperren; Zeitpuffer und Alternativrouten einplanen.' },
+  { bis: 200, key: 'haupt',    color: '#2b6cb0', label: 'Hauptregenzeit (120–200 mm)', kurz: 'Hauptregenzeit 120–200',
+    fahr: 'Hauptregenzeit — viele Pisten unpassierbar, Flüsse hoch, Parkstraßen oft gesperrt; Etappen auf Hauptstraßen planen.' },
+  { bis: 1e9, key: 'sehrnass', color: '#5b3fa0', label: 'sehr nass (> 200 mm)',       kurz: 'sehr nass >200',
+    fahr: 'Sehr nasse Zeit — Überschwemmungen möglich, Brücken/Fähren können ausfallen; nur Hauptstraßen, Reserve an Zeit und Diesel.' },
+];
+
+function regenKlasse(mm) {
+  if (mm == null || !isFinite(mm)) return { key: 'keine', color: '#6b6760', label: 'keine Daten', fahr: '' };
+  return REGEN_KLASSEN.find(k => mm < k.bis) || REGEN_KLASSEN[REGEN_KLASSEN.length - 1];
+}
+function heuteMitternacht() { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }
+function zeitleisteDatum(tag) {
+  const d = heuteMitternacht();
+  d.setDate(d.getDate() + (typeof tag === 'number' ? tag : regenTag));
+  return d;
+}
+// Monatswerte gelten für die Monatsmitte; dazwischen wird linear gemischt:
+// Monat a mit Gewicht (1 − w), Monat b mit Gewicht w. Jahreswechsel läuft rund (Dez → Jan).
+function klimaMischung(datum) {
+  const m = datum.getMonth(), tage = new Date(datum.getFullYear(), m + 1, 0).getDate();
+  const f = (datum.getDate() - 0.5) / tage;
+  return f < 0.5 ? { a: (m + 11) % 12, b: m, w: f + 0.5 } : { a: m, b: (m + 1) % 12, w: f - 0.5 };
+}
+function klimaInterpoliert(werte, datum) {
+  if (!werte) return null;
+  const x = klimaMischung(datum), va = werte[x.a], vb = werte[x.b];
+  if (va == null && vb == null) return null;
+  if (va == null) return vb;
+  if (vb == null) return va;
+  return va + (vb - va) * x.w;
+}
+function klimaZelle(lat, lng) {
+  if (!klimaIndex || !isFinite(lat) || !isFinite(lng)) return null;
+  const r = (klimaDaten && klimaDaten.raster) || 1;
+  const k = v => Math.round(Math.floor(v / r) * r * 1e4) / 1e4;   // wie round(x, 4) im Skript — sonst „10.799999…" ≠ „10.8"
+  return klimaIndex[k(lng) + ',' + k(lat)] || null;
+}
+
+async function ladeKlima() {
+  try {
+    const res = await fetch(SERVER_BASE + '/data/klima.json');
+    if (!res.ok) return;
+    const d = await res.json();
+    if (!d || !Array.isArray(d.zellen) || !d.zellen.length) return;
+    klimaDaten = d;
+    klimaIndex = {};
+    d.zellen.forEach(z => { klimaIndex[z.lon + ',' + z.lat] = z; });
+    if (regenAn) renderRegen();   // Ebene war schon an → nachziehen
+  } catch (e) { /* Datei fehlt / file:// — Hinweis kommt beim Toggle */ }
+}
+
+function regenGeoJSON() {
+  const feats = [], r = (klimaDaten && klimaDaten.raster) || 1;
+  (klimaDaten ? klimaDaten.zellen : []).forEach((z, i) => {
+    if (!z.p || !z.p.some(v => v != null)) return;   // Zelle ohne Regenwerte: nicht zeichnen
+    const props = { idx: i };
+    for (let m = 0; m < 12; m++) props['p' + m] = z.p[m];
+    feats.push({ type: 'Feature', properties: props,
+      geometry: { type: 'Polygon', coordinates: [[[z.lon, z.lat], [z.lon + r, z.lat], [z.lon + r, z.lat + r], [z.lon, z.lat + r], [z.lon, z.lat]]] } });
+  });
+  return { type: 'FeatureCollection', features: feats };
+}
+function regenFarbe(z, datum) { return regenKlasse(klimaInterpoliert(z && z.p, datum)).color; }
+
+// Region wie die App sie wählt: erste GEFAHREN_REGIONAL-Box des Landes, die den Punkt enthält.
+function regionAnPunkt(lat, lng, land) {
+  const laender = (land && GEFAHREN_REGIONAL[land]) ? [land] : Object.keys(GEFAHREN_REGIONAL);
+  for (const l of laender) {
+    const r = (GEFAHREN_REGIONAL[l] || []).find(x => x.b && lng >= x.b[0] && lat >= x.b[1] && lng <= x.b[2] && lat <= x.b[3]);
+    if (r) return { land: l, r: r.r, g: r.g };
+  }
+  return null;
+}
+// Malaria-Status für EINEN Monat aus dem Gefahren-Text (gleiche Regeln wie regionalGefahren in index/mobile).
+function malariaMonat(g, monat) {
+  if (!g || !/malaria/i.test(g)) return '';
+  if (/malariafrei|KEINE Malaria/i.test(g)) return '🟢 malariafrei';
+  if (/ganzjaehrig/i.test(g)) return '🔴 Malaria ganzjährig';
+  const MON = { Jan: 0, Feb: 1, 'Mär': 2, Mrz: 2, Apr: 3, Mai: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Okt: 9, Nov: 10, Dez: 11 };
+  const monRx = '(Jan|Feb|Mär|Mrz|Apr|Mai|Jun|Jul|Aug|Sep|Okt|Nov|Dez)';
+  const imBereich = (m, a, b) => (a <= b) ? (m >= a && m <= b) : (m >= a || m <= b);
+  const mt = new RegExp(monRx + '-' + monRx).exec(g);
+  if (!mt) return /gering|malaria-arm/i.test(g) ? '🟢 Malaria gering' : '🟡 Malaria: Gefahren-Ebene (🦟) lesen';
+  const pk = new RegExp('Peak ' + monRx + '-' + monRx).exec(g);
+  if (imBereich(monat, MON[mt[1]], MON[mt[2]])) {
+    return (pk && imBereich(monat, MON[pk[1]], MON[pk[2]]))
+      ? `🔴 Malaria-Hochsaison (Saison ${mt[1]}–${mt[2]}, Peak ${pk[1]}–${pk[2]})`
+      : `🔴 Malaria-Saison (${mt[1]}–${mt[2]})`;
+  }
+  return `🟢 Malaria außerhalb der Saison ${mt[1]}–${mt[2]} (Restrisiko bleibt)`;
+}
+// Zyklonsaison SW-Indischer Ozean, grob Nov–Apr. Betroffen ist vor allem die Küste Mosambiks;
+// Ausläufer erreichen Malawi und das Ost-Hochland Zimbabwes (Idai 2019, Freddy 2023).
+function zyklonHinweis(land, lng, monat) {
+  if (!(monat >= 10 || monat <= 3)) return '';
+  if (land === 'Mosambik') return '🌀 Zyklonsaison (ca. Nov–Apr): tropische Wirbelstürme können die Küste Mosambiks treffen (z. B. Idai 2019 bei Beira, Freddy 2023). Vor Küstenetappen die Vorhersage prüfen.';
+  if (land === 'Malawi' || land === 'Eswatini' || (land === 'Zimbabwe' && lng >= 31.5)) return '🌀 Zyklon-Ausläufer möglich (ca. Nov–Apr): Starkregen und Überschwemmungen aus Stürmen über Mosambik (z. B. Idai 2019, Freddy 2023).';
+  return '';
+}
+function solarWort(kwh) {
+  if (kwh == null) return '';
+  return kwh >= 6 ? 'sehr gut' : kwh >= 5 ? 'gut' : kwh >= 4 ? 'mäßig' : 'schwach (Wolken/Regen)';
+}
+function regenZahl(v, nk) { return (typeof v !== 'number' || !isFinite(v)) ? '–' : (nk ? v.toFixed(nk) : Math.round(v)); }
+
+// 12 Monatsbalken als Inline-SVG; der gewählte Monat ist hervorgehoben. `hell` = helle Fläche (Popup).
+function regenDiagramm(z, datum, hell) {
+  const W = 260, H = 88, links = 26, unten = 14, oben = 12;
+  const maxP = Math.max(120, ...z.p.map(v => v || 0));
+  const bw = (W - links - 4) / 12, m0 = datum.getMonth();
+  const tx = hell ? '#333' : '#e8e4dc', tx2 = hell ? '#999' : '#8a857a', linie = hell ? '#ddd' : '#3d3b37';
+  let s = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;max-width:100%" role="img" aria-label="Niederschlag je Monat">`;
+  [0, 0.5, 1].forEach(f => {
+    const y = H - unten - (H - unten - oben) * f;
+    s += `<line x1="${links}" y1="${y.toFixed(1)}" x2="${W - 2}" y2="${y.toFixed(1)}" stroke="${linie}" stroke-width="0.5"/>`;
+    s += `<text x="${links - 3}" y="${(y + 3).toFixed(1)}" font-size="7" text-anchor="end" fill="${tx2}">${Math.round(maxP * f)}</text>`;
+  });
+  for (let m = 0; m < 12; m++) {
+    const v = z.p[m], h = v == null ? 0 : (H - unten - oben) * v / maxP;
+    const x = links + m * bw + 1, y = H - unten - h, k = regenKlasse(v);
+    s += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${(bw - 2).toFixed(1)}" height="${h.toFixed(1)}" fill="${k.color}"${m === m0 ? ` stroke="${tx}" stroke-width="1.5"` : ''}/>`;
+    s += `<text x="${(x + (bw - 2) / 2).toFixed(1)}" y="${H - 3}" font-size="8" text-anchor="middle" fill="${m === m0 ? tx : tx2}"${m === m0 ? ' font-weight="bold"' : ''}>${'JFMAMJJASOND'[m]}</text>`;
+    if (m === m0 && v != null) s += `<text x="${(x + (bw - 2) / 2).toFixed(1)}" y="${Math.max(8, y - 2).toFixed(1)}" font-size="8" text-anchor="middle" fill="${tx}">${Math.round(v)}</text>`;
+  }
+  return s + '</svg>';
+}
+
+// Ein Text für Popup (helle Fläche) und Panel (dunkel) — Werte für das gewählte Datum interpoliert.
+function regenInfoHtml(z, datum, hell) {
+  if (!z) return '';
+  const c = hell ? { t: '#222', t2: '#444', t3: '#777' } : { t: 'var(--text)', t2: 'var(--text2)', t3: 'var(--text3)' };
+  const w = k => klimaInterpoliert(z[k], datum);
+  // tx/tn sind bei POWER die EXTREMWERTE des Monats über den Bezugszeitraum (Lüderitz Jan 43 °C, Windhoek
+  // Jul −4 °C), keine Tagesmittel — echter Lauf 25.09. Das Tagesmittel ist t.
+  const mm = w('p'), kl = regenKlasse(mm), t = w('t'), tx = w('tx'), tn = w('tn'), rh = w('rh'), ws = w('ws'), sr = w('sr');
+  const reg = regionAnPunkt(z.pt ? z.pt[1] : z.lat + 0.5, z.pt ? z.pt[0] : z.lon + 0.5, z.land);
+  const monat = datum.getMonth();
+  const hinweise = [];
+  if (kl.fahr) hinweise.push('🚙 ' + kl.fahr);
+  if (t != null && t >= 28) hinweise.push(`🌡️ Heiß: Ø ${regenZahl(t)} °C im Monatsmittel${tx != null ? ', Spitzen bis ' + regenZahl(tx) + ' °C' : ''} — früh fahren, Wasserreserve, Tiere im Schatten.`);
+  else if (tx != null && tx >= 40) hinweise.push(`🌡️ Hitzespitzen bis ${regenZahl(tx)} °C kamen in diesem Monat vor (${klimaZeitraumKurz()}) — Wasserreserve, Tiere im Schatten.`);
+  if (tn != null && tn <= 0) hinweise.push(`🥶 Frost möglich: Tiefstwert ${regenZahl(tn)} °C in diesem Monat (${klimaZeitraumKurz()}) — Schlafsack, Wasserleitungen, Diesel-Winterfestigkeit.`);
+  else if (t != null && t <= 12) hinweise.push(`🥶 Kühl: Ø ${regenZahl(t)} °C im Monatsmittel — warme Kleidung, Heizung einplanen.`);
+  if (rh != null && t != null && rh >= 75 && t >= 24) hinweise.push('💦 Schwül: hohe Feuchte bei über 24 °C im Mittel — Kreislauf, Schimmel im Fahrzeug.');
+  if (sr != null) hinweise.push(`☀️ Solar-Ertrag ${solarWort(sr)}: Ø ${regenZahl(sr, 1)} kWh/m²/Tag Globalstrahlung.`);
+  const zyk = zyklonHinweis(z.land, z.pt ? z.pt[0] : z.lon, monat); if (zyk) hinweise.push(zyk);
+  const mal = reg ? malariaMonat(reg.g, monat) : ''; if (mal) hinweise.push('🦟 ' + mal + ' — Details in der 🦟-Ebene.');
+  return `<div style="font-family:monospace;font-size:11px;line-height:1.5;color:${c.t2}">
+    <div style="font-weight:700;color:${hell ? '#2b6cb0' : 'var(--blue)'}">🌧️ ${esc(z.land)}${reg ? ' — ' + esc(reg.r) : ''}</div>
+    <div style="margin-top:3px;color:${c.t}"><b>${esc(regenDatumText(datum))}: ${esc(kl.label)}</b> · ≈ ${regenZahl(mm)} mm/Monat</div>
+    <div style="margin-top:4px">${regenDiagramm(z, datum, hell)}</div>
+    <div style="margin-top:4px;color:${c.t}">🌡️ Ø ${regenZahl(t)} °C · Extreme ${regenZahl(tx)} / ${regenZahl(tn)} °C · 💧 ${regenZahl(rh)} % · 💨 ${regenZahl(ws, 1)} m/s · ☀️ ${regenZahl(sr, 1)} kWh/m²/Tag</div>
+    ${hinweise.map(h => `<div style="margin-top:4px">${esc(h)}</div>`).join('')}
+    <div style="margin-top:6px;font-size:9px;color:${c.t3}">Klimatologie NASA POWER (${esc(klimaZeitraumKurz())}; Ø = Monatsmittel, Extreme = höchster/tiefster Wert des Monats im Zeitraum), Rasterzelle ${esc(z.lon)}…${esc(z.lon + ((klimaDaten && klimaDaten.raster) || 1))}° / ${esc(z.lat)}…${esc(z.lat + ((klimaDaten && klimaDaten.raster) || 1))}°, Abfragepunkt ${z.pt ? esc(z.pt[1] + '/' + z.pt[0]) : '–'}. Langjähriges Mittel, KEINE Vorhersage — Regenzeiten verschieben sich von Jahr zu Jahr um Wochen. Reanalyse mit ~50 km Auflösung: an Wüstenküsten (Namib) zu nass, im Gebirge grob. Einteilung nach mm/Monat ist eine Faustregel für Pisten.</div>
+  </div>`;
+}
+// POWER nennt den Bezugszeitraum als langen Satz („20-year … (January 2001 - December 2020)") — für
+// Popup und Hinweis reichen die Jahre.
+function klimaZeitraumKurz() {
+  const z = (klimaDaten && klimaDaten.zeitraum) || '';
+  const m = z.match(/(\d{4})\D+(\d{4})/);
+  return m ? m[1] + '–' + m[2] : (z ? z.slice(0, 40) : 'langjähriges Mittel');
+}
+function regenDatumText(d) {
+  // 2026-10-04-1: andere Oberflächensprache → Datum vom Browser formatieren (i18n.js setzt das Gebietsschema)
+  if (window.DARK_I18N && DARK_I18N.lang !== 'de') return d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  return `${['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][d.getDay()]} ${d.getDate()}. ${REGEN_MKURZ[d.getMonth()]} ${d.getFullYear()}`;
+}
+function regenPopupHtml(idx) {
+  const z = klimaDaten && klimaDaten.zellen[idx];
+  return z ? `<div style="max-width:280px">${regenInfoHtml(z, zeitleisteDatum(), true)}</div>` : '';
+}
+
+function regenLeaflet(an) {
+  // Layer UND Renderer entfernen: map.removeLayer(layer) nimmt nur die Flächen — der Canvas-
+  // Renderer bliebe als eigener Layer samt <canvas> (2× Kartenfläche, Retina 4×) auf der Karte;
+  // jedes Ein/Aus ließe einen weiteren zurück, bis iOS die Canvas-Grenze erreicht (Review 24.09.).
+  if (regenLeafletLayer) { try { map.removeLayer(regenLeafletLayer); } catch (e) {} regenLeafletLayer = null; }
+  if (regenRenderer) { try { map.removeLayer(regenRenderer); } catch (e) {} regenRenderer = null; }
+  if (!an || !map || !klimaDaten) return;
+  // Eigene Ebene UNTER den Gefahren-/Park-/Warnflächen (overlayPane = 400): die bleiben die
+  // wichtigeren Klick-Ziele. Canvas statt SVG — ~850 Flächen sollen beim Schieben nicht ruckeln.
+  if (!map.getPane('regen')) { map.createPane('regen'); map.getPane('regen').style.zIndex = 350; }
+  const datum = zeitleisteDatum();
+  regenRenderer = L.canvas({ pane: 'regen', padding: 0.5 });
+  regenLeafletLayer = L.geoJSON(regenGeoJSON(), {
+    renderer: regenRenderer,
+    style: f => ({ color: 'rgba(255,255,255,0.15)', weight: 0.5, fillColor: regenFarbe(klimaDaten.zellen[f.properties.idx], datum), fillOpacity: 0.45 }),
+    onEachFeature: (f, layer) => layer.bindPopup(() => regenPopupHtml(f.properties.idx), { maxWidth: 300 })
+  }).addTo(map);
+}
+
+function regenMlFarbe(datum) {
+  // Mischung der zwei Nachbarmonate als Ausdruck — der Schieber ändert nur eine Paint-Property,
+  // die Quelle bleibt stehen (kein setData pro Bewegung).
+  const x = klimaMischung(datum);
+  // Fehlt ein Monat, zählt der Nachbar; fehlen beide, wird −1 gemischt → Stufe unter 0 = grau
+  // („keine Daten"), dieselbe Farbe wie regenKlasse(null) in Leaflet.
+  const va = ['coalesce', ['get', 'p' + x.a], ['get', 'p' + x.b], -1], vb = ['coalesce', ['get', 'p' + x.b], ['get', 'p' + x.a], -1];
+  const mm = ['+', ['*', va, 1 - x.w], ['*', vb, x.w]];
+  const stufen = ['step', mm, regenKlasse(null).color, 0, REGEN_KLASSEN[0].color];
+  for (let i = 1; i < REGEN_KLASSEN.length; i++) stufen.push(REGEN_KLASSEN[i - 1].bis, REGEN_KLASSEN[i].color);
+  return stufen;
+}
+function regenMaplibre(an) {
+  // Nicht isStyleLoaded(): das ist false, solange irgendeine Quelle Kacheln nachlädt — und jede
+  // Schieber-Bewegung lässt die Kacheln neu laden. Ein Toggle in dem Moment ginge sonst verloren
+  // (Ebene bleibt sichtbar, Knopf aus). Gebraucht wird nur der geladene Stil ('load'-Ereignis).
+  if (!mlMap || !mlMap.__stilGeladen) return;
+  try {
+    if (mlMap.getLayer('regen-fill')) mlMap.removeLayer('regen-fill');
+    if (mlMap.getLayer('regen-line')) mlMap.removeLayer('regen-line');
+    if (mlMap.getSource('regen-src')) mlMap.removeSource('regen-src');
+  } catch (e) {}
+  if (!an || !klimaDaten) return;
+  mlMap.addSource('regen-src', { type: 'geojson', data: regenGeoJSON() });
+  // Unter die Beschriftungen (erste Symbol-Ebene des Stils) — und damit unter alle später
+  // angehängten Overlays (Parks/Gefahren/Warnungen), die oben angefügt werden.
+  const stil = mlMap.getStyle(), symbol = stil && stil.layers ? stil.layers.find(l => l.type === 'symbol') : null;
+  const vor = symbol ? symbol.id : undefined;
+  mlMap.addLayer({ id: 'regen-fill', type: 'fill', source: 'regen-src', paint: { 'fill-color': regenMlFarbe(zeitleisteDatum()), 'fill-opacity': 0.45 } }, vor);
+  mlMap.addLayer({ id: 'regen-line', type: 'line', source: 'regen-src', paint: { 'line-color': 'rgba(255,255,255,0.15)', 'line-width': 0.5 } }, vor);
+  if (!mlMap.__regenClickBound) {
+    mlMap.__regenClickBound = true;
+    mlMap.on('click', 'regen-fill', e => {
+      for (const id of ['parks-fill', 'gefahren-fill', 'reisewarn-fill']) {   // die sind die wichtigeren Popups
+        if (mlMap.getLayer(id) && mlMap.queryRenderedFeatures(e.point, { layers: [id] }).length) return;
+      }
+      new maplibregl.Popup({ maxWidth: '300px' }).setLngLat(e.lngLat).setHTML(regenPopupHtml(e.features[0].properties.idx)).addTo(mlMap);
+    });
+  }
+}
+function regenNeuFaerben() {
+  const datum = zeitleisteDatum();
+  if (mapType === 'maplibre') {
+    if (mlMap && mlMap.getLayer('regen-fill')) mlMap.setPaintProperty('regen-fill', 'fill-color', regenMlFarbe(datum));
+    return;
+  }
+  if (!regenLeafletLayer) return;
+  regenLeafletLayer.eachLayer(l => l.setStyle({ fillColor: regenFarbe(klimaDaten.zellen[l.feature.properties.idx], datum) }));
+}
+
+// Zentraler Re-Render — nach Karten-Load, Moduswechsel und Toggle (wie renderGefahren/renderReisewarnEbene).
+function renderRegen() {
+  if (mapType === 'maplibre') regenMaplibre(regenAn); else regenLeaflet(regenAn);
+  const btn = document.getElementById('regen-toggle-btn');
+  if (btn) btn.style.borderColor = regenAn ? 'var(--blue)' : '';
+  zeitleisteRender();
+}
+function toggleRegenzeit() {
+  regenAn = !regenAn;
+  try { localStorage.setItem('safari-regen-layer', regenAn ? '1' : '0'); } catch (e) {}   // Privatmodus: Ebene geht trotzdem an
+  renderRegen();
+  if (!regenAn) { regenInfoSchliessen(); return; }
+  if (!klimaDaten) {
+    zeigeKartenHinweis('🌧️ Klimadaten fehlen — einmalig MIT Internet im Projektordner: <code>python3 fetch-klima.py</code> (ca. 1000 Anfragen, 15–40 min), danach <code>./deploy.sh</code> und App neu starten.', true);
+    return;
+  }
+  zeigeKartenHinweis(`🌧️ Regenzeiten eingeblendet — Klimatologie NASA POWER (${esc(klimaZeitraumKurz())}), keine Vorhersage. Zeitleiste unten verschieben, „Heute“ springt zurück, Zelle antippen zeigt Monatswerte.`);
+}
+
+// ── Zeitleiste ──
+function zeitleisteRender() {
+  const el = document.getElementById('zeitleiste');
+  if (!el) return;
+  const an = !!(regenAn && klimaDaten);
+  el.style.display = an ? '' : 'none';
+  if (!an) return;
+  const s = document.getElementById('zl-slider');
+  if (s) { s.min = REGEN_TAGE_MIN; s.max = REGEN_TAGE_MAX; s.value = regenTag; }
+  zeitleisteLabel();
+  zeitleisteMonate();
+  zeitleisteLegende();
+  regenPanelLayout();
+}
+function zeitleisteLabel() {
+  const el = document.getElementById('zl-datum');
+  if (!el) return;
+  const rel = regenTag === 0 ? 'heute' : regenTag > 0 ? `in ${regenTag} Tagen` : `vor ${-regenTag} Tagen`;
+  el.textContent = `${regenDatumText(zeitleisteDatum())} · ${rel}`;
+}
+function zeitleisteMonate() {
+  const box = document.getElementById('zl-monate');
+  if (!box) return;
+  const spanne = REGEN_TAGE_MAX - REGEN_TAGE_MIN, breite = box.clientWidth || 300, heute = heuteMitternacht();
+  const x = tage => (tage - REGEN_TAGE_MIN) / spanne * breite;
+  let html = `<i style="left:${x(0).toFixed(0)}px" title="heute"></i>`;
+  const start = zeitleisteDatum(REGEN_TAGE_MIN);
+  let d = new Date(start.getFullYear(), start.getMonth() + 1, 1), letzte = -1e9;
+  for (let i = 0; i < 24; i++) {
+    const tage = Math.round((d - heute) / 86400000);
+    if (tage > REGEN_TAGE_MAX) break;
+    const mitte = x(tage + new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate() / 2);
+    if (mitte - letzte >= 24) {   // nur so viele Beschriftungen, wie lesbar nebeneinander passen
+      html += `<span style="left:${mitte.toFixed(0)}px">${REGEN_MKURZ[d.getMonth()]}${d.getMonth() === 0 ? '&nbsp;' + String(d.getFullYear()).slice(2) : ''}</span>`;
+      letzte = mitte;
+    }
+    d = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+  }
+  box.innerHTML = html;
+}
+function zeitleisteLegende() {
+  const el = document.getElementById('zl-legende');
+  if (!el) return;
+  el.innerHTML = REGEN_KLASSEN.map(k => `<span><b style="background:${k.color}"></b>${esc(k.kurz)}</span>`).join('')
+    + `<span style="margin-left:auto">mm/Monat · NASA POWER · Klimatologie, keine Vorhersage</span>`;
+}
+function zeitleisteSetzen(tage) {
+  regenTag = Math.max(REGEN_TAGE_MIN, Math.min(REGEN_TAGE_MAX, Math.round(tage)));
+  const s = document.getElementById('zl-slider');
+  if (s && +s.value !== regenTag) s.value = regenTag;
+  zeitleisteLabel();
+  if (regenRenderTimer) cancelAnimationFrame(regenRenderTimer);
+  regenRenderTimer = requestAnimationFrame(() => { regenRenderTimer = null; regenNeuFaerben(); regenInfoAktualisieren(); });
+}
+function zeitleisteSchritt(tage) { zeitleisteSetzen(regenTag + tage); }
+function zeitleisteHeute() {
+  zeitleisteSetzen(0);
+  regenInfoOeffnen(true);   // heutiger Stand zur Position — und online gleich die echte Vorhersage
+}
+
+// ── ℹ️-Panel: Klimatologie zur Position für das gewählte Datum + Live-Vorhersage (online, Cache) ──
+const WETTER_LIVE_KEY = 'safari-wetter-live';
+function regenBezugspunkt() {
+  if (userPos) return { lat: userPos.lat, lng: userPos.lng, quelle: 'GPS-Position' };
+  const c = mapCenter();
+  return c ? { lat: c.lat, lng: c.lng, quelle: 'Kartenmitte (kein GPS)' } : null;
+}
+function regenInfoOeffnen(mitLive) {
+  const panel = document.getElementById('regen-panel');
+  if (!panel) return;
+  if (!klimaDaten) { zeigeKartenHinweis('🌧️ Klimadaten fehlen — einmalig MIT Internet: <code>python3 fetch-klima.py</code>, dann <code>./deploy.sh</code>.', true); return; }
+  regenPanelPos = regenBezugspunkt();
+  if (!regenPanelPos) return;
+  const alt = document.getElementById('regen-live');   // Vorhersage des VORIGEN Bezugspunkts nicht stehen lassen —
+  if (alt) alt.remove();                                // sie wird aus dem Cache neu aufgebaut, mit Nähe-Prüfung
+  const lp = document.getElementById('map-layer-panel');
+  if (lp) lp.style.display = 'none';   // nur ein Panel links oben
+  panel.style.display = 'flex';
+  regenPanelLayout();
+  regenInfoAktualisieren();
+  if (mitLive) ladeLiveWetter(regenPanelPos.lat, regenPanelPos.lng, true);
+}
+// Das Panel darf die Zeitleiste nicht verdecken (am iPhone lag es über den Knöpfen) und auf
+// schmalen Bildschirmen nicht über dem Suchfeld liegen — Höhe/Position aus der echten Kartenfläche.
+function regenPanelLayout() {
+  const panel = document.getElementById('regen-panel'), wrap = document.querySelector('.map-wrap'), zl = document.getElementById('zeitleiste');
+  if (!panel || !wrap) return;
+  const schmal = wrap.clientWidth < 640;
+  const oben = schmal ? 54 : 10;                                            // unter dem Suchfeld (top 10 + ~34 px)
+  const zlHoehe = (zl && zl.style.display !== 'none') ? zl.offsetHeight + 34 : 0;   // Zeitleiste + ihr Abstand nach unten
+  panel.style.top = oben + 'px';
+  panel.style.maxHeight = Math.max(160, wrap.clientHeight - oben - zlHoehe - 8) + 'px';
+}
+function regenInfoSchliessen() {
+  const panel = document.getElementById('regen-panel');
+  if (panel) panel.style.display = 'none';
+}
+function regenInfoAktualisieren() {
+  const panel = document.getElementById('regen-panel'), body = document.getElementById('regen-panel-body');
+  if (!panel || !body || panel.style.display === 'none' || !regenPanelPos) return;
+  const z = klimaZelle(regenPanelPos.lat, regenPanelPos.lng);
+  const kopf = `<div style="font-size:10px;color:var(--text3);margin-bottom:6px">Bezug: ${esc(regenPanelPos.quelle)} ${esc(formatDD(regenPanelPos.lat, regenPanelPos.lng))}</div>`;
+  const live = document.getElementById('regen-live');
+  const liveHtml = live ? live.outerHTML : `<div id="regen-live">${liveWetterHtml(liveWetterCache(regenPanelPos.lat, regenPanelPos.lng))}</div>`;
+  body.innerHTML = kopf + (z ? regenInfoHtml(z, zeitleisteDatum(), false)
+    : '<div>Für diesen Punkt liegt keine Klimazelle vor (außerhalb der 16 Reiseländer oder Datei unvollständig — <code>python3 fetch-klima.py</code> erneut ausführen).</div>')
+    + liveHtml;
+}
+function liveWetterCache(lat, lng) {
+  try {
+    const c = JSON.parse(localStorage.getItem(WETTER_LIVE_KEY) || 'null');
+    if (!c || !c.daily || !Array.isArray(c.daily.time)) return null;
+    if (kmAbstand(lat, lng, c.lat, c.lng) > 60) return null;   // Stand gilt nur in der Nähe des abgefragten Punkts
+    return c;
+  } catch (e) { return null; }
+}
+function liveWetterHtml(c, meldung) {
+  const kopf = `<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);display:flex;align-items:center;gap:6px">
+    <b style="color:var(--text)">📡 Vorhersage 7 Tage</b>
+    <button class="zl-btn" style="margin-left:auto;height:24px" onclick="ladeLiveWetter(regenPanelPos.lat, regenPanelPos.lng)">🌐 laden</button></div>`;
+  const zeile = meldung ? `<div style="font-size:10px;color:var(--text3);margin-top:4px">${esc(meldung)}</div>` : '';
+  if (!c) return kopf + (zeile || `<div style="font-size:10px;color:var(--text3);margin-top:4px">Noch kein Stand — braucht Internet (Open-Meteo). Die Klimatologie oben gilt offline.</div>`);
+  const alt = Math.round((Date.now() - c.ts) / 3600000);
+  const d = c.daily, u = c.units || {};
+  let rows = '';
+  for (let i = 0; i < d.time.length; i++) {
+    const t = new Date(d.time[i] + 'T12:00:00');
+    const mm = d.precipitation_sum ? d.precipitation_sum[i] : null, pr = d.precipitation_probability_max ? d.precipitation_probability_max[i] : null;
+    const tagText = (window.DARK_I18N && DARK_I18N.lang !== 'de') ? t.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'numeric' }) : `${['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][t.getDay()]} ${t.getDate()}.${t.getMonth() + 1}.`;
+    rows += `<tr><td>${tagText}</td>
+      <td style="color:${mm != null && mm >= 10 ? 'var(--blue)' : 'inherit'}">🌧 ${regenZahl(mm, 1)} mm${pr != null ? ' (' + Math.round(pr) + ' %)' : ''}</td>
+      <td>🌡 ${regenZahl(d.temperature_2m_max && d.temperature_2m_max[i])}/${regenZahl(d.temperature_2m_min && d.temperature_2m_min[i])} °</td>
+      <td>💨 ${regenZahl(d.wind_speed_10m_max && d.wind_speed_10m_max[i])} ${esc(u.wind_speed_10m_max || 'km/h')}</td></tr>`;
+  }
+  return kopf + zeile + `<div style="font-size:10px;color:var(--text3);margin-top:3px">${alt > 24 ? '📴 ' : ''}Stand vor ${alt} h · Punkt ${c.lat.toFixed(2)}/${c.lng.toFixed(2)} · Open-Meteo.com (CC BY 4.0)</div>
+    <table class="regen-live-tab">${rows}</table>`;
+}
+async function ladeLiveWetter(lat, lng, still) {
+  const zeige = html => { const el = document.getElementById('regen-live'); if (el) el.innerHTML = html; };
+  const cache = liveWetterCache(lat, lng);
+  if (navigator.onLine === false) { zeige(liveWetterHtml(cache, cache ? null : 'Offline — kein Stand gespeichert.')); return; }
+  if (!still) zeige(liveWetterHtml(cache, '⏳ Vorhersage wird geholt …'));
+  // Position auf 2 Nachkommastellen (~1 km) — für eine Vorhersage genug, und weniger preisgegeben als nötig.
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(2)}&longitude=${lng.toFixed(2)}`
+    + '&daily=precipitation_sum,precipitation_probability_max,temperature_2m_max,temperature_2m_min,wind_speed_10m_max&timezone=auto&forecast_days=7';
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 8000);
+  try {
+    const res = await fetch(url, { signal: ctl.signal });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const d = await res.json();
+    if (!d || !d.daily || !Array.isArray(d.daily.time)) throw new Error('Antwort ohne daily.time');
+    const c = { ts: Date.now(), lat: lat, lng: lng, daily: d.daily, units: d.daily_units || {} };
+    try { localStorage.setItem(WETTER_LIVE_KEY, JSON.stringify(c)); } catch (e) {}
+    zeige(liveWetterHtml(c));
+  } catch (e) {
+    zeige(liveWetterHtml(cache, (cache ? 'Nicht erreichbar — gespeicherter Stand: ' : 'Nicht erreichbar (offline?): ') + (e && e.name === 'AbortError' ? 'Zeitüberschreitung' : (e && e.message) || 'Fehler')));
+  } finally { clearTimeout(timer); }
+}
+window.addEventListener('resize', () => { if (regenAn && klimaDaten) { zeitleisteMonate(); regenPanelLayout(); } });
+
+// ═══ KARTENSUCHE (offline: GeoNames-Ortsindex via /api/orte/search · online: Nominatim) ═══
+// Offline-Index erzeugt fetch-orte.py (data/orte.json). Straßen bewusst nur online (Enter-Taste,
+// Nominatim-Höflichkeit: keine Anfrage pro Tastendruck). Fehlender Index → sichtbarer Hinweis.
+let sucheTimer = null;
+let sucheMarker = null;
+
+function sucheOrteLive() {
+  clearTimeout(sucheTimer);
+  sucheTimer = setTimeout(() => sucheAusfuehren(false), 250);
+}
+function sucheTaste(ev) {
+  if (ev.key === 'Enter') { ev.preventDefault(); sucheAusfuehren(true); }
+  if (ev.key === 'Escape') sucheSchliessen();
+}
+function sucheSchliessen() {
+  const e = document.getElementById('suche-ergebnisse');
+  if (e) { e.style.display = 'none'; e.innerHTML = ''; }
+}
+function sucheIcon(typ) { return typ === 'Berg/Pass' ? '⛰' : typ === 'See/Wasserfall' ? '💧' : typ === 'Flughafen' ? '✈️' : '🏘'; }
+// 2026-09-12 (Re-Audit H4): Treffer werden in einem Array gehalten und per Index angesprungen — vorher stand der
+// Ortsname (aus Nominatim/OSM, von jedermann editierbar) in einem JS-String im onclick; &#39; wird vom HTML-Parser
+// VOR dem JS wieder zu ' → Ausbruch aus dem String → Skript im Origin der App.
+let sucheTreffer = [];
+function sucheZeile(lat, lng, titel, sub, zoom) {
+  const idx = sucheTreffer.push({ lat: Number(lat), lng: Number(lng), zoom: Number(zoom) || 11, titel: String(titel || '') }) - 1;
+  return `<div data-i="${idx}" onclick="sucheWahl(this.dataset.i)" style="padding:7px 10px;cursor:pointer;border-bottom:1px solid var(--border)">
+    <div style="font-size:12px;color:var(--text)">${esc(titel)}</div>
+    <div style="font-size:9px;color:var(--text3)">${esc(sub)}</div></div>`;
+}
+function sucheWahl(i) {
+  const t = sucheTreffer[Number(i)];
+  if (!t || isNaN(t.lat) || isNaN(t.lng)) return;
+  fliegeZu(t.lat, t.lng, t.zoom, t.titel);
+}
+async function sucheAusfuehren(mitOnline) {
+  const q = document.getElementById('suche-input').value.trim();
+  const box = document.getElementById('suche-ergebnisse');
+  if (q.length < 2) { sucheSchliessen(); return; }
+  sucheTreffer = [];
+  let html = '', offlineFehlt = false;
+  try {
+    const res = await fetch(SERVER_BASE + '/api/orte/search?query=' + encodeURIComponent(q) + '&k=8');
+    const j = await res.json();
+    if (!j.available) { offlineFehlt = true; html += `<div style="padding:8px 10px;font-size:10px;color:#e07a5f">${esc(j.grund || 'Ortsindex fehlt')}</div>`; }
+    else html += j.treffer.map(t => sucheZeile(t.lat, t.lng, sucheIcon(t.typ) + ' ' + t.name, t.land + ' · ' + t.typ, 11)).join('');
+  } catch (e) { offlineFehlt = true; html += '<div style="padding:8px 10px;font-size:10px;color:#e07a5f">Server nicht erreichbar — Offline-Ortssuche aus</div>'; }
+  if (mitOnline) {
+    try {
+      const nc = new AbortController(); const nt = setTimeout(() => nc.abort(), 6000);
+      const nres = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&countrycodes=za,na,bw,zm,zw,mz,mw,tz,ke,ug,rw,bi,et,ao,sz,ls&q=' + encodeURIComponent(q), { signal: nc.signal });
+      clearTimeout(nt);
+      if (nres.ok) {
+        const nj = await nres.json();
+        if (nj.length) html += '<div style="padding:4px 10px;font-size:9px;color:var(--text3);border-top:1px solid var(--border)">🌐 Online (Nominatim/OSM):</div>'
+          + nj.map(r => sucheZeile(parseFloat(r.lat), parseFloat(r.lon), '🌐 ' + r.display_name.split(',').slice(0, 2).join(','), r.type || '', 15)).join('');
+      }
+    } catch (e) { html += '<div style="padding:6px 10px;font-size:10px;color:var(--text3)">🌐 Online-Suche nicht erreichbar (offline?)</div>'; }
+  } else if (!offlineFehlt) {
+    html += '<div style="padding:4px 10px;font-size:9px;color:var(--text3);border-top:1px solid var(--border)">Enter ⏎ sucht zusätzlich Straßen online</div>';
+  }
+  box.innerHTML = html || '<div style="padding:8px 10px;font-size:11px;color:var(--text3)">Keine Treffer</div>';
+  box.style.display = 'block';
+}
+function fliegeZu(lat, lng, zoom, titel) {
+  sucheSchliessen();
+  if (sucheMarker) { try { sucheMarker.remove(); } catch (e) {} sucheMarker = null; }
+  if (mapType === 'maplibre' && mlMap) {
+    mlMap.flyTo({ center: [lng, lat], zoom: zoom });
+    sucheMarker = new maplibregl.Marker({ color: '#e07a5f' }).setLngLat([lng, lat]).addTo(mlMap);
+  } else if (map) {
+    map.flyTo([lat, lng], zoom);
+    sucheMarker = L.marker([lat, lng]).addTo(map).bindPopup(esc(titel)).openPopup();  // 2026-09-05-1: Fremdtext escapen
+  }
+}
+
+let currentTileLayer = null;
+let offlineTilesAvailable = false;
+let offlineIsVector = false;
+let useOfflineTiles = false;
+let mapType = 'leaflet'; // 'leaflet' oder 'maplibre'
+let mlMap = null; // MapLibre Instanz
+let mlMarkers = []; // Bug 10: getrackte MapLibre-Marker (sauberes .remove(), kein Leak)
+let mlLoadTimer = null; // Auto-Fallback: Wächter, ob die Vektor-Karte rechtzeitig lädt
+let mapFellBack = false; // verhindert Mehrfach-Fallback; wird bei manuellem Moduswechsel zurückgesetzt
+
+// Auto-Fallback: Vektor-Karte (MapLibre) lädt nicht/scheitert → zurück auf Leaflet + Länderumrisse
+// statt schwarzer Karte (Projektregel: nie still/schwarz scheitern). Einmalig pro Vektor-Versuch.
+function mapFallbackToLeaflet(reason) {
+  if (mapFellBack) return;
+  mapFellBack = true;
+  if (mlLoadTimer) { clearTimeout(mlLoadTimer); mlLoadTimer = null; }
+  if (mlMap) { try { mlMap.remove(); } catch (e) {} mlMap = null; }
+  const mapDiv = document.getElementById('map');
+  if (mapDiv) mapDiv.innerHTML = '';
+  useOfflineTiles = false;
+  map = L.map('map', { zoomControl: false }).setView([-20, 25], 4);
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+  L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);  // 2026-09-05-1: Maßstab
+  currentTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18, attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende', className: 'map-tiles'
+  }).addTo(map);
+  drawLaenderUmrisse(); // offline bleibt so wenigstens die Orientierung (nie schwarz)
+  mapType = 'leaflet';
+  const btn = document.getElementById('tile-toggle-btn');
+  if (btn) { btn.textContent = '🗺️'; btn.title = 'Online-Karte aktiv — klicken für Offline'; btn.style.borderColor = ''; }
+  renderMarkers();
+  renderGefahren();
+  renderReisewarnEbene();
+  renderRegen();
+  zeigeKartenHinweis('⚠️ Offline-Vektor-Karte nicht verfügbar (' + reason + ') — auf Standard-Karte zurückgeschaltet. 🗺️-Button für erneuten Versuch.');
+}
+
+async function checkOfflineTiles() {
+  try {
+    const res = await fetch(SERVER_BASE + '/api/tiles/status');
+    if (res.ok) {
+      const data = await res.json();
+      offlineTilesAvailable = data.available;
+      offlineIsVector = data.is_vector || false;
+      const btn = document.getElementById('tile-toggle-btn');
+      if (offlineTilesAvailable) {
+        btn.title = `Offline-Karte verfügbar (${offlineIsVector ? 'Vektor' : 'Raster'}) — klicken zum Wechseln`;
+        btn.style.borderColor = 'var(--green)';
+        setTileSource(true);
+      } else {
+        btn.title = 'Keine Offline-Karte — karte.mbtiles in den App-Ordner legen (./setup-offline-karte.sh)';
+        btn.style.opacity = '0.4';
+      }
+    }
+  } catch(e) {
+    // Server nicht erreichbar — OSM bleibt aktiv
+  }
+}
+
+function initMap() {
+  // Bug 8: Ohne Leaflet (vendor/ fehlt UND offline) NICHT still sterben, sondern erklären
+  if (typeof L === 'undefined') {
+    document.getElementById('map').innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;padding:2rem;text-align:center;font-family:monospace;font-size:13px;color:#e07a5f;line-height:2">
+      ⚠️ Kartenbibliothek (Leaflet) nicht geladen.<br>
+      vendor/leaflet.js fehlt und kein Internet für den CDN-Fallback.<br>
+      Fix: <strong>./deploy.sh einmal MIT Internet ausführen</strong> — Schritt 0 lädt die Offline-Bibliotheken.</div>`;
+    return;
+  }
+  // 2026-10-04-3: Popups schieben die Karte so, dass ihre Kopfzeile unter dem Suchfeld und links der Knopfleiste liegt
+  L.Popup.mergeOptions({ autoPanPaddingTopLeft: L.point(10, kartenHinweisOben()), autoPanPaddingBottomRight: L.point(64, 10) });
+  // Start mit Leaflet + OSM
+  map = L.map('map', { zoomControl: false }).setView([-20, 25], 4);
+  currentTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende', maxZoom: 18, className: 'map-tiles'
+  }).addTo(map);
+  // Bug 8: Kacheln nicht erreichbar (offline) → Hinweis statt leerer Karte; Umrisse bleiben
+  let tileErrorGemeldet = false;
+  currentTileLayer.on('tileerror', () => {
+    if (tileErrorGemeldet || useOfflineTiles) return;
+    tileErrorGemeldet = true;
+    zeigeKartenHinweis('🌐 Karten-Kacheln nicht erreichbar (offline?) — Länderumrisse bleiben als Orientierung.<br>Echte Offline-Karte: karte.mbtiles in den Projektordner legen.');
+  });
+  drawLaenderUmrisse(); // Bug 8: 16 Länder als Offline-Hintergrund (byteidentisch mit index/mobile)
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+  L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);  // 2026-09-05-1: Maßstab
+  mapType = 'leaflet';
+
+  // Langer Klick auf LEERE Karte → neuen POI erstellen
+  // Wichtig: nur wenn NICHT auf Marker, NICHT beim Panning
+  let mapPressTimer = null;
+  let mapDragging = false;
+
+  map.on('dragstart', () => {
+    mapDragging = true;
+    clearTimeout(mapPressTimer);
+  });
+  map.on('dragend', () => { mapDragging = false; });
+
+  map.on('contextmenu', e => {
+    // Rechtsklick / langer Tap auf leere Karte → POI erstellen
+    if (!e.originalEvent?.target?.closest('.leaflet-marker-icon')) {
+      createPoiAtLocation(e.latlng);
+    }
+  });
+
+  renderMarkers();
+  renderGefahren();
+  renderReisewarnEbene();
+  renderRegen();
+  checkOfflineTiles();
+  ladeParks(); // Parkgrenzen (data/parks.geojson) asynchron — rendert nach, falls Layer an
+  ladeReisewarnEbene(); // amtliche Reisewarnungen vom Server; ohne Netz gilt der gespeicherte Stand
+  ladeKlima(); // Klimatologie (data/klima.json) asynchron — Regenzeit-Ebene rendert nach, falls an
+}
+
+function loadMapLibre(callback) {
+  if (window.maplibregl) { callback(); return; }
+  // Bug 8 (Teil 2): LOKAL zuerst (vendor/, lädt deploy.sh Schritt 0) — CDN nur als Fallback
+  const script = document.createElement('script');
+  script.src = 'vendor/maplibre-gl-4.7.1.js';
+  script.onload = callback;
+  script.onerror = () => {
+    const cdn = document.createElement('script');
+    cdn.src = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
+    cdn.onload = callback;
+    cdn.onerror = () => {
+      zeigeKartenHinweis('⚠️ MapLibre nicht ladbar (vendor/maplibre-gl-4.7.1.js fehlt + offline).<br>./deploy.sh einmal MIT Internet ausführen.');
+    };
+    document.head.appendChild(cdn);
+  };
+  document.head.appendChild(script);
+}
+
+function setTileSource(offline) {
+  useOfflineTiles = offline;
+  mapFellBack = false; // manueller Moduswechsel = erneuter Vektor-Versuch erlaubt
+  if (mlLoadTimer) { clearTimeout(mlLoadTimer); mlLoadTimer = null; }
+  const btn = document.getElementById('tile-toggle-btn');
+  const mapDiv = document.getElementById('map');
+
+  if (offline && offlineTilesAvailable && offlineIsVector) {
+    // Bug 9 GESCHLOSSEN (14.07., durch Bug-11-Clustering): Der Safari-Crash war
+    // IPC::Connection MACH_SEND_TOO_LARGE — ausgelöst durch tausende einzelne HTML-Marker.
+    // Seit dem Vektor-Clustering (wenige Marker) läuft Safari stabil → keine Chrome-Warnung mehr nötig.
+    // Vektor-Tiles: MapLibre GL JS — dynamisch laden
+    loadMapLibre(() => {
+      if (map) { map.remove(); map = null; }
+      mapDiv.innerHTML = '';
+      mlMap = new maplibregl.Map({
+        container: 'map',
+        style: SERVER_BASE + '/api/tiles/style.json',
+        center: [25, -20],
+        zoom: 4,
+        maxZoom: 18,
+        // Bug 9/9c: Safari-WebKit-Crash — GPU-Speicher drastisch senken:
+        // pixelRatio 1 statt Retina-2 (viertelt Framebuffer: 2600x1420 statt 5200x2840),
+        // Tile-Cache begrenzen statt unbegrenzt. trackResize (v4-Default) hält die Größe aktuell.
+        pixelRatio: 1,
+        maxTileCacheSize: 64,
+        fadeDuration: 0
+      });
+      mlMap.addControl(new maplibregl.NavigationControl(), 'bottom-right');
+      mapType = 'maplibre';
+      btn.textContent = '📴';
+      btn.title = 'Offline-Karte aktiv (Vektor) — klicken für Online';
+      btn.style.borderColor = 'var(--green)';
+      // Bug 9: Canvas füllte nur eine Teilfläche — Größe nach Layout-Abschluss neu setzen
+      requestAnimationFrame(() => { if (mlMap) mlMap.resize(); });
+      // Auto-Fallback-Wächter: lädt die Karte nicht binnen 8 s (Style/Tiles kaputt, Server weg,
+      // WebGL-Verlust …) → sauber auf Leaflet zurück statt schwarz.
+      if (mlLoadTimer) clearTimeout(mlLoadTimer);
+      mlLoadTimer = setTimeout(() => {
+        if (!mlMap || !mlMap.loaded()) mapFallbackToLeaflet('lädt nicht');
+      }, 8000);
+      mlMap.on('load', () => { mlMap.__stilGeladen = true; if (mlLoadTimer) { clearTimeout(mlLoadTimer); mlLoadTimer = null; } mlMap.resize(); renderMarkersMaplibre(); renderGefahren(); renderReisewarnEbene(); renderRegen(); });
+      // Bug 9c: MapLibre-Fehler sichtbar machen (Diagnose im Feld statt stummer Konsole)
+      mlMap.on('error', e => {
+        const msg = e && e.error && e.error.message ? e.error.message : 'unbekannt';
+        if (/sourceMappingURL|\.map$/.test(msg)) return;
+        // Fataler Ladefehler VOR dem 'load' (Style/Glyphen/Source/Netz) → sofort zurückfallen
+        if (mlMap && !mlMap.loaded() && /load failed|failed to fetch|networkerror|style|glyph|source|access control/i.test(msg)) {
+          mapFallbackToLeaflet(msg.substring(0, 60));
+          return;
+        }
+        zeigeKartenHinweis('⚠️ Karten-Fehler: ' + msg.substring(0, 160));
+      });
+    });
+    return;
+  }
+
+  if (offline && offlineTilesAvailable && !offlineIsVector) {
+    // Raster-Tiles: Leaflet
+    if (mlMap) { mlMap.remove(); mlMap = null; mapDiv.innerHTML = ''; map = L.map('map', { zoomControl: false }).setView([-20,25],4); L.control.zoom({position:'bottomright'}).addTo(map); mapType = 'leaflet'; }
+    if (currentTileLayer) map.removeLayer(currentTileLayer);
+    currentTileLayer = L.tileLayer(SERVER_BASE + '/api/tiles/{z}/{x}/{y}', {
+      maxZoom: 14, attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende (offline)', className: 'map-tiles'
+    }).addTo(map);
+    btn.textContent = '📴';
+    btn.title = 'Offline-Karte aktiv (Raster) — klicken für Online';
+    btn.style.borderColor = 'var(--green)';
+    renderMarkers();
+    renderGefahren();
+    renderReisewarnEbene();
+    renderRegen();
+  } else {
+    // Online: Leaflet + OSM
+    if (mlMap) { mlMap.remove(); mlMap = null; mapDiv.innerHTML = ''; map = L.map('map', { zoomControl: false }).setView([-20,25],4); L.control.zoom({position:'bottomright'}).addTo(map); mapType = 'leaflet'; }
+    if (currentTileLayer) map.removeLayer(currentTileLayer);
+    currentTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18, attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende', className: 'map-tiles'
+    }).addTo(map);
+    btn.textContent = '🗺️';
+    btn.title = 'Online-Karte aktiv — klicken für Offline';
+    btn.style.borderColor = '';
+    renderMarkers();
+    renderGefahren();
+    renderReisewarnEbene();
+    renderRegen();
+  }
+}
+
+function toggleTileSource() {
+  if (!offlineTilesAvailable) {
+    alert('Keine Offline-Karte gefunden.\n\nkarte.mbtiles in den App-Ordner legen (Pfad: Einstellungen → Server → Verzeichnis)\n— oder ./setup-offline-karte.sh ausführen — und Safari Assistant neu starten.');
+    return;
+  }
+  setTileSource(!useOfflineTiles);
+}
+
+// MapLibre Marker
+function renderMarkersMaplibre() {
+  if (!mlMap) return;
+  // Bug 11: Bewegungs-/Zoom-Handler EINMALIG pro mlMap-Instanz binden → nach Pan/Zoom neu clustern.
+  // Property am Instanz-Objekt: eine frische mlMap (nach Karten-Wechsel) bekommt ihre eigene Bindung.
+  if (!mlMap.__clusterMoveBound) {
+    mlMap.on('moveend', () => renderMarkersMaplibre());
+    mlMap.__clusterMoveBound = true;
+  }
+  // Bug 10: Marker sauber entfernen (nur DOM zu löschen ließ die Marker-Objekte als Leak zurück).
+  mlMarkers.forEach(m => m.remove());
+  mlMarkers = [];
+  // Bug 10: Layer-Sichtbarkeit respektieren (wie Leaflet-Cluster + Liste).
+  const visible = pois.filter(p => layers[p.layer || 'manuell']?.visible !== false);
+  const filtered = currentFilter === 'all' ? visible : visible.filter(p => p.type === currentFilter);
+
+  // Bug 11: MapLibre hatte GAR KEIN Clustering — bei tausenden importierten POIs wurde jeder
+  // Punkt einzeln als HTML-Marker gezeichnet (unbrauchbar + GPU-Last, vgl. Bug 9; online clustert
+  // Leaflet über MarkerCluster, offline/Vektor nicht). Wir clustern hier selbst im Pixelraum (Grid),
+  // damit die Emoji-Teardrops erhalten bleiben — Offline-Glyphs können keine Farb-Emojis rendern,
+  // native MapLibre-Symbol-Layer wären also icon-los.
+  const zoom = mlMap.getZoom();
+  const b = mlMap.getBounds();
+  const pad = 0.35; // etwas über den Rand hinaus, damit Randcluster stabil sind
+  const inView = filtered.filter(p =>
+    p.lng >= b.getWest() - pad && p.lng <= b.getEast() + pad &&
+    p.lat >= b.getSouth() - pad && p.lat <= b.getNorth() + pad);
+
+  if (zoom >= 11) { // wie Leaflet disableClusteringAtZoom: 11
+    inView.forEach(poi => mlMarkers.push(makeMlPoiMarker(poi)));
+    return;
+  }
+
+  const CELL = 60; // Pixel-Rastergröße (analog Leaflets maxClusterRadius)
+  const cells = {};
+  inView.forEach(poi => {
+    const pt = mlMap.project([poi.lng, poi.lat]);
+    const key = Math.floor(pt.x / CELL) + ':' + Math.floor(pt.y / CELL);
+    (cells[key] = cells[key] || []).push(poi);
+  });
+  Object.values(cells).forEach(group => {
+    if (group.length === 1) { mlMarkers.push(makeMlPoiMarker(group[0])); return; }
+    let sx = 0, sy = 0;
+    group.forEach(p => { sx += p.lng; sy += p.lat; });
+    const center = [sx / group.length, sy / group.length];
+    const el = document.createElement('div');
+    el.className = 'ml-marker';
+    el.style.cssText = 'width:36px;height:36px;border-radius:50%;background:rgba(200,169,90,0.85);display:flex;align-items:center;justify-content:center;font-family:monospace;font-size:12px;font-weight:700;color:#0f0e0c;border:2px solid #c8a95a;box-shadow:0 2px 6px rgba(0,0,0,0.4);cursor:pointer';
+    el.textContent = group.length;
+    el.addEventListener('click', () => mlMap.flyTo({ center, zoom: Math.min(zoom + 3, 18) }));
+    mlMarkers.push(new maplibregl.Marker({ element: el }).setLngLat(center).addTo(mlMap));
+  });
+}
+
+// Bug 11: Einzel-POI als Emoji-Teardrop (identisch zum bisherigen Marker), ausgelagert für's Clustering.
+function makeMlPoiMarker(poi) {
+  const t = TYPES[poi.type] || TYPES.custom;
+  const layerColor = layers[poi.layer || 'manuell']?.color || t.color; // Layer-Farbe wie in Leaflet
+  const el = document.createElement('div');
+  el.className = 'ml-marker';
+  el.style.cssText = `width:34px;height:34px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${t.bg};border:2px solid ${layerColor};display:flex;align-items:center;justify-content:center;cursor:pointer;`;
+  el.innerHTML = `<span style="transform:rotate(45deg);font-size:15px">${t.icon}</span>`;
+  el.addEventListener('click', () => showDetail(poi));
+  return new maplibregl.Marker({ element: el }).setLngLat([poi.lng, poi.lat]).addTo(mlMap);
+}
+
+window.addEventListener('load', async () => {
+  let dbOk = true;
+  try { await openDB(); } catch (e) {   // 2026-09-12 (M5): Safari-Privatmodus/gelöschte Website-Daten → vorher schwarze Seite ohne Hinweis
+    dbOk = false; console.error('IndexedDB nicht verfügbar:', e);
+    setTimeout(() => showToast('⚠️ POI-Speicher nicht verfügbar (Privatmodus? Website-Daten gelöscht?) — Karte läuft, Importe werden nicht gespeichert'), 800);
+  }
+  try { routen = dbOk ? await dbRoutenAlle() : []; } catch (e) { routen = []; } // GPX-Routen (überleben wie POIs in IndexedDB)
+
+  // Migration: alte localStorage-POIs in IndexedDB übertragen
+  const oldPois = localStorage.getItem('safari-pois');
+  if (oldPois) {
+    try {
+      const old = JSON.parse(oldPois);
+      if (old.length > 0) {
+        old.forEach(p => { if (!p.layer) p.layer = 'manuell'; });
+        await dbPutAll(old);
+        if (!layers['manuell']) layers['manuell'] = { visible: true, color: '#9a9589', name: 'manuell' };
+      }
+      localStorage.removeItem('safari-pois');
+    } catch(e) {}
+  }
+
+  // POIs aus IndexedDB laden
+  try { pois = dbOk ? await dbGetAll() : []; } catch (e) { pois = []; console.error('POIs laden:', e); }
+
+  // Bestehende POIs ohne layer-Tag dem 'manuell'-Layer zuweisen
+  const untagged = pois.filter(p => !p.layer);
+  if (untagged.length > 0) {
+    untagged.forEach(p => { p.layer = 'manuell'; });
+    try { await dbPutAll(untagged); } catch (e) {}
+    if (!layers['manuell']) layers['manuell'] = { visible: true, color: '#9a9589', name: 'manuell' };
+  }
+
+  // Bug 10: fehlende Layer aus den geladenen POIs rekonstruieren (localStorage safari-layers
+  // kann verloren gehen, während die POIs in IndexedDB überleben) — sonst unsichtbar auf der Karte
+  ensureLayersForPois();
+
+  // Layer-Counts synchronisieren
+  Object.keys(layers).forEach(key => {
+    layers[key].count = pois.filter(p => (p.layer || 'manuell') === key).length;
+  });
+  saveLayers();
+
+  initMap();
+  renderList();
+  renderLayerList();
+  const vEl = document.getElementById('poi-version');
+  if (vEl) vEl.textContent = APP_VERSION;
+
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(pos => {
+      userPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    });
+  }
+});
+</script>
+</body>
+</html>

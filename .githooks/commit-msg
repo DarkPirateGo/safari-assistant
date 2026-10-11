@@ -1,0 +1,12 @@
+#!/bin/sh
+# Datenschutz-Schranke / privacy gate: the commit message (it is public too).
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "privacy-gate: BLOCKIERT / BLOCKED - python3 fehlt, Commit abgebrochen / python3 not found, commit aborted" >&2
+  exit 1
+fi
+top=$(git rev-parse --show-toplevel) || exit 1
+if [ ! -f "$top/tools/privacy_gate.py" ]; then
+  echo "privacy-gate: BLOCKIERT / BLOCKED - tools/privacy_gate.py fehlt / is missing" >&2
+  exit 1
+fi
+exec python3 "$top/tools/privacy_gate.py" --commit-msg "$1"

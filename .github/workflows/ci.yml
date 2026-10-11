@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Test suite (node test-app.js)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4          # pin to full SHA
+      - uses: actions/setup-node@v4        # pin to full SHA
+        with:
+          node-version: '22'
+      # python3 and openssl come with the runner. test-app.js runs the Python tests itself:
+      # test-reisewarnungen.py, test-tls.py, test-warngebiete.py, test-sicherheit.py, test-hilfe.py,
+      # the privacy-gate self-test tools/test_privacy_gate.py and the OSM data validator
+      # tools/validate_osm_exports.py (the 'privacy' job below runs the last two again).
+      - name: Show tool versions
+        run: |
+          node --version
+          python3 --version
+          openssl version
+      - name: Run test suite
+        run: node test-app.js
+
+  python:
+    name: Python compile check (${{ matrix.python }})
+    # Fixed image: setup-python offers no Python 3.9 build for Ubuntu 26.04.
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.9 = the /usr/bin/python3 that macOS uses when Safari Assistant.app is started from Finder.
+        python: ['3.9', '3.12']
+    steps:
+      - uses: actions/checkout@v4          # pin to full SHA
+      - uses: actions/setup-python@v5      # pin to full SHA
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Compile every Python file
+        run: |
+          shopt -s nullglob
+          files=( *.py tools/*.py )
+          printf '  %s\n' "${files[@]}"
+          python -m py_compile "${files[@]}"
+      - name: Import server.py without optional dependencies
+        # server.py must load without PyMuPDF (it reports the missing library at runtime).
+        run: python -c "import importlib.util; s = importlib.util.spec_from_file_location('srv', 'server.py'); m = importlib.util.module_from_spec(s); s.loader.exec_module(m); print('server.py imports cleanly')"
+      - name: Parse shipped JSON data
+        run: |
+          shopt -s nullglob
+          fail=0
+          for f in features-manifest.json data/*.json data/*.geojson POIs/*.json; do
+            if python -c "import json, sys; json.load(open(sys.argv[1], encoding='utf-8'))" "$f"; then
+              echo "  ok    $f"
+            else
+              echo "  FAIL  $f"; fail=1
+            fi
+          done
+          exit $fail
+
+  # Datenschutz-Schranke als CI-Job / privacy gate CI job (docs/PRIVACY-GATE.md).
+  #
+  # Optional settings (Settings > Secrets and variables > Actions). Nothing is required; without them the job
+  # still runs every generic (A) rule. Pull requests from forks never receive secrets.
+  #   Secret   PRIVACY_DENYLIST_B64         base64 of your local term list:  base64 < ~/.config/privacy-gate/denylist.txt
+  #                                         (push events only; hits are printed as [redacted])
+  #   Variable PRIVACY_ALLOWED_NAMES        e.g.  DARK        (identity allowlist; push events only, see docs/PRIVACY-GATE.md)
+  #   Variable PRIVACY_ALLOWED_EMAIL_REGEX  e.g.  (\d+\+)?DarkPirateGo@users\.noreply\.github\.com
+  #   Variable PRIVACY_REQUIRE_UTC          1 = commits with a non-UTC timestamp fail CI (push events only)
+  privacy:
+    name: Privacy gate (whole history)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4          # pin to a full commit SHA once verified
+        with:
+          fetch-depth: 0                   # every commit, tag and file of the history, not only the tip
+          persist-credentials: false
+      - uses: actions/setup-python@v5      # pin to a full commit SHA once verified
+        with:
+          python-version: '3.12'           # Python 3.9 compatibility is checked by the 'python' job above
+      - name: Private term list (push events only)
+        if: github.event_name == 'push'
+        env:
+          PRIVACY_DENYLIST_B64: ${{ secrets.PRIVACY_DENYLIST_B64 }}
+        run: |
+          if [ -z "$PRIVACY_DENYLIST_B64" ]; then
+            echo "::notice::PRIVACY_DENYLIST_B64 fehlt - Prüfung ohne B-Regeln / not set - scanning without B rules"
+            exit 0
+          fi
+          umask 077
+          printf '%s' "$PRIVACY_DENYLIST_B64" | base64 -d > "$RUNNER_TEMP/privacy-terms.txt"
+          echo "PRIVACY_DENYLIST=$RUNNER_TEMP/privacy-terms.txt" >> "$GITHUB_ENV"
+      - name: Scan the whole history
+        env:
+          PRIVACY_ALLOWED_NAMES: ${{ github.event_name == 'push' && vars.PRIVACY_ALLOWED_NAMES || '' }}
+          PRIVACY_ALLOWED_EMAIL_REGEX: ${{ github.event_name == 'push' && vars.PRIVACY_ALLOWED_EMAIL_REGEX || '' }}
+          PRIVACY_REQUIRE_UTC: ${{ github.event_name == 'push' && vars.PRIVACY_REQUIRE_UTC || '' }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != "push" ]; then
+            echo "::notice::$GITHUB_EVENT_NAME: ohne B-Regeln und Identitäts-Allowlist / without B rules and identity allowlist"
+          fi
+          python3 tools/privacy_gate.py --all
+      - name: Self-test of the gate
+        if: ${{ !cancelled() }}
+        run: python3 tools/test_privacy_gate.py
+      - name: Validate OSM exports
+        if: ${{ !cancelled() }}
+        run: python3 tools/validate_osm_exports.py

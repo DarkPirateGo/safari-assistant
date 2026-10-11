@@ -1,0 +1,63 @@
+# private-terms.example.txt
+# Vorlage für die LOKALE Term-Liste der Datenschutz-Schranke (B-Regeln von tools/privacy_gate.py).
+# Template for the LOCAL term list of the privacy gate (B rules of tools/privacy_gate.py).
+#
+# Diese Vorlage enthält nur erfundene Beispiele. Die echte Liste enthält deine privaten Begriffe und
+# darf NIE in ein Repository - auch nicht in ein privates.
+# This template contains made-up examples only. The real list contains your private terms and must
+# NEVER go into a repository - not even a private one.
+#
+# Einrichten / set up (macOS, Linux):
+#   mkdir -p ~/.config/privacy-gate
+#   cp tools/private-terms.example.txt ~/.config/privacy-gate/denylist.txt
+#   chmod 600 ~/.config/privacy-gate/denylist.txt
+#   Dann die Beispiele unten durch echte Begriffe ersetzen (ohne "# " am Zeilenanfang).
+#   Then replace the examples below with your real terms (without the leading "# ").
+#
+# Anderer Ort, immer außerhalb des Repos / other location, always outside the repository:
+#   git config privacy.denylist ~/geheim/terms.txt     (relativer Pfad = relativ zum Repo-Wurzelordner /
+#                                                        a relative path is resolved against the repo root)
+#   export PRIVACY_DENYLIST=~/geheim/terms.txt          (hat Vorrang / takes precedence)
+#   Suchreihenfolge / lookup order: $PRIVACY_DENYLIST -> git config privacy.denylist
+#                                   -> ~/.config/privacy-gate/denylist.txt
+# Pflicht machen - fehlt die Liste, scheitert jeder Commit / make it mandatory - a missing list fails every commit:
+#   git config privacy.requireDenylist true
+# Testen / test:  python3 tools/privacy_gate.py --paths .
+# Für CI / for CI:  base64 < ~/.config/privacy-gate/denylist.txt   -> Repository-Secret PRIVACY_DENYLIST_B64
+#
+# Format: eine Regel pro Zeile; Leerzeilen und Zeilen mit "#" werden ignoriert.
+#         one rule per line; blank lines and lines starting with "#" are ignored.
+# Regel-ID = B-<Zeilennummer>, z. B. B-07 = Zeile 7 / rule id = B-<line number>, e.g. B-07 = line 7.
+# Treffer erscheinen immer als [redacted] / hits are always printed as [redacted].
+# Geprüft werden Dateiinhalte, Dateinamen, Commit-Nachrichten, Branch-/Tag-Namen, Autor und Committer.
+# Checked: file contents, file names, commit messages, branch/tag names, author and committer.
+# \uXXXX-Escapes und HTML-Entities werden vorher dekodiert / \uXXXX escapes and HTML entities are decoded first.
+#
+# word:  ganzes Wort; Groß-/Kleinschreibung und Akzente egal. "Mustermann" trifft "MUSTERMANN",
+#        aber nicht "Mustermannstraße". Umschreibungen (ü/ue, ß/ss) bitte beide eintragen.
+#        whole word; ignores case and accents. "Mustermann" matches "MUSTERMANN" but not
+#        "Mustermannstraße". Spelling variants (ü/ue, ß/ss) need their own lines.
+# word: Mustermann
+# word: Erika Musterfrau
+#
+# text:  Teiltext (trifft auch mitten im Wort), sonst wie word / substring (also inside words), otherwise like word
+# text: beispielweg 12
+# text: maxi.mustermann.alt
+#
+# regex: Python-Regex, geprüft gegen den kleingeschriebenen, akzentfreien Text
+#        Python regex, matched against the lower-cased, accent-free text
+# regex: (?<![0-9])9999[0-9](?![0-9])
+# regex: musterstadt-?\d{3}
+#
+# geo:   Breite,Länge,Radius in km - jedes Koordinatenpaar im Kreis, beide Achsenreihenfolgen, Text und JSON.
+#        Echte Werte dürfen mehr Nachkommastellen haben.
+#        lat,lon,radius in km - any coordinate pair inside the circle, either axis order, text and JSON.
+#        Real values may use more decimals.
+# geo: 45.67,12.34,3
+#
+# allow: <Zeile> <Pfad-Glob> <Anzahl> - erlaubt bis zu <Anzahl> Treffer der Regel aus <Zeile> je passender Datei.
+#        Für öffentliche Daten, die zufällig wie ein privater Begriff aussehen (z. B. ein gleichnamiges Dorf).
+#        Die Schranke schlägt die passende Zeile selbst vor.
+#        allows up to <count> hits of the rule on <line> per matching file - for public data that happens to
+#        look like a private term (e.g. a village with the same name). The gate prints the line to add.
+# allow: 42 data/orte.json 2

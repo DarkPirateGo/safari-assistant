@@ -1,0 +1,12 @@
+# .privacy-allowlist - öffentliche Ausnahmen für tools/privacy_gate.py / public exceptions for tools/privacy_gate.py
+# Format: <Regel-ID> <Pfad-Glob> <exakter Treffer>  /  <rule id> <path glob> <exact matched text>
+#   (durch genau ein Leerzeichen getrennt; der Text geht bis zum Zeilenende / single spaces; text runs to end of line)
+# NUR ÖFFENTLICHE Texte! Diese Datei wird veröffentlicht. / ONLY PUBLIC strings! This file is published.
+# Private Fehlalarme gehören als "allow:"-Zeile in die LOKALE Term-Liste. / Private false positives go into the
+# LOCAL term list as "allow:" lines.  Nie freigebbar / never allowlistable: A-S*, A-P02, A-G*, A-F06, B-*.
+A-P12 index.html +49 30 5000 2000
+A-P12 mobile.html +49 30 5000 2000
+A-P12 test-app.js +49 30 5000 2000
+A-P13 test-app.js 47.0000625, 8.0000625
+A-P13 test-app.js 8FVC2222+22
+A-P01 POIs/Tansania-osm.json info@luxurytentedcamp.com

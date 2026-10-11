@@ -1,0 +1,14 @@
+#!/bin/sh
+# Datenschutz-Schranke / privacy gate: every commit, tag, ref name and file the remote does not have yet
+# (including files added and deleted again). git passes "<remote name> <url>" as arguments and the refs on stdin.
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "privacy-gate: BLOCKIERT / BLOCKED - python3 fehlt, Push abgebrochen / python3 not found, push aborted" >&2
+  exit 1
+fi
+top=$(git rev-parse --show-toplevel) || exit 1
+if [ ! -f "$top/tools/privacy_gate.py" ]; then
+  echo "privacy-gate: BLOCKIERT / BLOCKED - tools/privacy_gate.py fehlt / is missing" >&2
+  exit 1
+fi
+# stdin (the refs being pushed) is passed through unchanged by exec
+exec python3 "$top/tools/privacy_gate.py" --push "$1"

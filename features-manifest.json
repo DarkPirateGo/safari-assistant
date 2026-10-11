@@ -1,0 +1,2372 @@
+{
+  "_hinweis": "Feature-Manifest für Safari Assistant. Jedes Feature wird durch Marker-Strings abgesichert, die in der Datei vorhanden sein MÜSSEN. test-app.js prüft alle Einträge automatisch (Sektion 22). Bei JEDEM neuen Feature hier einen Eintrag ergänzen — dann kann es nie wieder unbemerkt verschwinden.",
+  "_version": "2026-10-06-1",
+  "features": [
+    {
+      "file": "index.html",
+      "name": "Bug 7: Panel-Scroll-Fix (.panel-body overflow — Notfallkarte/Checklisten erreichbar)",
+      "contains": [
+        ".panel-body { flex: 1; min-height: 0; overflow-y: auto"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Versionsanzeige (APP_VERSION + Einstellungen-Panel, Cache-Check)",
+      "contains": [
+        "const APP_VERSION",
+        "app-version-display",
+        "verEl.textContent = 'index.html ' + APP_VERSION"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "POI-Karte-Button in der Navigation (öffnet pois.html)",
+      "contains": [
+        "window.open('pois.html', '_blank', 'noopener')",
+        "POI-Karte"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Antwortsprachen-Leiste (DE/EN/FR/PT/SW/AF, langInstruction in beiden Send-Funktionen)",
+      "contains": [
+        "id=\"lang-bar\"",
+        "function langInstruction",
+        "function setLang",
+        "MODULES[thisCtx].system + PROMPT_GRUNDREGELN + langInstruction()",
+        "systemPrompt += langInstruction()"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Notfallkarte mehrsprachig (DE/EN/FR/PT/SW, deutsche Keys bleiben Speicherformat)",
+      "contains": [
+        "const NK_T",
+        "function nkT",
+        "function setNkLang",
+        "safari-nk-lang",
+        "nkT(k)"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "UX P2: Streaming (tokenweises Rendern, NDJSON/SSE, Abbruch rettet Teilantwort)",
+      "contains": [
+        "const streamBuffers = {}",
+        "function startStream(",
+        "function updateStream(",
+        "function endStream(",
+        "stream: true, // P2: tokenweises Streaming (NDJSON)",
+        "stream: true, // P2: SSE-Streaming",
+        "content_block_delta",
+        "// P2: Teilantwort retten",
+        "renderStreamEl(ctx); // P2: Live-Stream nach Modulwechsel wiederherstellen"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "UX P2: Streaming (tokenweises Rendern, NDJSON/SSE, Abbruch rettet Teilantwort, Web-Search-Quellen aus Stream)",
+      "contains": [
+        "const streamBuffers = {}",
+        "function startStream(",
+        "function updateStream(",
+        "function endStream(",
+        "stream: true, // P2: tokenweises Streaming (NDJSON)",
+        "stream: true, // P2: SSE-Streaming",
+        "content_block_delta",
+        "// P2: Teilantwort retten",
+        "web_search_tool_result"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "UX P4: Tageslicht-Modus (Dunkel/Hell/Auto via prefers-color-scheme)",
+      "contains": [
+        ":root[data-theme=\"light\"]",
+        "id=\"theme-row\"",
+        "function applyTheme",
+        "function setTheme",
+        "mSettings.theme",
+        "prefers-color-scheme"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "UX P1: Chat-Persistenz (überlebt iOS-App-Kill, Bilder gestrippt, Quota-Fallback)",
+      "contains": [
+        "safari-mobile-chats",
+        "function persistChats",
+        "function clearAllChats",
+        "hadImage",
+        "persistChats(); // P1: Frage sofort sichern",
+        "persistChats(); // P1: Antwort (oder Abbruch) sichern"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "UX P3: Touch-Targets 44px + Zoom freigegeben + 16px-Eingabe",
+      "contains": [
+        "min-height: 44px",
+        "width: 44px; height: 44px",
+        "font-size: 16px"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "UX P5: Verbindungsstatus (Ping-Loop, conn-dot, Warnung vor dem Senden)",
+      "contains": [
+        "id=\"conn-dot\"",
+        "async function checkConnection",
+        "setInterval(checkConnection, 30000)",
+        "visibilitychange",
+        "Mac nicht erreichbar"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "GPS→Land-Erkennung offline (16 Länder-Polygone, Port von index.html)",
+      "contains": [
+        "const LAENDER_GEO",
+        "function pipTest",
+        "function landAusGPS",
+        "function aktivesLand",
+        "safari-land-override",
+        "name: 'Südafrika'",
+        "name: 'Lesotho'",
+        "name: 'Eswatini'",
+        "name: 'Ruanda'",
+        "name: 'Burundi'"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "Notruf-Sheet (🚨-Button, Land-Auto + Override, Notrufnummern 16 Länder)",
+      "contains": [
+        "id=\"notruf-overlay\"",
+        "function openNotruf",
+        "function renderNotruf",
+        "function setLandOverride",
+        "function captureLocationMobile",
+        "const NOTRUF_LAENDER",
+        "MEDIZIN/AMBULANZ",
+        "Nothilfe über Nairobi",
+        "🇱🇸 Lesotho",
+        "🇷🇼 Ruanda"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "Offline-GPS-Injektion für standortabhängige Module (auch ohne Koordinaten bei manuellem Land)",
+      "contains": [
+        "GPS_CTX_MODULES",
+        "AKTUELLER STANDORT DES NUTZERS",
+        "grenznahe Schätzung",
+        "Koordinaten unbekannt"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Fristen-Tracker Notfall (Dokumente/Visa/Prophylaxen)",
+      "contains": [
+        "FRISTEN_PLAN",
+        "id=\"fristen-bar\"",
+        "id=\"fristen-badge\"",
+        "function fristStatus",
+        "function fristSetzen",
+        "function fristCustomAdd",
+        "'safari-wartung', 'safari-fristen'",
+        "Herzwurm-Spot-on"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Afrika-Prompt-Ausbauten (Hund/Medizin/Navigation/Küche/Überleben/Sicherheit)",
+      "contains": [
+        "Heartworm occurs regionally",
+        "Babesiosis",
+        "PROHIBITED in big-game national parks",
+        "malaria until proven otherwise",
+        "standby emergency treatment",
+        "NEVER drive at night",
+        "pay fines only against an official, numbered receipt/ticket",
+        "VETERINARY FENCES",
+        "Veterinary control zones",
+        "decoy wallet",
+        "CHECKPOINT-REGELN"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "Afrika-Prompt-Ausbauten synchron",
+      "contains": [
+        "Heartworm occurs regionally",
+        "NEVER drive at night",
+        "decoy wallet"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Notrufnummern 16 Länder (inkl. Südafrika/Lesotho/Eswatini/Ruanda/Burundi, verifiziert 07/2026)",
+      "contains": [
+        "🇿🇦 Südafrika",
+        "🇱🇸 Lesotho",
+        "🇸🇿 Eswatini",
+        "🇷🇼 Ruanda",
+        "🇧🇮 Burundi",
+        "Nothilfe über Nairobi"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "GPS→Land-Erkennung offline (16 Länder-Polygone)",
+      "contains": [
+        "const LAENDER_GEO",
+        "function pipTest",
+        "function landAusGPS",
+        "function aktivesLand",
+        "safari-land-override",
+        "name: 'Südafrika'",
+        "name: 'Lesotho'",
+        "name: 'Eswatini'",
+        "name: 'Ruanda'",
+        "name: 'Burundi'"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "GPS-Notruf-Box in Notfallkarte (Land-Auto + Override)",
+      "contains": [
+        "id=\"notfall-gps-box\"",
+        "function setLandOverride",
+        "captureLocation(renderNotfallkarte)",
+        "MEDIZIN/AMBULANZ"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Offline-GPS-Injektion für standortabhängige Module",
+      "contains": [
+        "GPS_CTX_MODULES",
+        "AKTUELLER STANDORT DES NUTZERS",
+        "grenznahe Schätzung"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "GPS-Quick-Buttons Natur/Küche",
+      "contains": [
+        "Welche Tiere an meinem Standort?",
+        "Typische Küche in diesem Land"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Wartungs-Tracker Mechanik (km-Erinnerungen)",
+      "contains": [
+        "WARTUNG_PLAN",
+        "id=\"wartung-bar\"",
+        "id=\"wartung-badge\"",
+        "function wartungStatus",
+        "function wartungErledigt",
+        "function wartungNachtragen",
+        "function wartungCustomAdd",
+        "function wartungInChat",
+        "'safari-checklisten', 'safari-wartung'",
+        "Zahnriemen + Spannrolle",
+        "Ventilspiel prüfen/einstellen"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Fitness-Modul (Chat, Nav, RAG-Zuordnung)",
+      "contains": [
+        "fitness: {",
+        "data-ctx=\"fitness\"",
+        "nav-status-fitness",
+        "'kueche','fitness','foto'",
+        "resistance bands",
+        "Ausgleich nach langem Fahrtag"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "Fitness-Modul",
+      "contains": [
+        "fitness: {",
+        "resistance bands",
+        "Ausgleich nach langem Fahrtag"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Versions-Marker Zeile 2",
+      "contains": [
+        "<!-- Safari Assistant index.html v"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Shutdown-Button + shutdownApp (Bug 1)",
+      "contains": [
+        "id=\"shutdown\"",
+        "async function shutdownApp",
+        "/api/shutdown"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Hilfe-Panel: iPhone-Verbindungsanleitung",
+      "contains": [
+        "id=\"panel-hilfe\"",
+        "data-module=\"hilfe\"",
+        "/go/k7x2m9pq4d",
+        "ipconfig getifaddr en0",
+        "Starlink als Router"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Notfall-Karte komplett (Bug 4)",
+      "contains": [
+        "id=\"panel-notfallkarte\"",
+        "data-module=\"notfallkarte\"",
+        "function renderNotfallkarte",
+        "NOTFALL_TEMPLATE",
+        "Tollwut-Titer",
+        "safari-notfallkarte"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Race-Condition-Pattern (Bug 3)",
+      "contains": [
+        "const thisCtx = currentCtx;",
+        "function addMessage(role, text, imageUrl, badge, ctx)",
+        "function showTyping(ctx)",
+        "function removeTyping(ctx)"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Race-Härtung condenseChat/History/GPS-Timeout (Bug 3)",
+      "contains": [
+        "'🗜 komprimiert', ctx)",
+        "m.badge || null, entry.ctx)",
+        "if (ctx !== currentCtx) return;\n          if (settings.userLat)"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "RAG-Dokumentsystem",
+      "contains": [
+        "id=\"panel-dokumente\"",
+        "async function searchDocs",
+        "function buildRagContext",
+        "async function handleDocUpload",
+        "indexedDB.open('safari-docs'"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Per-Modul Modell-Dropdown",
+      "contains": [
+        "function setModuleModel",
+        "function cleanupStaleModels",
+        "settings.moduleModels"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Token-Sparen: Kurz-Modus / Vollkontext / Kompression",
+      "contains": [
+        "function sendFast",
+        "claudeVollkontext",
+        "async function condenseChat"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Backup/Restore-System",
+      "contains": [
+        "async function exportBackup",
+        "async function importBackup",
+        "safari-checklisten"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Checklisten (4 Vorlagen)",
+      "contains": [
+        "id=\"panel-checklisten\"",
+        "function renderChecklisten",
+        "Tollwut-Titer-Bescheinigung",
+        "Carnet de Passages",
+        "1HZ: 9,5L"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Markdown-Rendering XSS-sicher",
+      "contains": [
+        "function escHtml"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "GPS für Sicherheitslage/Wetter",
+      "contains": [
+        "function captureLocation",
+        "settings.userLat"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Wetter Dual-Mode (Claude online, Gemma-Fallback)",
+      "contains": [
+        "fallbackToOllama"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Claude-API-Anbindung (claude/sicherheit)",
+      "contains": [
+        "async function sendClaudeMessage",
+        "anthropic-dangerous-direct-browser-access",
+        "web_search"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "Versions-Marker Zeile 2",
+      "contains": [
+        "<!-- Safari Assistant mobile.html v"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "Setup-Sheet mit Modellwahl (Bug 2)",
+      "contains": [
+        "id=\"setup-overlay\"",
+        "id=\"m-model-select\"",
+        "function setManualModel",
+        "function effectiveModel",
+        "effectiveModel(thisCtx)"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "Stale-Model-Check beim Start (Bug 2)",
+      "contains": [
+        "cleanupStaleManualModel",
+        "nicht mehr installiert"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "Versionsanzeige im Setup-Sheet (Cache-Erkennung)",
+      "contains": [
+        "APP_VERSION",
+        "setup-version"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "Race-Condition-Pattern (Bug 3)",
+      "contains": [
+        "const thisCtx = currentCtx;",
+        "if (ctx !== currentCtx) return;"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "Dynamische Host-Erkennung (Hotspot/Router)",
+      "contains": [
+        "const HOST = location.hostname || 'localhost'"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "6-Sprachen-Leiste",
+      "contains": [
+        "data-lang=\"Deutsch\"",
+        "data-lang=\"Swahili\"",
+        "data-lang=\"Afrikaans\"",
+        "function langInstruction"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "Bild-Upload mit Auto-Resize + Ollama images-Format",
+      "contains": [
+        "function handleFile",
+        "images"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "Versions-Marker Zeile 2 + APP_VERSION + Anzeige im Header",
+      "contains": [
+        "<!-- Safari Assistant pois.html v",
+        "const APP_VERSION",
+        "id=\"poi-version\""
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "IndexedDB-Persistenz (safari-pois-db) + localStorage-Migration",
+      "contains": [
+        "indexedDB.open('safari-pois-db'",
+        "function dbGetAll",
+        "function dbPutAll",
+        "function dbDeleteByLayer",
+        "function dbClear",
+        "localStorage.removeItem('safari-pois')"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "MarkerCluster pro Layer + Klick direkt am Marker (Klick-Bug-Workaround)",
+      "contains": [
+        "function makeClusterGroup",
+        "disableClusteringAtZoom",
+        "// Click direkt am Marker",
+        "m.on('click'",
+        "L.DomEvent.stopPropagation"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "Layer-System (Toggle, Löschen, Farben, Karten-Panel)",
+      "contains": [
+        "safari-layers",
+        "function toggleLayer",
+        "function deleteLayer",
+        "id=\"map-layer-panel\"",
+        "function renderMapLayerList"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "POI-Kategorien komplett (9, inkl. Tierarzt + Krankenhaus)",
+      "contains": [
+        "label:'Wasserstelle'",
+        "label:'Campingplatz'",
+        "label:'Treibstoff'",
+        "label:'Mechaniker'",
+        "label:'Tierarzt'",
+        "label:'Krankenhaus'",
+        "label:'Grenzübergang'",
+        "label:'Warnung'",
+        "label:'Eigener POI'"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "GPX/KML/Overpass-Import → IndexedDB",
+      "contains": [
+        "function parseGPX",
+        "function parseKML",
+        "function parseOverpass",
+        "function osmType",
+        ".gpx,.kml,.json,.geojson",
+        "id=\"overpass-hint\""
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "Nächster-POI-Distanzsuche (🧭, GPS + Kartenmitte-Fallback)",
+      "contains": [
+        "function nearestSearch",
+        "function mapCenter",
+        "nearestSearch()",
+        "function dist",
+        "function formatDist"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "Favoriten-Listen",
+      "contains": [
+        "safari-fav-lists",
+        "function quickAddFavorite",
+        "function renderFavorites",
+        "function addToFavInline"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "Offline-Karten (MBTiles Raster/Vektor via server.py)",
+      "contains": [
+        "/api/tiles/status",
+        "function setTileSource",
+        "function loadMapLibre",
+        "style.json"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "KI-Anbindung (POI → Assistent-Frage, inkl. vet/hospital)",
+      "contains": [
+        "function askAssistant",
+        "safari-nav-question",
+        "index.html?nav=1",
+        "Herzwurm-Prophylaxe",
+        "Malaria-Schnelltest"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Bergungs-Doktrin in Notfall- + Überleben-Prompt (Sandbleche, Luftdruck, Winde) + Quick-Button Bergungsplan mit Foto-Hinweis",
+      "contains": [
+        "VEHICLE RECOVERY DOCTRINE (Festgefahren in Sand/Schlamm)",
+        "'Festgefahren in Sand/Schlamm — Bergungsplan'",
+        "photo of the stuck vehicle"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "Bergungs-Doktrin in Notfall- + Überleben-Prompt (Sandbleche, Luftdruck, Winde) + Quick-Button Bergungsplan mit Foto-Hinweis",
+      "contains": [
+        "VEHICLE RECOVERY DOCTRINE (Festgefahren in Sand/Schlamm)",
+        "'Festgefahren in Sand/Schlamm — Bergungsplan'",
+        "photo of the stuck vehicle"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "P6: Modul-Leiste sortiert zuletzt genutzte Module nach vorn (MRU, persistiert)",
+      "contains": [
+        "const MRU_KEY = 'safari-mobile-mru'",
+        "function touchMRU",
+        "function moduleOrder",
+        "moduleOrder().map(key",
+        "touchMRU(thisCtx); // P6"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Chat-Tabs: \"Neuer Chat\" behält alten Chat als Tab im Modul (max 5, Überlauf + Schließen wandern in Verlauf, persistiert ohne Bilder)",
+      "contains": [
+        "id=\"chat-tabs\"",
+        "let chatTabs = ladeJSON('safari-chat-tabs', {})",
+        "function archiveCurrentAsTab",
+        "function renderChatTabs",
+        "function activateTab",
+        "function closeTab",
+        "const kept = archiveCurrentAsTab(currentCtx)",
+        "saveMsgsToHistory(ctx, drop.msgs)",
+        "if (abortControllers[ctx]) { showToast("
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Verlauf-Umbau: nach Modulen gegliedert + Stichwort-Suche (durchsucht auch Nachrichtentexte)",
+      "contains": [
+        "id=\"history-search\"",
+        "history-group-head",
+        "function saveMsgsToHistory",
+        "(h.messages || []).some(m => typeof m.content === 'string' && m.content.toLowerCase().includes(q))"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Sonnenzeiten offline in der Notfallkarte (GPS oder Landesmitte, Dunkelheits-Warnung)",
+      "contains": [
+        "function sunTimes",
+        "function landZentroid",
+        "function sonnenBlockDesktop",
+        "html += sonnenBlockDesktop();",
+        "bis Sonnenuntergang"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "Sonnenzeiten offline im 🚨-Notruf-Sheet (byteidentischer Kern mit index.html)",
+      "contains": [
+        "function sunTimes",
+        "function landZentroid",
+        "function sonnenBlockMobil",
+        "html += sonnenBlockMobil();"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Fahrzeug-Logbuch (Tanken/Wartung/Reparatur/Grenze/Notiz, l/100km-Volltank-Rechnung, im Backup)",
+      "contains": [
+        "let logbuch = ladeJSON('safari-logbuch', [])",
+        "const LOG_TYPEN",
+        "function logVerbrauch",
+        "function renderLogbuch",
+        "id=\"panel-logbuch\"",
+        "if (mod === 'logbuch') renderLogbuch();",
+        "'safari-logbuch', 'safari-hund-verlauf',"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Hund-Gesundheitsverlauf in der Notfallkarte (Datum/Gewicht/Eintrag; Stammdaten bleiben in Hund-Sektion)",
+      "contains": [
+        "let hundVerlauf = ladeJSON('safari-hund-verlauf', [])",
+        "function hundVerlaufHtml",
+        "html += hundVerlaufHtml();",
+        "function addHundEintrag"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "RAG-Mobile: Sync-Store + Suche (/api/rag/sync, /api/rag/search, /api/rag/status; Scoring-Port von searchDocs)",
+      "contains": [
+        "RAG_STORE_FILE",
+        "RAG_STOPWORDS",
+        "def rag_search",
+        "def rag_terms",
+        "'/api/rag/sync'",
+        "'/api/rag/search'",
+        "'/api/rag/status'",
+        "score += 3",
+        "_handle_rag_sync",
+        "_handle_rag_search"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "RAG-Sync zum Server (automatisch bei Init/Upload/Zuordnung/Löschen; Status im Dokumente-Panel)",
+      "contains": [
+        "async function syncRagToServer",
+        "id=\"rag-sync-status\"",
+        "/api/rag/sync"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "RAG am iPhone: /api/rag/search vor sendOllama, Kontext-Injektion + 📄-Badge, 4s-Timeout, Abort-sicher",
+      "contains": [
+        "/api/rag/search",
+        "ragBadge = ' · 📄 Doku'",
+        "setTimeout(() => rc.abort(), 4000)",
+        "model + ragBadge",
+        "if (controller.signal.aborted)"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "Bug 8: Offline-fest — lokale vendor-Bibliotheken mit CDN-Fallback, L-Guard-Banner, Cluster-Guard",
+      "contains": [
+        "vendor/leaflet.js",
+        "vendor/leaflet.markercluster.js",
+        "vendor/leaflet.css",
+        "if (typeof L === 'undefined') document.write",
+        "Kartenbibliothek (Leaflet) nicht geladen",
+        "if (!map) return; // Bug 8"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "Bug 8: Offline-Länderumrisse (16 Länder byteidentisch) + Kacheln-Ausfall-Hinweis",
+      "contains": [
+        "const LAENDER_GEO",
+        "function drawLaenderUmrisse",
+        "drawLaenderUmrisse();",
+        "function zeigeKartenHinweis",
+        "tileerror"
+      ]
+    },
+    {
+      "file": "deploy.sh",
+      "name": "Bug 8: Schritt 0 lädt vendor-Bibliotheken (mit Größencheck) + kopiert vendor/ ins Bundle + Downgrade-Sperre für pois.html",
+      "contains": [
+        "vendor_fetch leaflet.js",
+        "vendor_fetch MarkerCluster.Default.css",
+        "mkdir -p \"$DST/vendor\"",
+        "for f in index.html mobile.html pois.html"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "Vektor-Offline (Teil 1): MapLibre lokal zuerst (vendor/), CDN-Fallback, sichtbarer Hinweis statt alert",
+      "contains": [
+        "vendor/maplibre-gl-4.7.1.css",
+        "script.src = 'vendor/maplibre-gl-4.7.1.js'",
+        "cdn.src = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js'"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "Vektor-Offline (Teil 2): style.json mit lokalen Glyphs + dynamischem Port, /fonts/ mit Online-Redirect-Fallback",
+      "contains": [
+        "self.server.server_port}/fonts/",
+        "self.server.server_port}/api/tiles/",
+        "path.startswith('/fonts/')",
+        "fonts.openmaptiles.org/' + path[len('/fonts/'):]"
+      ]
+    },
+    {
+      "file": "deploy.sh",
+      "name": "Vektor-Offline (Teil 3): MapLibre in vendor_fetch (Schritt 0)",
+      "contains": [
+        "vendor_fetch maplibre-gl-4.7.1.js",
+        "vendor_fetch maplibre-gl-4.7.1.css"
+      ]
+    },
+    {
+      "file": "setup-offline-karte.sh",
+      "name": "Vektor-Offline (Teil 4): Setup-Skript baut karte.mbtiles (Planetiler/Afrika) + lädt Noto-Glyphs, kopiert ins Bundle",
+      "contains": [
+        "planetiler.jar",
+        "--area=africa",
+        "--output=karte.mbtiles",
+        "Noto Sans Regular",
+        "cp karte.mbtiles \"$DST/karte.mbtiles\""
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "Bug 9/9c: Vektor-Karte stabil — MapLibre 4.7.1, pixelRatio 1 + Tile-Cache-Limit (Safari-GPU), resize-Handling, sichtbare Karten-Fehler",
+      "contains": [
+        "pixelRatio: 1",
+        "maxTileCacheSize: 64",
+        "maxZoom: 18",
+        "requestAnimationFrame(() => { if (mlMap) mlMap.resize(); });",
+        "mlMap.resize(); renderMarkersMaplibre(); renderGefahren();",
+        "mlMap.on('error', e => {"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "Bug 9c: ThreadingHTTPServer (parallele Tile-/RAG-Requests) + Label-minzoom (Symbol-Last)",
+      "contains": [
+        "SafariServer((wunsch, port), SafariHandler)",
+        "class SafariServer(ThreadingHTTPServer):",
+        "\"minzoom\":10,\"filter\":[\"in\",\"class\",\"village\"",
+        "\"minzoom\":6,\"filter\":[\"in\",\"class\",\"town\""
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "Straßennamen auf der Vektor-Karte (transportation_name, ab z11, entlang der Linie)",
+      "contains": [
+        "\"id\":\"road-name\"",
+        "\"source-layer\":\"transportation_name\"",
+        "\"symbol-placement\":\"line\""
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "Info-Layer auf der Vektor-Karte: Flughäfen, POIs (Krankenhaus/Apotheke/Tankstelle/Camp/Polizei/Shops...), Nationalparks, Gewässernamen, Bahn, Gipfel",
+      "contains": [
+        "\"id\":\"airport-label\"",
+        "\"id\":\"poi-dot\"",
+        "\"id\":\"poi-name\"",
+        "\"id\":\"park-name\"",
+        "\"id\":\"water-name\"",
+        "\"id\":\"waterway-name\"",
+        "\"id\":\"rail\"",
+        "\"id\":\"mountain-peak\"",
+        "\"source-layer\":\"aerodrome_label\"",
+        "\"hospital\",\"#e07a5f\""
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "Bug 10: Importierte POIs sichtbar — verwaiste Layer rekonstruieren (ensureLayersForPois), Vektor-Rebuild erreichbar (map=null-Guard fixiert), Auto-Zoom auf Import, MapLibre-Marker respektieren Layer-Sichtbarkeit + sauberes remove",
+      "contains": [
+        "function ensureLayersForPois",
+        "ensureLayersForPois();",
+        "if (mapType === 'maplibre') { if (mlMap) renderMarkersMaplibre(); return; }",
+        "function focusPois",
+        "focusPois(imported);",
+        "mlMarkers.forEach(m => m.remove());"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "Bug 11: Clustering im MapLibre-Vektor-Modus (Pixel-Grid, moveend-Rebind, Zoom<11, Cluster-Klick zoomt hinein, Emoji-Teardrops via makeMlPoiMarker)",
+      "contains": [
+        "function makeMlPoiMarker",
+        "mlMap.__clusterMoveBound",
+        "mlMap.project([poi.lng, poi.lat])",
+        "const CELL = 60;",
+        "mlMap.flyTo({ center, zoom: Math.min(zoom + 3, 18) })"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Kuratierte Länder→Arten-Liste (FAUNA_LAENDER, 16 Länder) — erdet Natur/Überleben/Hund auf verlässliche Arten statt Halluzination",
+      "contains": [
+        "const FAUNA_LAENDER",
+        "'Lesotho':",
+        "'Namibia':",
+        "'Südafrika':",
+        "const FAUNA_CTX = ['natur','ueberleben','hund']",
+        "KURATIERTE TIER-GRUNDLAGE FÜR"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "Kuratierte Länder→Arten-Liste (FAUNA_LAENDER) synchron + Injektion",
+      "contains": [
+        "const FAUNA_LAENDER",
+        "const FAUNA_CTX = ['natur','ueberleben','hund']",
+        "KURATIERTE TIER-GRUNDLAGE FÜR"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Claude-Modul mit Web-Search (Internetrecherche auch im allgemeinen Claude-Modul, nicht nur sicherheit/wetter)",
+      "contains": [
+        "const isClaude = thisCtx === 'claude'",
+        "isSicherheit || isWetter || isClaude"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Regionale Gefahren-Ebene (GEFAHREN_REGIONAL, 16 Länder→Regionen mit Box, GPS-Auswahl) + Injektion natur/ueberleben/hund/medizin",
+      "contains": [
+        "const GEFAHREN_REGIONAL",
+        "function regionalGefahren",
+        "const REGIO_CTX = ['natur','ueberleben','hund','medizin']",
+        "regionalGefahren(land.name, settings.userLat, settings.userLng)"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "Regionale Gefahren-Ebene (GEFAHREN_REGIONAL) synchron + Injektion",
+      "contains": [
+        "const GEFAHREN_REGIONAL",
+        "function regionalGefahren",
+        "regionalGefahren(land.name, mSettings.userLat, mSettings.userLng)"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Saison-Auflösung: aktueller Monat löst Malaria-Saison (Nov-Mai etc.) zu JETZT AKTIV / derzeit GERING auf (regionalGefahren)",
+      "contains": [
+        "new Date().getMonth()",
+        "const saison = (g) =>",
+        "Malaria JETZT AKTIV",
+        "Saison-Stand ${MKURZ[monat]}"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "Saison-Auflösung synchron (regionalGefahren: Monat → Malaria JETZT AKTIV / derzeit GERING)",
+      "contains": [
+        "new Date().getMonth()",
+        "const saison = (g) =>",
+        "Malaria JETZT AKTIV",
+        "Saison-Stand ${MKURZ[monat]}"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Sichtbarer Malaria-Status in der Notfallkarte (malariaRegionen + malariaBlockDesktop, aktueller Monat)",
+      "contains": [
+        "function malariaRegionen",
+        "function malariaBlockDesktop()",
+        "html += malariaBlockDesktop();"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "Sichtbarer Malaria-Status im 🚨-Sheet (malariaRegionen synchron + malariaBlockMobil)",
+      "contains": [
+        "function malariaRegionen",
+        "function malariaBlockMobil()",
+        "html += malariaBlockMobil();"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "Gefahrenzonen-Overlay aus GEFAHREN_REGIONAL (toggelbar, Leaflet + MapLibre, Popup je Region)",
+      "contains": [
+        "const GEFAHREN_REGIONAL",
+        "function gefahrenGeoJSON()",
+        "function gefahrenLeaflet(",
+        "function gefahrenMaplibre(",
+        "onclick=\"toggleGefahren()\"",
+        "gefahren-fill"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "CORS auf jeder Antwort (end_headers-Override) — Fix cross-origin Glyph/Font-Fetch (Vektor-Karte Load failed)",
+      "contains": [
+        "def end_headers(self):",
+        "if origin and self.origin_passt(origin, eigene_hosts()):",
+        "self.send_header('Access-Control-Allow-Origin', origin)",
+        "super().end_headers()"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "Auto-Fallback: Vektor-Karte scheitert → Leaflet + Länderumrisse statt schwarz (Wächter + error-Handler)",
+      "contains": [
+        "function mapFallbackToLeaflet(",
+        "mlLoadTimer = setTimeout(",
+        "mapFellBack = false;"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "Park-Polygone (OSM/ODbL) verfeinern das Gefahren-Overlay — Boxen-Fallback, beide Kartenmodi, Region-Text-Vererbung",
+      "contains": [
+        "async function ladeParks()",
+        "function parksLeaflet(",
+        "function parksMaplibre(",
+        "mlMap.addLayer({ id: 'parks-fill'",
+        "function parkRegion("
+      ]
+    },
+    {
+      "file": "fetch-parks.py",
+      "name": "Parkgrenzen-Beschaffung: Overpass → data/parks.geojson, vereinfacht (Bug-11-Lektion), ODbL-Attribution",
+      "contains": [
+        "def dp_vereinfachen",
+        "MAX_PUNKTE_PRO_GEBIET",
+        "OpenStreetMap contributors (ODbL)"
+      ]
+    },
+    {
+      "file": "deploy.sh",
+      "name": "deploy.sh bündelt data/parks.geojson (Schritt 4b) — Fehlen wird sichtbar gemeldet",
+      "contains": [
+        "data/parks.geojson",
+        "python3 fetch-parks.py"
+      ]
+    },
+    {
+      "file": "fetch-pois.py",
+      "name": "POI-Beschaffung: Overpass → POIs/<Land>-osm.json (alle osmType-Kategorien, Tags verschlankt, ODbL)",
+      "contains": [
+        "def verschlanken",
+        "TAG_WHITELIST",
+        "OpenStreetMap contributors (ODbL)",
+        "border_control"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "Import-Tab: automatischer Weg über fetch-pois.py + erweiterte manuelle Overpass-Query (Werkstatt/Camp)",
+      "contains": [
+        "python3 fetch-pois.py",
+        "shop~\"car_repair|car_parts\""
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "Kiwix Offline-Wikipedia: Autostart kiwix-serve :8090 + /api/kiwix/status + sauberes Mitbeenden",
+      "contains": [
+        "def start_kiwix()",
+        "if path == '/api/kiwix/status':",
+        "def stoppe_kiwix()"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "📚 Wikipedia-Eintrag (Werkzeuge) → kiwix-serve, hostname-relativ mit Status-Check",
+      "contains": [
+        "onclick=\"openWikipedia()\"",
+        "async function openWikipedia()"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "📚 Offline-Wikipedia-Button (⚙️-Sheet) → kiwix-serve, byteident. openWikipedia()",
+      "contains": [
+        "onclick=\"openWikipedia()\"",
+        "async function openWikipedia()"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "Wiki-RAG: /api/wiki/search — Kiwix-Volltextsuche + Artikel-Auszüge (Medizin-ZIM zuerst, Grund bei Kiwix-Aus)",
+      "contains": [
+        "if path == '/api/wiki/search':",
+        "def wiki_suche(",
+        "def wiki_buecher()"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Wiki-RAG zuschaltbar pro Modul: 📚-Toggle (Extra-Leiste), Injektion in ragContext, 📚-Badge",
+      "contains": [
+        "id=\"wiki-btn\"",
+        "function toggleWikiRag()",
+        "function wikiAktiv(",
+        "async function sucheWiki("
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "Wiki-RAG zuschaltbar pro Modul (mobile): 📚-Button in der Eingabeleiste, systemContent-Injektion, Badge",
+      "contains": [
+        "id=\"wiki-btn\"",
+        "function toggleWikiRag()",
+        "ragBadge += ' · 📚 Wikipedia';"
+      ]
+    },
+    {
+      "file": "fetch-orte.py",
+      "name": "Offline-Ortsindex: GeoNames-Dumps 16 Länder → data/orte.json (Orte/Berge/Seen/Flughäfen, CC BY 4.0)",
+      "contains": [
+        "def kategorie(",
+        "DUMP_URL",
+        "CC BY 4.0"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "Offline-Ortssuche /api/orte/search (Lazy-Index, Scoring exakt>Präfix>Substring, Pop-Ranking)",
+      "contains": [
+        "if path == '/api/orte/search':",
+        "def orte_suche(",
+        "def orte_index()"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "Kartensuche: Suchfeld offline (Ortsindex) + Enter=online (Nominatim, 16-Länder-Filter) + Fly-to beide Modi",
+      "contains": [
+        "id=\"suche-input\"",
+        "function sucheAusfuehren(",
+        "function fliegeZu(",
+        "nominatim.openstreetmap.org"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "GPX-Routen/Tracks: trk/rte → Linien-Layer (IndexedDB v2, beide Kartenmodi, Distanz, Panel-Toggle/Zoom/Löschen)",
+      "contains": [
+        "function parseGPXRouten(",
+        "function routenLeaflet()",
+        "function routenMaplibre()",
+        "function routenPanelHtml()",
+        "createObjectStore('routen'"
+      ]
+    },
+    {
+      "file": "deploy.sh",
+      "name": "deploy.sh bündelt data/orte.json (Ortsindex für die Kartensuche)",
+      "contains": [
+        "data/orte.json",
+        "python3 fetch-orte.py"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Wiki-RAG-Sichtbarkeit: Quelle als 📚-Pille auf der Antwort + Toggle fett-aktiv + Speichern-Icon 💾 (Kollision gelöst)",
+      "contains": [
+        "class=\"src-pill wiki\"",
+        ".wiki-btn.active",
+        "title=\"Im Wissensspeicher ablegen\">💾</button>"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "Wiki-RAG DE→EN: Frage → englische Suchbegriffe (lokales Modell) vor der Kiwix-Suche, Fallback auf Rohfrage",
+      "contains": [
+        "def wiki_suchbegriffe(",
+        "WIKI_TRANSLATE_MODEL",
+        "'suchbegriffe': begriffe"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Wechselkurs in der Notfallkarte: lokale Währung ↔ €/$, online (open.er-api) + Offline-Cache mit Datum",
+      "contains": [
+        "const WAEHRUNG_LAENDER",
+        "function ladeWechselkurse(",
+        "function waehrungBlockDesktop(",
+        "open.er-api.com"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "Wechselkurs im 🚨-Sheet: lokale Währung ↔ €/$, online + Offline-Cache (byteident. Kernlogik)",
+      "contains": [
+        "const WAEHRUNG_LAENDER",
+        "function ladeWechselkurse(",
+        "function waehrungBlockMobil(",
+        "open.er-api.com"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Notfallkarte: fällige Fahrzeug-Prüfungen (nur fällig/überfällig) + Sonnenzeiten-Block",
+      "contains": [
+        "function wartungBlockDesktop(",
+        "html += wartungBlockDesktop();",
+        "wartungStatus(i).state === 'faellig'"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "Sicherheit 2026-09-05-1 (aktualisiert 09-12): Pfad-Härtung Dokument-API, Body-Limits, Mutationen nur Loopback+Same-Origin, CORS nur eigene Hosts, Bind 127.0.0.1",
+      "contains": [
+        "def safe_docs_path(module, filename, must_exist=False):",
+        "if wurzel not in aufgeloest.parents:",
+        "def mutation_erlaubt(self):",
+        "if path in ('/api/shutdown', '/api/docs/upload', '/api/extract-pdf', '/api/rag/sync',",
+        "def _body_length(self, limit):",
+        "MAX_JSON_BODY   = 32 * 1024 * 1024",
+        "if origin and not self.origin_passt(origin, LOKALE_HOSTS):",
+        "def lan_modus_gewuenscht():",
+        "wunsch = '0.0.0.0' if lan else '127.0.0.1'"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Review 2026-09-05-1: Start ohne alert() — Start-Banner (Ollama aus / Modelle fehlen mit ollama pull), 404 = Modell fehlt, 30-s-Poll",
+      "contains": [
+        "async function checkOllama(silent) {",
+        "function renderStartBanner()",
+        "function fehlendeModelle()",
+        "ollama pull ${e.modelName}",
+        "setInterval(() => { checkOllama(true); ladeIphoneStatus(); }, 30000);"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Review 2026-09-05-1: Live-Chat-Persistenz Desktop (Reload/Absturz verliert keine offenen Gespräche mehr)",
+      "contains": [
+        "function persistLiveChats(limit)",
+        "function restoreLiveChats()",
+        "speichereJSON('safari-live-chats'",
+        "window.addEventListener('beforeunload'"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Review 2026-09-05-1: Notfall — eigene Position (DD/DMS/Plus Code, kopierbar), wählbare Notrufnummern, Sofort-Protokolle ohne KI, Kontext-Schutz gegen Prompt-Injection",
+      "contains": [
+        "function plusCode(lat, lng) {",
+        "function positionKarteHtml() {",
+        "const NOTFALL_PROTOKOLLE = [",
+        "function telHtml(nummer) {",
+        "const KONTEXT_SCHUTZ = ",
+        "+ ragContext + KONTEXT_SCHUTZ;",
+        "function sofortProtokolleHtml(ort) {"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Review 2026-09-05-1: Backup ohne API-Key/GPS, Antwort kopieren, Claude-Fehler klassifiziert, keine Google Fonts (2026-09-27), kein persönlicher km-Startwert",
+      "contains": [
+        "delete st.anthropicKey; delete st.userLat;",
+        "async function kopiereAntwort(msgId)",
+        "e.httpStatus === 401",
+        "keine Google Fonts mehr",
+        "km: 0,"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "Review 2026-09-05-1: 🚨-Sheet mit Position (kopieren/teilen), wählbaren Nummern, Sofort-Protokollen; API-Key im Setup; 404 = Modell fehlt; Toast; Kontext-Schutz",
+      "contains": [
+        "function positionBlockMobil() {",
+        "function sofortBlockMobil() {",
+        "function teilePositionMobil()",
+        "${telHtml(eintrag.polizei)}",
+        "id=\"m-api-key\"",
+        "function speichereApiKeyMobil()",
+        "function showToast(msg) {",
+        "if (ragBadge) systemContent += KONTEXT_SCHUTZ;",
+        "ollama pull ${e.modelName}"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "Review 2026-09-05-1: XSS-Fixes (esc mit ', keine Daten in onclick), Import robust (Endung, Parserfehler, Toast, Drag&Drop), ein Standort-Marker, Position kopierbar, Maßstab, beschriftete 44-px-Buttons, CDN-CSS nur Fallback",
+      "contains": [
+        ".replace(/'/g,'&#39;')",
+        "onclick=\"askAssistant(currentDetailPoi.name, currentDetailPoi.type)\"",
+        "function showFavDetail(idx)",
+        "function xmlOderFehler(text)",
+        "function importDateien(files)",
+        "function zeigeStandort(lat, lng, acc)",
+        "function kopiereStandort()",
+        "L.control.scale({ imperial: false",
+        "<span class=\"map-btn-label\">",
+        "onerror=\"this.onerror=null;this.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'\"",
+        "chunkedLoading: true"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "Fix 2026-09-11-1: Server stirbt beim Start nicht mehr wortlos — belegter Port und defektes Loopback (lo0 ohne 127.0.0.1) werden benannt, bei lo0-Defekt Ausweichbindung auf 0.0.0.0 mit Warnung",
+      "contains": [
+        "def oeffne_server(port):",
+        "if e.errno == errno.EADDRINUSE:",
+        "if e.errno == errno.EADDRNOTAVAIL and wunsch == '127.0.0.1':",
+        "sudo ifconfig lo0 alias 127.0.0.1 netmask 255.0.0.0",
+        "server, bind, lan = oeffne_server(port)",
+        "import errno"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "Instanz-Verwaltung 2026-09-11-1: /api/ping, Laufzeitdatei, Übernahme einer Altinstanz auf dem Port, Schonung fremder Software, Eltern-Wache gegen Waisen, Mac-IP fürs iPhone",
+      "contains": [
+        "APP_SIGNATUR = 'safari-assistent'",
+        "def runtime_schreiben(port, bind):",
+        "def port_belegt_von(port, timeout=1.5):",
+        "def ist_unser_prozess(pid):",
+        "def alte_instanz_beenden(port):",
+        "def starte_eltern_wache():",
+        "def lan_ip():",
+        "if path == '/api/ping':",
+        "if alte_instanz_beenden(port):",
+        "SAFARI_PARENT_WATCH",
+        "def ist_eigener_server_alt(port, timeout=1.5):",
+        "def pid_auf_port(port):"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-09-11-1: Serverstatus in den Einstellungen (Port/PID/Bindung/Mac-IP/iPhone-Adresse + lsof-Hinweis), getServerUrl nutzt location statt festem :8765, Mac-IP-Anleitung im iPhone-Guide",
+      "contains": [
+        "async function pruefeServer()",
+        "id=\"server-status\"",
+        "if (mod === 'settings') pruefeServer();",
+        "if (location.protocol === 'http:' || location.protocol === 'https:') return location.origin;",
+        "Adresse des Macs — Name statt IP",
+        "ipconfig getifaddr en1",
+        "route -n get default",
+        "Der Zugangscode bleibt gleich."
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-09-11-1: SERVER_URL aus location statt festem :8765 (Ausweichport)",
+      "contains": [
+        "const SERVER_URL = (location.protocol === 'http:' || location.protocol === 'https:') ? location.origin"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "Fix 2026-09-11-1: removeTyping ohne undefiniertes thisCtx — der zweite Aufruf im Antwortpfad warf einen ReferenceError, dadurch erschien gar keine Antwort",
+      "contains": [
+        "const el = document.getElementById('typing-' + targetCtx);\n  if (el) el.remove();"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-09-13-1: Claude-Modellwahl für die Online-Module — Liste live aus der Anthropic-Models-API (GET /v1/models), lokal gecacht; Auswahl in den Einstellungen (Dropdown + manuelle ID + Liste laden) und Schnellwahl im Chat; alle drei Anthropic-Aufrufe nutzen getClaudeModel()",
+      "contains": [
+        "// ── CLAUDE-MODELLWAHL (BYTEIDENTISCH in index.html und mobile.html) ──",
+        "const CLAUDE_STANDARD_MODELL = 'claude-sonnet-4-6';",
+        "https://api.anthropic.com/v1/models?limit=100",
+        "function claudeModelleAusAntwort(j)",
+        "function getClaudeModel() { return settings.claudeModel || CLAUDE_STANDARD_MODELL; }",
+        "function setzeClaudeModell(id)",
+        "async function ladeClaudeModellListe()",
+        "id=\"claude-model-select\"",
+        "id=\"claude-model-manual\"",
+        "id=\"claude-model-quick\"",
+        "model: getClaudeModel(),",
+        "'safari-claude-modelle': v =>"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-09-13-1: Claude-Modellwahl im iPhone-Setup (gleicher Cache-Key wie Desktop, sendClaude nutzt getClaudeModelMobil())",
+      "contains": [
+        "// ── CLAUDE-MODELLWAHL (BYTEIDENTISCH in index.html und mobile.html) ──",
+        "id=\"m-claude-model\"",
+        "function getClaudeModelMobil() { return mSettings.claudeModel || CLAUDE_STANDARD_MODELL; }",
+        "function setzeClaudeModellMobil(id)",
+        "async function ladeClaudeModellListeMobil()",
+        "model: getClaudeModelMobil(),"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-09-13-1: QR-Code der iPhone-Adresse in den Einstellungen (eigener Offline-Encoder, Byte-Modus/ECC M/Version 1–40, kein CDN) — scannen statt abtippen",
+      "contains": [
+        "// ── QR-CODE (offline, ohne Bibliothek) ──────────────────────────",
+        "const QR = (() => {",
+        "function ausrichtungsPositionen(ver)",
+        "function iphoneQrHtml(url)",
+        "+ iphoneQrHtml(st.url)",
+        "QR.svg(url, 4)",
+        "Mit der iPhone-Kamera scannen"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-09-13-1: iPhone-Modus schaltet nach 12 h ohne Anfrage automatisch ab (Vergessen-Schutz) — einschalten bleibt eine bewusste Entscheidung",
+      "contains": [
+        "LAN_INAKTIV_H",
+        "def lan_inaktiv_s():",
+        "if lan_inaktiv_s() >= LAN_INAKTIV_H * 3600:",
+        "'inaktiv_s': lan_inaktiv_s(), 'auto_aus_h': LAN_INAKTIV_H"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-09-13-1: Reisewarn-Pipeline — Auswärtiges Amt (maßgeblich), UK FCDO und US State Department, automatisch sobald online, Cache offline nutzbar, Texte wörtlich",
+      "contains": [
+        "# ── REISEWARNUNGEN (2026-09-13-1)",
+        "AA_LISTE_URL = 'https://www.auswaertiges-amt.de/opendata/travelwarning'",
+        "FCDO_URL = 'https://www.gov.uk/api/content/foreign-travel-advice/{slug}'",
+        "USA_RSS_URL = 'https://travel.state.gov/_res/rss/TAsTWs.xml'",
+        "def aa_stufe(e):",
+        "def reisewarnungen_aktualisieren():",
+        "def starte_reisewarn_wache():",
+        "def reisewarnungen_anstossen():",
+        "if path == '/api/reisewarnungen':",
+        "starte_reisewarn_wache()"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-09-13-1: Reisewarnungen im Desktop (eigenes Panel, Statuszeile, „Jetzt holen\"), amtlicher Text wörtlich mit Stand und Quelle, Einspeisung in die Prompts",
+      "contains": [
+        "// ── REISEWARNUNGEN (BYTEIDENTISCH in index.html, mobile.html und pois.html) ──",
+        "id=\"panel-reisewarnungen\"",
+        "function renderReisewarnungen()",
+        "function reisewarnKarte(land)",
+        "function zeigeReisewarnStatus()",
+        "const REISEWARN_CTX = ['sicherheit', 'navigation', 'notfall'];",
+        "systemContent += reisewarnPrompt(land.name);",
+        "systemPrompt += reisewarnPrompt(landRW.name);",
+        "Vor einer Reiseentscheidung den Originaltext lesen"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-09-13-1: Reisewarnung des aktuellen Landes im Notruf-Sheet + Einspeisung in die Prompts am iPhone",
+      "contains": [
+        "// ── REISEWARNUNGEN (BYTEIDENTISCH in index.html, mobile.html und pois.html) ──",
+        "function reisewarnBlockMobil(land)",
+        "html += reisewarnBlockMobil(land);",
+        "systemPrompt += reisewarnPrompt(landM.name);",
+        "ladeReisewarnungenMobil();"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "2026-09-13-1: Reisewarnungs-Ebene auf der Karte (Landesfläche aus LAENDER_GEO, amtlicher Text im Popup, keine erfundenen Gebietsgrenzen)",
+      "contains": [
+        "// ── REISEWARNUNGEN (BYTEIDENTISCH in index.html, mobile.html und pois.html) ──",
+        "function reisewarnGeoJSON()",
+        "function toggleReisewarnung()",
+        "id=\"reisewarn-toggle-btn\"",
+        "Maßgeblich ist der amtliche Text, nicht diese Fläche",
+        "ladeReisewarnEbene();"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-09-14-1: Lokales HTTPS für den iPhone-Zugang — eigene CA (Namensbeschränkung auf .local und private Netze) signiert ein Serverzertifikat nach Apples Vorgaben; automatische Neuausstellung bei Adresswechsel und vor Ablauf; Loopback bleibt http",
+      "contains": [
+        "# ── LOKALES HTTPS FÜR DAS iPHONE (2026-09-14-1) ───────────────",
+        "def tls_vorbereiten():",
+        "def bonjour_name():",
+        "def lokale_ips():",
+        "def tls_ip_erlaubt(ip):",
+        "def tls_laeuft_bald_ab(",
+        "extendedKeyUsage = serverAuth",
+        "nameConstraints = critical,permitted;DNS:.local",
+        "TLS_SRV_TAGE = 820",
+        "def __init__(self, adresse, handler, ssl_kontext=None):",
+        "srv = SafariServer((ip, port), SafariHandler, ssl_kontext=ctx)",
+        "sicher = '; Secure' if isinstance(self.connection, ssl.SSLSocket) else ''"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-09-14-1: Adresse fürs iPhone über den Bonjour-Namen statt der IP (überlebt Starlink ↔ Hotspot), IP-Variante nur wenn das Zertifikat sie deckt",
+      "contains": [
+        "url_name = f'{schema}://{name}:{port}/go/{token}' if name else ''",
+        "ip_gedeckt = (not st['tls']) or (ip and ip in (TLS_STATE.get('ips') or []))",
+        "'tls': st['tls'], 'tls_grund': st['tls_grund'], 'tls_info': tls_status()"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-09-14-1: Offline-Wikipedia wird unter /wiki durchgereicht, damit sie am iPhone auch über https erreichbar ist — mit Prüfung und Rückfall, falls kiwix --urlRootLocation nicht kennt",
+      "contains": [
+        "KIWIX_ROOT",
+        "'--urlRootLocation', '/wiki'",
+        "def kiwix_antwortet(pfad):",
+        "def kiwix_proxy_pfad():",
+        "def _proxy_kiwix(self, path, query):",
+        "kennt --urlRootLocation nicht"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-09-14-1: Einstellungen zeigen den Verschlüsselungszustand und die einmalige Zertifikatsinstallation am iPhone (inkl. Zertifikatsvertrauen und Fingerabdruck), Knopf „Im Finder zeigen“",
+      "contains": [
+        "function iphoneTlsHtml(st)",
+        "+ iphoneTlsHtml(st)",
+        "function zeigeZertifikatImFinder()",
+        "Zertifikatsvertrauen",
+        "Fingerabdruck der CA",
+        "Einmalig: Zertifikat aufs iPhone",
+        "Unverschlüsselt (http)"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-09-15-1: Warngebiete aus dem amtlichen Text lesen — Blockzerlegung nach Stufe, Namensabgleich gegen ein OSM-Verzeichnis statt Raten, Ausnahmen („außer Pemba“) und Teilgebiete („nördlich des …“) markiert, Ungelöstes ausgewiesen",
+      "contains": [
+        "# ── WARNGEBIETE: aus dem amtlichen Text die konkreten Gebiete lesen (2026-09-15-1) ──",
+        "def warnbloecke(warntext):",
+        "def namen_in_zeile(zeile, vokabular):",
+        "def warngebiete_aus_text(warntext, vokabular):",
+        "AUSNAHME_RE",
+        "TEILGEBIET_RE",
+        "def satzrest(zeile):",
+        "gehören zu keiner Warnung",
+        "'/data/warnzonen.geojson': '/data/warnzonen.geojson'"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-09-15-1: Gemeinsamer Warngebiete-Block (Flächen laden, Punkt-in-Polygon, Entfernung) und Positionskasten im Reisewarnungs-Panel",
+      "contains": [
+        "// ── WARNGEBIETE (BYTEIDENTISCH in index.html, mobile.html und pois.html) ──",
+        "function warnlageZurPosition(lat, lng)",
+        "function warnlageSatz(lat, lng)",
+        "function punktInRing(lat, lng, ring)",
+        "function kmZuStrecke(lat, lng, a, b)",
+        "function warnlageKastenHtml()",
+        "await ladeWarnzonen(getServerUrl());"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "2026-09-15-1: Karte färbt die gewarnten Gebiete (OSM-Verwaltungsgrenzen) statt ganzer Länder und meldet die Lage zur eigenen Position",
+      "contains": [
+        "art: 'gebiet'",
+        "art: 'land'",
+        "function zeigeWarnlage(genauigkeitM)",
+        "zeigeWarnlage(acc);",
+        "Verwaltungsgrenze aus OpenStreetMap (ODbL)",
+        "await ladeWarnzonen(SERVER_BASE);"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-09-15-1: Notruf-Sheet sagt, ob die eigene Position in einem gewarnten Gebiet liegt",
+      "contains": [
+        "function warnlageSatzMobil()",
+        "${warnlageSatzMobil()}",
+        "await ladeWarnzonen(SERVER_URL);"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-09-15-2: Gebietsgrenzen werden automatisch nachgezogen, sobald sich ein Warntext geändert hat (Stand je Land in warnzonen.geojson, Hintergrundlauf von fetch-warnzonen.py, frühestens alle 6 h)",
+      "contains": [
+        "# ── WARNGEBIETE NACHZIEHEN (2026-09-15-2) ─────────────────────",
+        "def warnzonen_veraltet(",
+        "def warnzonen_nachziehen(",
+        "def warnzonen_pruefen_und_nachziehen():",
+        "WARNZONEN_MIN_ABSTAND_H",
+        "SAFARI_OHNE_WARNZONEN_AUTO",
+        "warnzonen_pruefen_und_nachziehen()",
+        "'warnzonen': warnzonen_status(),"
+      ]
+    },
+    {
+      "file": "fetch-warnzonen.py",
+      "name": "2026-09-15-2: Fehlerbehebung — Geometrie-Abfrage mit „out geom;“ (mit „out geom tags;“ kamen Relationen ohne Mitglieder, erster Lauf ergab 0 Flächen); Teil-Läufe überschreiben andere Länder nicht mehr; Stand nur nach geglücktem Lauf vermerkt",
+      "contains": [
+        "out geom;",
+        "Stand NICHT vermerkt",
+        "Flächen anderer Länder aus der bestehenden Datei übernommen",
+        "'staende': staende,",
+        "Antwort enthält keine Mitglieder"
+      ]
+    },
+    {
+      "file": "fetch-warnzonen.py",
+      "name": "2026-09-15-3: Vorrat — „--vorrat“ holt die Verwaltungsgrenzen aller 16 Länder (beide Ebenen) einmalig nach data/verwaltungsgebiete.geojson; danach entstehen Flächen zu neuen Warnungen ohne Internet. Sichert nach jedem Land, überspringt bereits geholte (--neu erzwingt)",
+      "contains": [
+        "VORRAT_DATEI = BASE / 'data' / 'verwaltungsgebiete.geojson'",
+        "def vorrat_holen(",
+        "def vorrat_lesen():",
+        "def vorrat_abfrage(cc, ebene):",
+        "'--vorrat' in ARGUMENTE",
+        "aus dem lokalen Vorrat (kein Internet nötig)",
+        "'quelle': 'vorrat'",
+        "Zwischenstand gesichert"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-09-15-4: Untereinheiten und Himmelsrichtungen markieren die übergeordnete Fläche als nur teilweise gemeint (Nampula/Distrikte, Afar/Zonen, Norden des Tana River) — seit 19.09. je Gebiet statt je Satz",
+      "contains": [
+        "EINHEITEN_EBENE = (",
+        "RICHTUNG_RE = _re.compile(",
+        "def zeile_analysieren(zeile, vokabular):"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-09-19: Die Einschränkungs-Markierung ⚑ hängt am Gebiet, nicht am Satz — drei Regeln (Verwaltungsebene, Teilsätze mit Einschüben und Ausnahmen, Ausnahmen binden über den Namen); Bezugspunkte („westlich von Addis Abeba“, „an den Regionalstaat Tigray angrenzenden“) sind keine Warngebiete. Befund 18.09.: 19 von 19 markiert, 13 zu Unrecht",
+      "contains": [
+        "def _zeile_zerlegen(zeile):",
+        "def _ist_bezugspunkt(text, s, e):",
+        "EINSCHUB_RE = _re.compile(",
+        "TEILSATZ_RE = _re.compile(",
+        "GANZ_RE = _re.compile(",
+        "for n in (gebunden or im_teilsatz):",
+        "gefunden, ausgenommen = zeile_analysieren(zeile, vokabular)"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-09-15-6 / 2026-09-27: Selbsttest der eigenen Zertifikatskette; eine NEUE CA, deren IP-Beschränkung die Krypto nicht prüft, wird mit Beschränkung nur auf Namen ('dns') neu ausgestellt — nie automatisch unbeschränkt, eine vorhandene CA nie ersetzt",
+      "contains": [
+        "def tls_selbsttest(kontext, name):",
+        "bauen('dns', erzwingen=True)",
+        "neue CA wird mit Beschränkung nur auf .local-Namen ausgestellt",
+        "'selbsttest': probe",
+        "'constraints': bool(TLS_STATE.get('constraints', True))"
+      ]
+    },
+    {
+      "file": "fetch-parks.py",
+      "name": "fetch-parks.py v2026-09-15-1: Fehlerbehebung — Parkgrenzen mit „out geom;“ statt „out geom tags;“. Mit „tags“ kamen Relationen OHNE Mitglieder: die Datei hatte 132 Gebiete, davon 0 aus Relationen, es fehlten alle großen Parks (Serengeti, Etosha, Kruger, Okavango …). Der Lauf meldet jetzt die Herkunft, sichert nach jedem Land und behält bei einem Fehlversuch den bisherigen Stand",
+      "contains": [
+        "out geom;'''",
+        "ohne_mitglieder",
+        "aus Relationen",
+        "Zwischenstand gesichert",
+        "bisheriger Stand für",
+        "KEIN einziges Gebiet aus einer Relation"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-09-15-7: POI-Karte am iPhone erreichbar — 📍 in der Modul-Leiste öffnet pois.html in einem neuen Tab, Zugangscode in der Adresse (Safari und die Web-App vom Home-Bildschirm haben getrennte Cookie-Speicher)",
+      "contains": [
+        "onclick=\"openKarte()\"",
+        "function openKarte() {",
+        "window.open('pois.html' + (ZUGANG ? '?t=' + encodeURIComponent(ZUGANG) : ''), '_blank', 'noopener')"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-09-15-7: PyMuPDF wird unter beiden Importnamen gesucht (pymupdf und fitz) — eine installierte Bibliothek galt sonst als fehlend; die Meldung nennt den Interpreter des laufenden Servers (sys.executable) statt eines geratenen pip3",
+      "contains": [
+        "def lade_fitz():",
+        "import pymupdf",
+        "\"{sys.executable}\" -m pip install pymupdf",
+        "externally-managed-environment"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-09-15-7: Startmeldung nennt Python-Pfad, Version und den gefundenen PyMuPDF-Importnamen; fehlt das Benutzer-site-packages dieses Interpreters in sys.path, wird es nachgetragen statt eine vorhandene Bibliothek als fehlend zu melden",
+      "contains": [
+        "def benutzer_site_pfade():",
+        "def benutzer_site_ergaenzen():",
+        "🐍 Python: {sys.executable}",
+        "Benutzer-site-packages nachgetragen",
+        "NICHT gefunden — PDF-Ablage aus"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-09-15-7: Die PyMuPDF-Fehlermeldung belegt statt zu behaupten — Interpreter, wörtlicher Importfehler, abgesuchte Benutzerverzeichnisse samt Existenz und HOME stehen drin",
+      "contains": [
+        "def pymupdf_fehlertext(",
+        "Abgesuchte Benutzerverzeichnisse:",
+        "Importfehler:",
+        "HOME:"
+      ]
+    },
+    {
+      "file": "launcher_new.sh",
+      "name": "2026-09-16: Der Server wird auf Apple Silicon nativ gestartet (arch -arm64). Unter Rosetta lief das universelle python3 als x86_64 und konnte die arm64-Bibliothek PyMuPDF nicht laden — bei installierter Bibliothek und stets „already satisfied“ meldendem pip",
+      "contains": [
+        "PY_ARCH=\"\"",
+        "arch -arm64 python3 -c \"pass\"",
+        "$PY_ARCH python3 \"$RESOURCES/server.py\""
+      ]
+    },
+    {
+      "file": "launcher_new.sh",
+      "name": "2026-09-19: Ollama 0.34.2 statt 0.20.5 — die Startvariablen der alten Version (OLLAMA_NUM_GPU, OLLAMA_LIBRARY_PATH, OLLAMA_LLM_LIBRARY) sind aus dem Launcher raus, Cloud-Funktionen aus (OLLAMA_NO_CLOUD=1). Gemessen am 19.09.: 52,8 → 98,1 tok/s mit dem vorhandenen Modell; die MLX-Fassung bringt darüber hinaus nichts",
+      "contains": [
+        "2026-09-19: Ollama 0.34.2 statt 0.20.5",
+        "OLLAMA_NO_CLOUD=1 \\"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-09-16: Ein Architektur-Konflikt (arm64-Bibliothek, x86_64-Prozess) wird als solcher benannt statt zur nutzlosen Neuinstallation zu raten; die Startmeldung nennt die Architektur mit",
+      "contains": [
+        "def pymupdf_arch_konflikt(",
+        "incompatible architecture",
+        "Rosetta",
+        "{platform.machine()}"
+      ]
+    },
+    {
+      "file": "fetch-parks.py",
+      "name": "fetch-parks.py v2026-09-16-1: Schutzklassen IUCN IV und VI dazu — Masai Mara (National Reserve) und Ngorongoro (Conservation Area) fehlten, weil sie formal keine Nationalparks sind; der Typ im Popup nennt jetzt die amtliche Bezeichnung statt nur „Schutzgebiet“",
+      "contains": [
+        "KLASSEN_ABFRAGE = ('1', '1a', '1b', '2', '4', '6')",
+        "def gebiets_typ(",
+        "KLASSEN_TEXT",
+        "protection_title",
+        "'klasse':",
+        "nach Schutzklasse:"
+      ]
+    },
+    {
+      "file": "fetch-parks.py",
+      "name": "fetch-parks.py: „--tags <Muster>“ zeigt die OSM-Tags gleichnamiger Gebiete samt Urteil, ob die Abfrage sie erfasst — „warum fehlt X auf der Karte?“ wird damit gemessen statt vermutet",
+      "contains": [
+        "def tags_diagnose(",
+        "KLASSEN_ABFRAGE",
+        "NICHT erfasst",
+        "ARGUMENTE[:1] == ['--tags']"
+      ]
+    },
+    {
+      "file": "fetch-parks.py",
+      "name": "fetch-parks.py: Mindestgröße 50 km² NUR für die weiten Klassen IUCN IV/VI — Kleinstflächen (Kenia: 42 Stück, bis herunter zu 0,8 km²) machten die Ebene unlesbar; Nationalparks und strenge Reservate bleiben in jeder Größe",
+      "contains": [
+        "MIN_KM2_WEITE_KLASSEN = 50.0",
+        "WEITE_KLASSEN = ('4', '6')",
+        "def ring_km2(",
+        "zu_klein"
+      ]
+    },
+    {
+      "file": "fetch-parks.py",
+      "name": "fetch-parks.py: protect_class wird auch in römischer Schreibweise erkannt (VI = 6) — daran fiel das Ngorongoro-Schutzgebiet durch, relation/21319325 trägt protect_class=VI",
+      "contains": [
+        "def klasse_norm(",
+        "SCHREIBWEISEN",
+        "KLASSEN_REGEX",
+        "\"protect_class\"~\"{KLASSEN_REGEX}\",i"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "v2026-09-24-1: Regenzeit-Ebene mit Zeitleiste — 🌧️-Knopf, Tag-Schieber (3 Monate zurück bis 15 Monate voraus), ◀ ▶ « » und „Heute“, 1°-Raster nach Monatsniederschlag gefärbt (beide Kartenmodi, Canvas, unter den anderen Flächen), Zelle antippen zeigt Monatsdiagramm + Temperatur/Feuchte/Wind/Solar + Zyklon-/Malaria-Hinweis; fehlt data/klima.json, nennt der Knopf den Befehl",
+      "contains": [
+        "id=\"regen-toggle-btn\"",
+        "function toggleRegenzeit()",
+        "function zeitleisteSetzen(tage)",
+        "function zeitleisteHeute()",
+        "function klimaInterpoliert(werte, datum)",
+        "function klimaMischung(datum)",
+        "function regenKlasse(mm)",
+        "mlMap.addLayer({ id: 'regen-fill'",
+        "regenRenderer = L.canvas({ pane: 'regen'",
+        "function regenInfoHtml(z, datum, hell)",
+        "function malariaMonat(g, monat)",
+        "function zyklonHinweis(land, lng, monat)",
+        "python3 fetch-klima.py",
+        "KEINE Vorhersage",
+        "NASA POWER",
+        "map.removeLayer(regenRenderer)"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "v2026-09-24-1: ℹ️-Wetter-Panel — Klimatologie zur GPS-Position/Kartenmitte für das gewählte Datum + 7-Tage-Vorhersage von Open-Meteo (nur online, Cache in localStorage mit Nähe- und Altersprüfung, Zeitüberschreitung 8 s, Quellenangabe CC BY 4.0)",
+      "contains": [
+        "id=\"regen-panel\"",
+        "function regenInfoOeffnen(mitLive)",
+        "function regenInfoAktualisieren()",
+        "async function ladeLiveWetter(lat, lng, still)",
+        "api.open-meteo.com/v1/forecast",
+        "WETTER_LIVE_KEY = 'safari-wetter-live'",
+        "Open-Meteo.com (CC BY 4.0)",
+        "function liveWetterCache(lat, lng)"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-09-24-1: data/klima.json (Klimatologie der Regenzeit-Ebene) steht in der Statik-Allowlist — sonst 404 für die Karte",
+      "contains": [
+        "'/data/klima.json': '/data/klima.json'"
+      ]
+    },
+    {
+      "file": "deploy.sh",
+      "name": "deploy.sh v2026-09-24-1: data/klima.json ins Bundle (Fehlen wird gemeldet, nicht verschwiegen), fetch-klima.py in FILES",
+      "contains": [
+        "cp \"$SRC/data/klima.json\" \"$DST/data/\"",
+        "python3 fetch-klima.py",
+        "fetch-klima.py features-manifest.json"
+      ]
+    },
+    {
+      "file": "fetch-klima.py",
+      "name": "fetch-klima.py v2026-09-25-1: NASA-POWER-Klimatologie je 1°-Rasterzelle der 16 Länder (LAENDER_GEO aus pois.html), Zwischenstand alle 20 Zellen, --probe zeigt die Rohantwort, erste Antwort wird hart auf Struktur/Einheiten/Plausibilität geprüft (Skript entstand ohne Zugang zum Dienst)",
+      "contains": [
+        "def laender_polygone(",
+        "def raster_zellen(",
+        "def antwort_zu_zelle(",
+        "def struktur_pruefen(",
+        "def hole_mit_wiederholung(",
+        "'--probe'",
+        "PRECTOTCORR",
+        "ALLSKY_SFC_SW_DWN",
+        "COMMUNITY = 'RE'",
+        "SICHERN_ALLE = 20",
+        "OHNE Zugang zu"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "v2026-09-25-1: Über-Block in Einstellungen → App — Creator-Logo DARK (dark-logo.jpg), Name, Version, Creator-Zeile; fehlendes Bild wird sichtbar gemeldet statt still zu verschwinden",
+      "contains": [
+        "id=\"about-card\"",
+        "src=\"dark-logo.jpg\"",
+        "alt=\"DARK — Creator-Logo\"",
+        "id=\"about-logo-fehlt\"",
+        ".about-card { background: #040523"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "v2026-09-25-1: Creator-Logo DARK im ⚙️-Setup-Sheet neben dem Titel (dark-logo.jpg, onerror-Schutz)",
+      "contains": [
+        "src=\"dark-logo.jpg\"",
+        "alt=\"DARK — Creator-Logo\"",
+        "⚙️ Setup"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-09-25-1: dark-logo.jpg in der Statik-Allowlist (Creator-Logo für Mac und iPhone)",
+      "contains": [
+        "'/dark-logo.jpg': '/dark-logo.jpg'"
+      ]
+    },
+    {
+      "file": "deploy.sh",
+      "name": "deploy.sh v2026-09-25-1: dark-logo.jpg in FILES — Logo landet mit im Bundle (2026-09-27: + icon.png für das iPhone-Home-Symbol)",
+      "contains": [
+        "pois.html dark-logo.jpg icon.png test-app.js"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-09-27 Audit H1: statische Dateien unter /vendor/ und /fonts/ nur nach Prüfung des AUFGELÖSTEN Pfads (kein %2e%2e mehr)",
+      "contains": [
+        "def _statik_pfad_ok(self, path):",
+        "if path.startswith(STATIK_PRAEFIXE) and self._statik_pfad_ok(path):",
+        "if wurzel in ziel.parents:"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-09-27 Audit H2: TLS-Handshake im Arbeits-Thread (nicht im Accept-Thread) + Verbindungsgrenze je Adresse",
+      "contains": [
+        "def finish_request(self, request, client_address):",
+        "MAX_JE_ADRESSE = 16",
+        "def _platz_nehmen(self, ip):"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-09-27 Audit H3: Stufen der CA-Namensbeschränkung aus dem Zertifikat gelesen, CA 825 Tage, bald ablaufende CA wird umbenannt und ersetzt",
+      "contains": [
+        "TLS_STUFEN = ('voll', 'dns', 'aus')",
+        "def tls_ca_merkmale():",
+        "TLS_CA_TAGE = 825",
+        "_ca_beiseitelegen('abgelaufen')"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-09-27 Audit M1/M2/L1/L3: Zugangscode maskiert im Log, Logs in ~/Library/Logs/Safari Assistant (bis 2026-10-04-1: Logs/DARK), Kachel-Grenzen, Sicherheits-Header, Ollama-Optionen aus dem WLAN begrenzt",
+      "contains": [
+        "def url_fuers_log(url):",
+        "LOG_DIR = Path(",
+        "if not (0 <= z <= 22 and 0 <= x < (1 << z) and 0 <= y < (1 << z)):",
+        "self.send_header('X-Content-Type-Options', 'nosniff')",
+        "def ollama_optionen_begrenzen(daten):"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-09-27 Audit F1/F2/F3: Backup-Import gehärtet (Tabs, Chats, Dokumente), alle Render-Stellen maskiert, nur http(s)-Links, noopener",
+      "contains": [
+        "function sicherLink(u)",
+        "function backupDocsSauber(liste)",
+        "const nachrichtSauber = m =>",
+        "onclick=\"activateTab(${Number(t.id) || 0})\"",
+        "window.open('mobile.html','_blank','noopener')"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "2026-09-27 Audit F1/F2: Land maskiert, Reisewarn-Link nur http(s); Demo-Punkte als fiktiv gekennzeichnet; OSM-Attribution mit Link",
+      "contains": [
+        "function sicherLink(u)",
+        "' · '+esc(p.country)",
+        "source:'Demo (fiktiv)'",
+        "openstreetmap.org/copyright"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-09-27 sichtbarer App-Name (seit 2026-10-04-2: Safari Assistant), Antwortsprache wird gespeichert, leichtes Profil per Klick, Tastatur für die Seitenleiste",
+      "contains": [
+        "<title>Safari Assistant</title>",
+        "function ladeAntwortsprache()",
+        "function leichtesProfil()",
+        "function navTastatur()"
+      ]
+    },
+    {
+      "file": "launcher_new.sh",
+      "name": "2026-09-27 Launcher: Logs in ~/Library/Logs/Safari Assistant (umask 077; bis 2026-10-04-1: Logs/DARK), kein stiller http.server-Ersatz, Meldung „Safari Assistant startet nicht\"",
+      "contains": [
+        "umask 077",
+        "LOG_DIR=\"$HOME/Library/Logs/Safari Assistant\"",
+        "Safari Assistant startet nicht"
+      ]
+    },
+    {
+      "file": "deploy.sh",
+      "name": "2026-09-27 deploy.sh: vendor/ zuerst mit SHA-256-Pins, Bundle optional (Safari Assistant.app, ältere Bundles DARK.app / „Safari Assistent.app\"), Commit nur mit DEPLOY_COMMIT=1/.deploy-commit",
+      "contains": [
+        "finde_app()",
+        "\"$HOME/Desktop/Safari Assistant.app\" \"/Applications/Safari Assistant.app\"",
+        "sha256_von()",
+        "DEPLOY_COMMIT",
+        "DEPLOY_OHNE_TESTS"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-10-04 Hilfe: /hilfe (Anleitung README als Seite, offline, de/en/fr/es) mit eigener strenger CSP, gleiche Zugangsprüfung wie mobile.html; i18n.js + i18n/*.js in der Statik-Allowlist",
+      "contains": [
+        "def _hilfe_laden():",
+        "HILFE, HILFE_FEHLER = _hilfe_laden()",
+        "if path == '/hilfe':",
+        "def _hilfe_seite(self, params):",
+        "self._csp = HILFE.CSP",
+        "'/i18n.js': '/i18n.js'",
+        "'/i18n/es.js': '/i18n/es.js'"
+      ]
+    },
+    {
+      "file": "hilfe.py",
+      "name": "2026-10-04 hilfe.py: Markdown-Renderer (Escaping, rohes HTML weg, Links nach Regeln, Anker wie GitHub, Tabellen, Hinweiskästen), README neben server.py oder in release-docs/, Rückfall auf Englisch mit Hinweis, Cache je Dateistand, CSP mit Stil-Prüfsumme",
+      "contains": [
+        "def rendern(",
+        "def link_ziel(adresse: str)",
+        "def slug(text: str)",
+        "class Slugs:",
+        "def _ist_sprachzeile(",
+        "UNTERORDNER = (\"\", \"release-docs\")",
+        "def _gemerkt(",
+        "Diese Anleitung gibt es noch nicht auf Deutsch — hier die englische Fassung.",
+        "Ce guide n'existe pas encore en français — voici la version anglaise.",
+        "Esta guía aún no existe en español — aquí está la versión en inglés.",
+        "CSP = (\"default-src 'none'; style-src \" + _pruefsumme(STIL)",
+        "HERKUNFT = (\"/index.html\", \"/mobile.html\", \"/pois.html\")"
+      ]
+    },
+    {
+      "file": "deploy.sh",
+      "name": "2026-10-04 deploy.sh: hilfe.py, i18n.js + i18n/*.js und README*.md (Projektordner oder release-docs/) ins Bundle; Downgrade-Sperre auch für i18n.js",
+      "contains": [
+        "hilfe.py i18n.js i18n/en.js i18n/fr.js i18n/es.js",
+        "README_DATEIEN=(README.md README.de.md README.fr.md README.es.md)",
+        "mkdir -p \"$DST/i18n\"",
+        "for f in index.html mobile.html pois.html i18n.js; do"
+      ]
+    },
+    {
+      "file": "i18n.js",
+      "name": "2026-10-04 i18n.js: Oberflächensprache zur Laufzeit (de/en/fr/es) — Speicher safari-ui-sprache, Antwortsprache folgt der Oberfläche, Wörterbuch i18n/<sprache>.js per <script> im <head>, Muster {0}, Auslassungen (Chat-Blasen, Eingabefelder), Meldungsfenster + Datums-/Zahlformat",
+      "contains": [
+        "Safari Assistant i18n.js v20",
+        "var SPEICHER = 'safari-ui-sprache';",
+        "var SPRACHEN = ['de', 'en', 'fr', 'es'];",
+        "var ANTWORT = { de: 'Deutsch', en: 'English', fr: 'Französisch', es: 'Spanisch' };",
+        "var DATUM = { en: 'en-GB', fr: 'fr-FR', es: 'es-ES' };",
+        "if (a === null || a === ANTWORT[lang]) localStorage.setItem('safari-antwortsprache', JSON.stringify(ANTWORT[neu]));",
+        "window.DARK_I18N = api;",
+        "window.__DARK_I18N_DATEN = function (sprache, woerter) {",
+        "if (sprache !== lang || !woerter || typeof woerter !== 'object') return;",
+        "document.write('<script src=\"i18n/' + lang + '.js\"><\\/script>');",
+        "var AUSLASSEN = '[data-i18n-skip], .msg-bubble, textarea, script, style, [contenteditable]';",
+        "var ATTRIBUTE = ['title', 'placeholder', 'aria-label', 'alt'];",
+        "obs.observe(document.documentElement, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ATTRIBUTE });",
+        "['alert', 'confirm', 'prompt'].forEach(function (f) {",
+        "Number.prototype.toLocaleString = function (loc, opt) { return zahl.call(this, ort(loc), opt); };"
+      ]
+    },
+    {
+      "file": "i18n/en.js",
+      "name": "2026-10-04 i18n/en.js: englisches Wörterbuch (Format window.__DARK_I18N_DATEN('en', {…}), Schlüssel = kompakter deutscher Text, Platzhalter {n} bleiben)",
+      "contains": [
+        "Safari Assistant i18n/en.js v20",
+        "window.__DARK_I18N_DATEN && window.__DARK_I18N_DATEN('en', {",
+        "\"Einstellungen\": \"Settings\",",
+        "\"in {0} Tagen\": \"in {0} days\",",
+        "\"alle {0} Tage\": \"every {0} days\","
+      ]
+    },
+    {
+      "file": "i18n/fr.js",
+      "name": "2026-10-04 i18n/fr.js: französisches Wörterbuch (Format window.__DARK_I18N_DATEN('fr', {…}))",
+      "contains": [
+        "Safari Assistant i18n/fr.js v20",
+        "window.__DARK_I18N_DATEN && window.__DARK_I18N_DATEN('fr', {",
+        "\"in {0} Tagen\": \"dans {0} jours\","
+      ]
+    },
+    {
+      "file": "i18n/es.js",
+      "name": "2026-10-04 i18n/es.js: spanisches Wörterbuch (Format window.__DARK_I18N_DATEN('es', {…}))",
+      "contains": [
+        "Safari Assistant i18n/es.js v20",
+        "window.__DARK_I18N_DATEN && window.__DARK_I18N_DATEN('es', {",
+        "\"in {0} Tagen\": \"en {0} días\","
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-10-04 Oberflächensprache: i18n.js im <head>, DE/EN/FR/ES in Seitenleiste + Einstellungen, ?-Hilfe in der Sprache, Schnellfragen im angezeigten Text, Antwortsprache Spanisch + Rückfall aus der Oberfläche, Zusammenfassen in der Antwortsprache, safari-ui-sprache geprüft + im Backup",
+      "contains": [
+        "<script src=\"i18n.js\"></script>",
+        "<button data-ui-lang=\"es\" onclick=\"DARK_I18N.set('es')\" title=\"Español\" data-i18n-skip>ES</button>",
+        "<button data-ui-lang=\"es\" onclick=\"DARK_I18N.set('es')\" data-i18n-skip>Español</button>",
+        "href=\"hilfe?lang=de&amp;from=/index.html\" onclick=\"return oeffneHilfe()\"",
+        "window.open('hilfe?lang=' + encodeURIComponent(l) + '&from=/index.html', '_blank', 'noopener');",
+        "function uiText(t) { return window.DARK_I18N ? DARK_I18N.t(t) : t; }",
+        "const buildQueryUi = () => uiText(buildQuery());",
+        "document.getElementById('input-box').value = uiText(text);",
+        "<button class=\"lang-btn\" data-lang=\"Spanisch\" onclick=\"setLang(this)\">ES</button>",
+        "const ANTWORT_SPRACHEN = ['Deutsch', 'English', 'Französisch', 'Spanisch', 'Portugiesisch', 'Swahili', 'Afrikaans'];",
+        "if (!ANTWORT_SPRACHEN.includes(l)) l = ({ de: 'Deutsch', en: 'English', fr: 'Französisch', es: 'Spanisch' })[(window.DARK_I18N || {}).lang] || 'Deutsch';",
+        "'safari-ui-sprache': v => { if (!['de', 'en', 'fr', 'es'].includes(v)) throw new Error('Sprache'); return v; },",
+        "function zusammenfassungsSprache() {",
+        "'Du fasst Gespräche kurz zusammen. ' + zusammenfassungsSprache() + ' Maximal 3-5 Sätze."
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-10-04 Oberflächensprache (iPhone): i18n.js im <head>, DE/EN/FR/ES im ⚙️-Sheet, „?\" in der Modul-Leiste, Schnellfragen im angezeigten Text, Antwortsprache Spanisch + Rückfall aus der Oberfläche",
+      "contains": [
+        "<script src=\"i18n.js\"></script>",
+        "<div id=\"ui-lang-row\" data-i18n-skip",
+        "<button data-ui-lang=\"es\" onclick=\"DARK_I18N.set('es')\"",
+        "<button class=\"mod-btn\" onclick=\"oeffneHilfe()\"",
+        "location.href = 'hilfe?lang=' + encodeURIComponent(l) + '&from=/mobile.html';",
+        "document.getElementById('input-box').value = window.DARK_I18N ? DARK_I18N.t(text) : text;",
+        "<button class=\"lang-btn\" data-lang=\"Spanisch\" onclick=\"setLang(this)\">🇪🇸 ES</button>",
+        "l = ({ de: 'Deutsch', en: 'English', fr: 'Französisch', es: 'Spanisch' })[(window.DARK_I18N || {}).lang] || 'Deutsch';"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "2026-10-04 Oberflächensprache (Karte): i18n.js im <head>, Sprachauswahl in der Kopfzeile, ?-Hilfe in der Sprache, Datum der Regen-Zeitleiste im Gebietsschema der Oberfläche",
+      "contains": [
+        "<script src=\"i18n.js\"></script>",
+        "id=\"ui-lang-select\" data-i18n-skip",
+        "onchange=\"DARK_I18N.set(this.value)\"",
+        "<option value=\"de\">DE</option><option value=\"en\">EN</option><option value=\"fr\">FR</option><option value=\"es\">ES</option>",
+        "if (s && window.DARK_I18N) s.value = DARK_I18N.lang;",
+        "location.href = 'hilfe?lang=' + encodeURIComponent(l) + '&from=/pois.html';",
+        "if (window.DARK_I18N && DARK_I18N.lang !== 'de') return d.toLocaleDateString('de-DE',"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-10-04 HEAD-Lücke: do_HEAD antwortet immer 405 (Allow: GET, POST), kein Rückfall auf SimpleHTTPRequestHandler.do_HEAD an zugang_pruefen/STATIK_DATEIEN vorbei",
+      "contains": [
+        "def do_HEAD(self):",
+        "self.send_response(405)",
+        "self.send_header('Allow', 'GET, POST')"
+      ]
+    },
+    {
+      "file": "test-sicherheit.py",
+      "name": "2026-10-04 Sicherheitstest HEAD: keine geerbten do_*-Methoden, HEAD 405 vom Mac und aus dem WLAN (mit/ohne Code), andere Methoden ohne Dateizugriff, GET unverändert",
+      "contains": [
+        "n not in vars(m.SafariHandler)",
+        "def head_dicht(st, hdr, wo):",
+        "class AusDemWlan(m.SafariHandler):"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-10-04-2 App-Name Safari Assistant: Wortmarke als Text in der Seitenleiste („Assistant“ in Akzentfarbe, fette geometrische System-Sans, nie übersetzt), Titel, Beenden-Texte, Backup-Datei safari-assistant-backup-*.json, CA-Name neuer Installationen",
+      "contains": [
+        "<title>Safari Assistant</title>",
+        "<div class=\"logo-title\" data-i18n-skip><span>Safari</span> <span class=\"logo-akzent\">Assistant</span></div>",
+        ".logo-title .logo-akzent { color: var(--accent); }",
+        "if (!confirm('Safari Assistant beenden?",
+        "a.download = `safari-assistant-backup-${dateStr}.json`;",
+        "info.ca_name || 'Safari Assistant lokale CA'",
+        "(ältere Installationen: „DARK lokale CA\" bzw. „Safari Assistent lokale CA\")",
+        "Creator: <b style=\"color:var(--text)\">DARK</b>"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-10-04-2 App-Name Safari Assistant: Titel, Home-Bildschirm, Wortmarke im ⚙️-Setup-Sheet (Creator-Logo DARK bleibt daneben)",
+      "contains": [
+        "<title>Safari Assistant</title>",
+        "<meta name=\"apple-mobile-web-app-title\" content=\"Safari Assistant\">",
+        "<div class=\"wortmarke\" data-i18n-skip><span>Safari</span> <span class=\"wortmarke-akzent\">Assistant</span></div>",
+        ".wortmarke-akzent { color: var(--accent); }",
+        "alt=\"DARK — Creator-Logo\""
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "2026-10-04-2 App-Name Safari Assistant: Titel und Home-Bildschirm der Karte",
+      "contains": [
+        "<title>Safari Assistant · Karte</title>",
+        "<meta name=\"apple-mobile-web-app-title\" content=\"Safari Assistant Karte\">"
+      ]
+    },
+    {
+      "file": "hilfe.py",
+      "name": "2026-10-04-2 /hilfe: Titel und Wortmarke Safari Assistant im Kopf, Links auf github.com/DarkPirateGo/safari-assistant",
+      "contains": [
+        "REPO = \"https://github.com/DarkPirateGo/safari-assistant\"",
+        "<span class=\"marke\"><span>Safari</span> <span class=\"marke-akzent\">Assistant</span></span>",
+        "f\"<title>Safari Assistant · {_esc(t['titel'])}</title>\\n\""
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-10-04-2 server.py: neue CAs heißen „Safari Assistant lokale CA“ (bestehende behalten ihren Namen, ca_name aus dem Zertifikat), Log-Ordner ~/Library/Logs/Safari Assistant, Kennung nach außen mit neuer Repo-Adresse",
+      "contains": [
+        "'-subj', '/CN=Safari Assistant lokale CA/O=Safari Assistant',",
+        "(Path.home() / 'Library' / 'Logs' / 'Safari Assistant')",
+        "PROJEKT_UA = 'SafariAssistant/2026.10 (+https://github.com/DarkPirateGo/safari-assistant)'",
+        "APP_SIGNATUR = 'safari-assistent'"
+      ]
+    },
+    {
+      "file": "build-app.sh",
+      "name": "2026-10-04-2 build-app.sh: baut ~/Desktop/Safari Assistant.app (Bundle-ID und Ressourcenordner bleiben), findet ältere DARK.app/„Safari Assistent.app\" und schlägt Umbenennen vor",
+      "contains": [
+        "APP_NAME=\"${APP_NAME:-Safari Assistant}\"",
+        "<string>2026.10.04</string>",
+        "<string>com.safari-assistent.app</string>",
+        "\"$HOME/Desktop/DARK.app\"",
+        "\"$HOME/Desktop/Safari Assistent.app\""
+      ]
+    },
+    {
+      "file": "tools/privacy_gate.py",
+      "name": "2026-10-04 Privacy-Gate A-F06: Ausnahme nur noch für docs/video/safari-assistant-(promo|desktop)-<xx>.mp4 + Poster (je 15 MiB); alte Namen dark-promo-* sind gesperrt",
+      "contains": [
+        "PROMO_VIDEO = re.compile(r'docs/video/safari-assistant-(?:promo|desktop)-[a-z]{2}\\.mp4')",
+        "PROMO_POSTER = re.compile(r'docs/video/safari-assistant-(?:promo|desktop)-[a-z]{2}-poster\\.(?:jpg|png)')",
+        "('docs/video/safari-assistant-promo-[a-z][a-z].mp4', 15)",
+        "('docs/video/safari-assistant-desktop-[a-z][a-z].mp4', 15)"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-10-04-2 Favicon: App-Icon icon.png als Browser-Symbol (Mac-Oberfläche)",
+      "contains": [
+        "<link rel=\"icon\" type=\"image/png\" href=\"icon.png\">"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "2026-10-04-2 Favicon: App-Icon icon.png als Browser-Symbol (Karte)",
+      "contains": [
+        "<link rel=\"icon\" type=\"image/png\" href=\"icon.png\">"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-10-04-3 App-Meldungen in Chat-Blasen in der Oberflächensprache (uiMulti beim Erzeugen, verlaufText für gespeicherte Platzhalter)",
+      "contains": [
+        "function uiMulti(t) { return window.DARK_I18N ? DARK_I18N.tMulti(t) : t; }",
+        "const ZUSAMMENFASSUNG_MARKE = '[Zusammenfassung des bisherigen Gesprächs]';",
+        "function verlaufText(m) {",
+        "addMessage('assistant', uiMulti('⚠️ Claude API: ' + grund), null, null, thisCtx);",
+        "addMessage(m.role, verlaufText(m), null, m.badge || null, entry.ctx)"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-10-04-3 App-Meldungen in Chat-Blasen in der Oberflächensprache (uiMulti), Abrufzeit im 🚨-Sheet als eigener Textknoten, Favicon",
+      "contains": [
+        "function uiMulti(t) { return window.DARK_I18N ? DARK_I18N.tMulti(t) : t; }",
+        "appendMsgEl('assistant', uiMulti('⚠️ Claude API: ' + grund), null, null, thisCtx);",
+        "letzter Abruf am Mac: <span>${escHtml(stand.geholt ?",
+        "<link rel=\"icon\" type=\"image/png\" href=\"icon.png\">"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-10-04-3 Notfallkarte: Karten-Sprache gewählt oder wie die Oberfläche (nkSprache/nkSkip, data-i18n-skip lang), ES-Knopf = Oberfläche, Person 1/2 übersetzt",
+      "contains": [
+        "function nkSprache() {",
+        "function nkSkip(s) {",
+        "const NK_UI_KNOPF = { es: '🇪🇸 ES' };",
+        "nkLang = l === nkUiSprache() ? '' : l;",
+        "'Person 1': 'Personne 1', 'Person 2': 'Personne 2',"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-10-04-3 i18n-Feinschliff Mac: Malaria-Monat als eigener Textknoten, Statuszeile (vor 3,5 h), ?-Link in der Oberflächensprache, aria-label der Sprachgruppen übersetzbar",
+      "contains": [
+        "Stand ${escHtml(d.monat)}<span>",
+        "Number(st.alter_h).toLocaleString('de-DE', { maximumFractionDigits: 1 })",
+        "hilfeLink.setAttribute('href', 'hilfe?lang=' + encodeURIComponent(DARK_I18N.lang) + '&from=/index.html');",
+        "<div class=\"ui-lang\" role=\"group\" aria-label=\"Sprache der Oberfläche\">"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "2026-10-04-3 Karte: Hinweis unter dem Suchfeld, Popups gehen vor (:has + autoPan), Suchfeld frei von der Knopfleiste, kurzer Platzhalter",
+      "contains": [
+        "#map:has(.leaflet-popup) #karten-hinweis { visibility: hidden; }",
+        "function kartenHinweisOben() {",
+        "L.Popup.mergeOptions({ autoPanPaddingTopLeft: L.point(10, kartenHinweisOben()), autoPanPaddingBottomRight: L.point(64, 10) });",
+        "placeholder=\"🔍 Ort suchen (⏎ = auch Straßen)\""
+      ]
+    },
+    {
+      "file": "i18n/en.js",
+      "name": "2026-10-04-3 i18n/en.js: Chat-Meldungen, FCDO-Stufe „Teile des Landes“, „Stand“ = Datum (Malaria-Monat eigen), Kurs-Fußzeile, Statuszeile, Mit-KI-vertiefen, Karte",
+      "contains": [
+        "\"⚠️ Claude API: {0}\": \"⚠️ Claude API: {0}\",",
+        "\"Von allen Reisen in Teile des Landes wird abgeraten\": \"All travel to parts of the country is advised against\",",
+        "\"Stand Okt\": \"Month: Oct\","
+      ]
+    },
+    {
+      "file": "i18n/fr.js",
+      "name": "2026-10-04-3 i18n/fr.js: Chat-Meldungen, FCDO-Stufe „Teile des Landes“, „Stand“ = Datum (Malaria-Monat eigen), Kurs-Fußzeile, Statuszeile, Mit-KI-vertiefen, Karte",
+      "contains": [
+        "\"Stand {0}{1}\": \"État au {0}{1}\",",
+        "\"Stand Okt\": \"Mois : oct.\",",
+        "\"{0} — Schritt für Schritt, Lage:\": \"{0} — étape par étape, situation :\","
+      ]
+    },
+    {
+      "file": "i18n/es.js",
+      "name": "2026-10-04-3 i18n/es.js: Chat-Meldungen, FCDO-Stufe „Teile des Landes“, „Stand“ = Datum (Malaria-Monat eigen), Kurs-Fußzeile, Statuszeile, Mit-KI-vertiefen, Karte",
+      "contains": [
+        "\"Stand {0}{1}\": \"Actualizado: {0}{1}\",",
+        "\"Stand Okt\": \"Mes: oct\",",
+        "\"Kurse schwanken\": \"Los tipos fluctúan\","
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-10-05-1 Name „Safari Assistant“ (englische Schreibweise): Wortmarke mit Leerzeichen, Backup-Datei safari-assistant-backup-*.json",
+      "contains": [
+        "<div class=\"logo-title\" data-i18n-skip><span>Safari</span> <span class=\"logo-akzent\">Assistant</span></div>",
+        "a.download = `safari-assistant-backup-${dateStr}.json`;",
+        "<title>Safari Assistant</title>"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-10-05-1 Name „Safari Assistant“: Wortmarke im ⚙️-Setup-Sheet mit Leerzeichen",
+      "contains": [
+        "<div class=\"wortmarke\" data-i18n-skip><span>Safari</span> <span class=\"wortmarke-akzent\">Assistant</span></div>",
+        "<meta name=\"apple-mobile-web-app-title\" content=\"Safari Assistant\">"
+      ]
+    },
+    {
+      "file": "launcher_new.sh",
+      "name": "2026-10-05-1 Log-Ordner ~/Library/Logs/Safari Assistant, Befehl in der Startmeldung mit Anführungszeichen",
+      "contains": [
+        "LOG_DIR=\"$HOME/Library/Logs/Safari Assistant\"",
+        "tail -20 ~/Library/Logs/\\\"Safari Assistant\\\"/server.log"
+      ]
+    },
+    {
+      "file": "deploy.sh",
+      "name": "2026-10-05-1 deploy.sh findet auch ein Bundle „Safari-Assistent.app“ (Name vom 04.10.)",
+      "contains": [
+        "\"$HOME/Desktop/Safari Assistant.app\"",
+        "\"$HOME/Desktop/Safari-Assistent.app\""
+      ]
+    },
+    {
+      "file": "build-app.sh",
+      "name": "2026-10-05-1 build-app.sh baut „Safari Assistant.app“, schlägt für „Safari-Assistent.app“ Umbenennen vor; Bundle-ID bleibt",
+      "contains": [
+        "APP_NAME=\"${APP_NAME:-Safari Assistant}\"",
+        "\"$HOME/Desktop/Safari-Assistent.app\"",
+        "<string>com.safari-assistent.app</string>"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-10-05-2 Streaming-Antwort mit Zeilenumbrüchen (pre-wrap während des Streamens)",
+      "contains": [
+        ".msg-bubble.stream-live { white-space: pre-wrap; }"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-10-05-2 Streaming-Antwort mit Zeilenumbrüchen (pre-wrap während des Streamens)",
+      "contains": [
+        ".msg-bubble.stream-live { white-space: pre-wrap; }"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "2026-10-05-2 Knopf Reisewarnungen zeigt an/aus (roter Rand)",
+      "contains": [
+        "btn.style.borderColor = reisewarnAn ? '#e24b4a' : '';"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-10-06-1 Dokumentensuche: Abschnitte tragen den Dokumentnamen (Quellenangabe im Prompt), auch für ältere Abschnitte",
+      "contains": [
+        "chunkStore.put({ ...chunk, docId, doc: docMeta.name });",
+        "doc: chunk.doc || nameById[chunk.docId] || 'Dokument', score"
+      ]
+    },
+    {
+      "file": "i18n/en.js",
+      "name": "2026-10-06-1 Dokumentliste: „{0} Seiten · {1} Abschnitte · {2}“ (mit Datum) übersetzt",
+      "contains": [
+        "\"{0} Seiten · {1} Abschnitte · {2}\": \"{0} pages · {1} sections · {2}\""
+      ]
+    },
+    {
+      "file": "i18n/fr.js",
+      "name": "2026-10-06-1 Dokumentliste mit Datum übersetzt",
+      "contains": [
+        "\"{0} Seiten · {1} Abschnitte · {2}\": \"{0} pages · {1} sections · {2}\""
+      ]
+    },
+    {
+      "file": "i18n/es.js",
+      "name": "2026-10-06-1 Dokumentliste mit Datum übersetzt",
+      "contains": [
+        "\"{0} Seiten · {1} Abschnitte · {2}\": \"{0} páginas · {1} secciones · {2}\""
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-10-06-1 iPhone-HTTPS: Rechnername aus dem Lokalen Hostnamen (.local) statt aus dem Router-DNS; nur .local/localhost ins Zertifikat; keine Herabstufung bei „permitted subtree violation“",
+      "contains": [
+        "p = subprocess.run([exe, '--get', 'LocalHostName'], capture_output=True, text=True, timeout=5)",
+        "def tls_name_erlaubt(name):",
+        "namen = [n for n in [name, 'localhost'] if n and tls_name_erlaubt(n)]",
+        "_re.search(r'unsupported[^|]*constraint', probe, _re.I)",
+        "b = bonjour_name()      # 2026-10-06-1"
+      ]
+    }
+  ]
+}

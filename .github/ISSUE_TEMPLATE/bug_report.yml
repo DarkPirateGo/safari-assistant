@@ -1,0 +1,109 @@
+name: Bug report
+description: Something does not work as it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### Remove personal data before you paste anything
+
+        Issues are public and stay public. From logs, terminal output and screenshots, remove or blur:
+
+        - user paths (`/Users/<you>/…`) and your Mac's user name
+        - your host name (`<your-mac>.local`) and IP addresses
+        - the access code (the part after `/go/` and `?t=`) and any QR code
+        - GPS positions and Plus Codes
+        - API keys (`sk-ant-…`)
+        - names, medical data, document or vehicle numbers from the emergency card, chats or notes
+
+        `server.log` prints the Python path and the app folder, which contain your user name.
+
+        **Security problems** go to the Security tab → **Report a vulnerability**, not into this form.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start Safari Assistant.app
+        2. Open the Mechanics module
+        3. Ask "..."
+        4. See ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part?
+      options:
+        - Chat modules (index.html)
+        - Phone view (mobile.html)
+        - iPhone mode / certificate / access code
+        - Map (pois.html)
+        - Interface language, translations, guide (? icon)
+        - Emergency card, checklists, logbook
+        - Travel advisories / warned areas
+        - Server (server.py)
+        - Offline Wikipedia (Kiwix)
+        - Offline map build (setup-offline-karte.sh)
+        - Install and packaging (deploy.sh, build-app.sh, launcher)
+        - Privacy gate / CI
+        - Documentation
+        - Something else
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: macOS version and Mac
+      placeholder: "macOS 15.x, Apple Silicon"
+    validations:
+      required: true
+
+  - type: input
+    id: ram
+    attributes:
+      label: RAM
+      placeholder: "32 GB"
+
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Ollama version (`ollama --version`), Python version, and the page version shown in ⚙️ Settings (Einstellungen) or the commit you use.
+      placeholder: "Ollama 0.34.2, Python 3.9, index.html v2026-09-xx-1"
+
+  - type: input
+    id: model
+    attributes:
+      label: Which model was the module using?
+      placeholder: "qwen3.6:35b-a3b"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log output and browser console (redacted)
+      description: |
+        The relevant lines from `~/Library/Logs/Safari Assistant/server.log` (or the terminal running `python3 server.py`) and anything red in the browser console.
+        Redact user paths, host name, IP addresses, access code, positions, API keys and personal data first (see the box at the top).
+      render: shell
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I removed user paths, host name, IP addresses, access code, GPS positions, API keys and personal data from everything I pasted or attached
+          required: true
+        - label: I ran `node test-app.js` and pasted any failures above
+        - label: I checked the [troubleshooting section](https://github.com/DarkPirateGo/safari-assistant/blob/main/docs/SETUP.md#troubleshooting)

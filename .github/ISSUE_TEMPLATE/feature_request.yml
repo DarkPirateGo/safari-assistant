@@ -1,0 +1,42 @@
+name: Feature request
+description: Suggest an improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Issues are public. Please do not include personal data such as your route, travel dates, positions or vehicle details unless they are needed to explain the idea.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the situation, not the solution. "On a sand track with no signal I need to ..." is more useful than "add a button".
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What do you have in mind?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: offline
+    attributes:
+      label: Does it work without internet?
+      description: Offline-first is a hard requirement for anything that is not clearly labelled as online.
+      options:
+        - Fully offline
+        - Works offline, better online
+        - Needs internet (must be labelled and listed in "What goes online")
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Would you like to build it?
+      options:
+        - label: I would be willing to open a pull request for this

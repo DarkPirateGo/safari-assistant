@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Safari Assistant – offline AI field assistant for overland travel in Africa</title>
+<meta name="description" content="An offline AI field assistant for overland travel in southern and eastern Africa: chat modules on local models on your Mac, an offline map with rain seasons and official travel warnings, an emergency card that works without AI, and a phone view over your own Wi-Fi.">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#040523">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Safari Assistant">
+<meta property="og:title" content="Safari Assistant – offline AI field assistant for overland travel">
+<meta property="og:description" content="Local chat modules, an offline map with rain seasons and travel warnings, and an emergency card that works without AI. For southern and eastern Africa, on your Mac.">
+<meta property="og:url" content="https://darkpiratego.github.io/safari-assistant/">
+<meta property="og:image" content="https://darkpiratego.github.io/safari-assistant/img/social-preview.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="Safari Assistant – offline AI field assistant for overland travel in Africa">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" sizes="32x32" href="img/logo/safari-assistant-icon-32.png">
+<link rel="apple-touch-icon" href="img/logo/safari-assistant-icon-180.png">
+<!-- Safari Assistant landing page (GitHub Pages from docs/), made by DARK. Loads
+     nothing from other servers: no web fonts, no scripts, no counters. Images come
+     from this repository. -->
+<style>
+/* ── Tokens: dark by default (the navy of the DARK logo), light on request ── */
+:root{
+  --bg:#040523; --surface:#0b0d31; --ink:#ebe7da; --ink-2:#c9c5b7; --muted:#a3a1b3;
+  --line:#23275a; --link:#d8bd76; --soft:rgba(200,169,90,.08); --code-bg:rgba(200,169,90,.12);
+  --sand:#c8a95a; --night:#040523; --hero-ink:#ece8dc; --hero-muted:#aeacbf;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 18px 44px rgba(0,0,0,.45);
+  --display:Futura,"Futura PT","Avenir Next","Century Gothic","Segoe UI",system-ui,sans-serif;
+  --text:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme:light){:root{
+  --bg:#f1f2f6; --surface:#ffffff; --ink:#0d1033; --ink-2:#353957; --muted:#585c77;
+  --line:#d6d8e4; --link:#7a5b12; --soft:#f4eedd; --code-bg:#ece4cf;
+  --shadow:0 1px 2px rgba(13,16,51,.08),0 16px 40px rgba(13,16,51,.14);
+  color-scheme:light}}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.6 var(--text);-webkit-font-smoothing:antialiased}
+a{color:var(--link);text-underline-offset:3px;text-decoration-thickness:1px}
+a:hover{text-decoration-thickness:2px}
+a:focus-visible,.btn:focus-visible{outline:3px solid var(--sand);outline-offset:3px;border-radius:6px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;line-height:1.12;letter-spacing:-.01em}
+h2{font-size:clamp(1.75rem,4.2vw,2.35rem);font-weight:700;margin:0 0 .5em}
+h3{font-size:1.2rem;font-weight:700;margin:0}
+p{margin:0 0 1em;text-wrap:pretty}
+code{font:.86em/1.4 var(--mono);background:var(--code-bg);padding:.12em .38em;border-radius:5px;white-space:nowrap}
+pre{margin:12px 0 0;overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:13px 16px;font:.85rem/1.6 var(--mono);color:var(--ink)}
+pre code{background:none;padding:0;font:inherit;white-space:pre}
+.wrap{max-width:1080px;margin:0 auto;padding-inline:20px}
+.read{max-width:66ch}
+
+/* ── Hero: always night, with a dusk glow behind the ridge ───────────────── */
+.hero{position:relative;color:var(--hero-ink);
+  background:radial-gradient(60% 46% at 64% 100%,rgba(200,169,90,.42) 0,rgba(200,169,90,.14) 45%,rgba(200,169,90,0) 78%),var(--night)}
+.hero .wrap{position:relative;padding-block:20px 0}
+.top{display:flex;justify-content:flex-end}
+.top ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px 22px;font-size:.93rem}
+.top a{color:var(--hero-muted);text-decoration:none}
+.top a:hover{color:var(--hero-ink);text-decoration:underline}
+.stage{padding-block:clamp(40px,8vw,88px) clamp(36px,6vw,64px)}
+.stage h1{margin:0 0 6px;line-height:0}
+.stage h1 img{display:block;width:min(100%,720px);height:auto}
+.pitch{margin:.55em 0 0;max-width:20em;font:500 clamp(1.3rem,3.6vw,2rem)/1.25 var(--display);letter-spacing:-.005em;color:var(--hero-ink);text-wrap:balance}
+.lede{max-width:38em;margin:1.1em 0 0;color:var(--hero-muted);font-size:1.04rem}
+.cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}
+.btn{display:inline-flex;align-items:center;padding:13px 22px;border-radius:10px;font-weight:600;text-decoration:none;
+  border:2px solid rgba(236,232,220,.38);color:var(--hero-ink);background:rgba(4,5,35,.4)}
+.btn:hover{border-color:var(--hero-ink)}
+.btn.main{background:var(--sand);border-color:var(--sand);color:var(--night)}
+.btn.main:hover{background:#d6b96c;border-color:#d6b96c}
+.langs{margin:16px 0 0;font-size:.92rem;color:var(--hero-muted)}
+.langs a{color:var(--hero-ink)}
+.facts{margin:6px 0 0;font-size:.92rem;color:var(--hero-muted)}
+.caution{margin-top:30px;max-width:38em;border-left:3px solid var(--sand);background:rgba(200,169,90,.09);
+  padding:14px 18px;border-radius:0 10px 10px 0;font-size:.98rem;color:var(--hero-ink)}
+.caution p{margin:0}
+.caution a{color:var(--sand)}
+.ridge{display:block;position:relative;top:3px;width:100%;height:clamp(36px,6vw,84px)}
+.ridge path{fill:var(--bg)}
+
+/* ── Sections ────────────────────────────────────────────────────────────── */
+section{padding-block:60px}
+section+section{border-top:1px solid var(--line)}
+.see{padding-top:28px}
+.note{margin:14px 0 0;color:var(--muted);font-size:.9rem}
+
+/* Screenshots */
+.shots{margin:26px 0 0}
+.shots .row{display:flex;justify-content:center;gap:28px}
+.shots figure{margin:0;flex:0 0 250px;min-width:0}
+.frame{border-radius:18px;overflow:hidden;border:1px solid var(--line);background:var(--surface);box-shadow:var(--shadow)}
+.frame img{display:block;width:100%;height:auto}
+.shots figure figcaption{margin-top:12px;font-weight:600;font-size:.97rem}
+.shots>figcaption{text-align:center}
+@media (max-width:860px){
+  .shots .row{justify-content:flex-start;overflow-x:auto;scroll-snap-type:x mandatory;gap:18px;
+    margin-inline:-20px;padding:4px 20px 14px;scrollbar-width:thin}
+  .shots figure{flex-basis:min(70vw,250px);scroll-snap-align:center}
+}
+
+/* What it does: heading column + content column */
+.intro{margin-bottom:30px}
+.part{display:grid;grid-template-columns:minmax(0,14rem) minmax(0,1fr);gap:10px 44px;padding-block:28px;border-top:1px solid var(--line)}
+.part>div{min-width:0;max-width:66ch}
+.part h3{padding-top:.15em}
+.part p:last-child,.part ul:last-child{margin-bottom:0}
+.dash{list-style:none;margin:0 0 1em;padding:0}
+.dash li{position:relative;padding-left:1.25em;margin-bottom:.45em}
+.dash li::before{content:"";position:absolute;left:0;top:.8em;width:.65em;height:2px;background:var(--sand)}
+.modules{columns:2 17rem;column-gap:36px}
+.modules li{break-inside:avoid}
+.group{margin:1.2em 0 .5em;font-weight:600}
+.group:first-of-type{margin-top:.4em}
+.small{font-size:.92rem;color:var(--muted)}
+.qmark{display:inline-flex;align-items:center;justify-content:center;width:1.5em;height:1.5em;border-radius:50%;
+  border:1.5px solid var(--sand);color:var(--ink);font-weight:700;font-size:.85em;line-height:1;vertical-align:.08em}
+@media (max-width:720px){.part{grid-template-columns:minmax(0,1fr)}}
+
+/* Which Mac: memory → model, estimates marked */
+.tiers{width:100%;border-collapse:collapse;margin:8px 0 1.4em;font-size:.97rem}
+.tiers th,.tiers td{text-align:left;vertical-align:top;padding:11px 0;border-top:1px solid var(--line)}
+.tiers thead th{border-top:0;padding-top:0;font-size:.78rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.tiers tbody th{width:8.5em;padding-right:18px;font-weight:700;white-space:nowrap}
+.tiers tbody tr:last-child>*{border-bottom:1px solid var(--line)}
+.basis{display:block;margin-top:4px;font-size:.88rem;line-height:1.5;color:var(--muted)}
+.tag{display:inline-block;margin-right:5px;padding:0 8px;border:1px dashed var(--muted);border-radius:999px;
+  font-size:.76rem;font-weight:600;letter-spacing:.03em;line-height:1.6;color:var(--ink-2);vertical-align:.05em}
+.tag.ok{border:1px solid var(--sand);background:var(--sand);color:var(--night)}
+@media (max-width:520px){.tiers tbody th{width:5.6em;padding-right:12px;white-space:normal}}
+
+/* How to start */
+.steps{list-style:none;margin:26px 0 0;padding:0;counter-reset:s;max-width:52rem}
+.steps li{counter-increment:s;display:grid;grid-template-columns:40px minmax(0,1fr);gap:16px;padding-block:18px;border-top:1px solid var(--line)}
+.steps li:first-child{border-top:0;padding-top:0}
+.steps li::before{content:counter(s);width:40px;height:40px;border-radius:50%;border:2px solid var(--sand);color:var(--ink);
+  display:flex;align-items:center;justify-content:center;font:700 1.1rem/1 var(--display)}
+.steps h3{margin:.35em 0 .3em}
+.steps p{margin:0;color:var(--ink-2)}
+.steps pre+p{margin-top:10px}
+.more{margin-top:22px}
+
+/* Safety: the loudest box on the page */
+.safety .panel{max-width:58rem;border:2px solid var(--sand);border-radius:16px;background:var(--soft);padding:clamp(20px,4vw,34px)}
+.safety .lead{font:700 clamp(1.25rem,3.2vw,1.6rem)/1.3 var(--display);margin:0 0 .8em;max-width:30em;text-wrap:balance}
+.musts{list-style:none;margin:0 0 1.6em;padding:0;display:grid;gap:12px;max-width:44em}
+.musts li{position:relative;padding-left:1.5em;font-size:1.06rem}
+.musts li::before{content:"";position:absolute;left:0;top:.55em;width:.7em;height:.7em;border-radius:50%;background:var(--sand)}
+.safety h3{font-size:1.05rem;margin:0 0 .6em}
+.safety .dash{max-width:66ch;color:var(--ink-2);font-size:.97rem}
+.status{margin:1.2em 0 0;padding-top:1em;border-top:1px solid var(--line);color:var(--ink-2);font-size:.97rem;max-width:66ch}
+
+/* Footer */
+footer{border-top:1px solid var(--line);padding-block:36px 48px;color:var(--muted);font-size:.92rem}
+.maker{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:18px;color:var(--ink)}
+.maker img{display:block;height:76px;width:auto;border-radius:8px}
+.maker a{font-weight:600}
+footer p{margin:0 0 .6em;max-width:72ch}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <nav class="top" aria-label="On this page">
+      <ul>
+        <li><a href="#what">What it does</a></li>
+        <li><a href="#mac">Which Mac</a></li>
+        <li><a href="#start">How to start</a></li>
+        <li><a href="#safety">Safety</a></li>
+        <li><a href="https://github.com/DarkPirateGo/safari-assistant">GitHub</a></li>
+      </ul>
+    </nav>
+    <div class="stage">
+      <h1><img src="img/logo/safari-assistant-wordmark-dark.svg" alt="Safari Assistant" width="747" height="77"></h1>
+      <p class="pitch">An offline AI field assistant for overland travel in southern and eastern Africa.</p>
+      <p class="lede">Chat modules on local models on your Mac, an offline map with rain seasons and
+      official travel warnings, an emergency card that works without AI, and a phone view over your own Wi-Fi.</p>
+      <div class="cta">
+        <a class="btn main" href="https://github.com/DarkPirateGo/safari-assistant">Get it on GitHub</a>
+        <a class="btn" href="https://github.com/DarkPirateGo/safari-assistant/blob/main/README.md">Read the guide</a>
+      </div>
+      <p class="langs">The guide in other languages:
+        <a href="https://github.com/DarkPirateGo/safari-assistant/blob/main/README.de.md" hreflang="de" lang="de">Deutsch</a>,
+        <a href="https://github.com/DarkPirateGo/safari-assistant/blob/main/README.fr.md" hreflang="fr" lang="fr">Français</a>,
+        <a href="https://github.com/DarkPirateGo/safari-assistant/blob/main/README.es.md" hreflang="es" lang="es">Español</a></p>
+      <p class="facts">For Macs with Apple Silicon. In English, German, French and Spanish. Free for non-commercial use.</p>
+      <div class="caution">
+        <p><strong>Answers come from language models and can be wrong.</strong> Safari Assistant is not a doctor,
+        a mechanic, a vet or a guide, and it cannot call for help: carry a real emergency communicator.
+        <a href="#safety">Safety and limitations</a></p>
+      </div>
+    </div>
+  </div>
+  <svg class="ridge" viewBox="0 0 1440 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+    <path d="M0 100V70C70 66 130 54 210 55C290 56 340 72 430 70C520 68 560 50 640 40C720 30 790 28 860 38C930 48 980 62 1060 60C1140 58 1190 40 1270 42C1340 44 1390 56 1440 58V100Z"/>
+  </svg>
+</header>
+
+<main>
+  <section class="see" aria-labelledby="see-title">
+    <div class="wrap">
+      <h2 id="see-title">See it in action</h2>
+      <figure class="shots">
+        <div class="row">
+          <figure>
+            <div class="frame"><picture>
+              <source media="(prefers-color-scheme: light)" srcset="img/en/chat-light.png">
+              <img src="img/en/chat-dark.png" width="250" alt="Screenshot of a chat with one of Safari Assistant’s modules" loading="lazy" decoding="async">
+            </picture></div>
+            <figcaption>Chat</figcaption>
+          </figure>
+          <figure>
+            <div class="frame"><picture>
+              <source media="(prefers-color-scheme: light)" srcset="img/en/map-light.png">
+              <img src="img/en/map-dark.png" width="250" alt="Screenshot of Safari Assistant’s offline map" loading="lazy" decoding="async">
+            </picture></div>
+            <figcaption>Map</figcaption>
+          </figure>
+          <figure>
+            <div class="frame"><picture>
+              <source media="(prefers-color-scheme: light)" srcset="img/en/emergency-light.png">
+              <img src="img/en/emergency-dark.png" width="250" alt="Screenshot of Safari Assistant’s emergency view" loading="lazy" decoding="async">
+            </picture></div>
+            <figcaption>Emergency</figcaption>
+          </figure>
+        </div>
+        <figcaption class="note">Example view with sample data</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section id="what" aria-labelledby="what-title">
+    <div class="wrap">
+      <h2 id="what-title">What it does</h2>
+      <p class="read intro">Safari Assistant runs on your Mac and opens in your browser. It covers 16 countries:
+      Angola, Botswana, Burundi, Eswatini, Ethiopia, Kenya, Lesotho, Malawi, Mozambique, Namibia,
+      Rwanda, South Africa, Tanzania, Uganda, Zambia and Zimbabwe.</p>
+
+      <div class="part">
+        <h3>14 chat modules</h3>
+        <div>
+          <p>Each module has its own system prompt, chat history and model. Twelve run on local models
+          through <a href="https://ollama.com">Ollama</a>; two optional online modules need your own Anthropic API key.</p>
+          <p class="group">On local models</p>
+          <ul class="dash modules">
+            <li><strong>Mechanics</strong>: vehicle diagnosis and field repair, tuned for the Toyota HZJ78 / 1HZ diesel</li>
+            <li><strong>Nature &amp; Wildlife</strong>: wildlife and plants, species identification, danger assessment</li>
+            <li><strong>Medicine &amp; First Aid</strong>: tropical and wilderness medicine, first aid</li>
+            <li><strong>Navigation &amp; Terrain</strong>: routes, terrain, water crossings, border posts</li>
+            <li><strong>Dog</strong>: dog health and safety on the road</li>
+            <li><strong>Survival &amp; Orientation</strong>: water, shelter, orientation, signalling</li>
+            <li><strong>Wildlife Photography</strong></li>
+            <li><strong>Languages</strong>: phrases and translation for the region</li>
+            <li><strong>Emergency Chat</strong>: calm step-by-step guidance</li>
+            <li><strong>Weather &amp; Rainy Seasons</strong>: seasons and rain periods*</li>
+            <li><strong>Camp Kitchen</strong>: cooking with what is in the vehicle</li>
+            <li><strong>Fitness</strong>: training without equipment</li>
+          </ul>
+          <p class="group">Online, optional</p>
+          <ul class="dash">
+            <li><strong>Security Situation — Live</strong>: current security situation, with web search</li>
+            <li><strong>Claude — Online AI</strong>: general online assistant, with web search</li>
+          </ul>
+          <p>One setting, Settings → <strong>Global Model</strong>, switches every local module to another
+          model; <a href="#mac">which model fits your Mac</a>.</p>
+          <p class="small">* On the Mac, Weather &amp; Rainy Seasons goes online via Claude when an API key is stored.</p>
+        </div>
+      </div>
+
+      <div class="part">
+        <h3>Your manuals and photos</h3>
+        <div>
+          <ul class="dash">
+            <li><strong>Your own manuals:</strong> upload PDFs, such as a workshop manual, a first-aid book or a
+            travel guide, and assign them to a module. The module searches them offline and cites document,
+            chapter and page in its answer.</li>
+            <li><strong>Photos:</strong> attach a photo of a sign, a part, a plant or an animal and ask about it.
+            With the local modules, the model looks at it on your Mac; nothing is uploaded.</li>
+            <li><strong>Offline Wikipedia</strong>, optional, via <code>kiwix-serve</code>: modules search it and
+            cite it, also from the iPhone.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="part">
+        <h3>Offline map</h3>
+        <div>
+          <ul class="dash">
+            <li>Vector map from an offline map file you build once, or online OpenStreetMap tiles.</li>
+            <li><strong>Rain:</strong> rain-season layer with a day-by-day timeline: monthly rain, temperatures,
+            humidity, wind, solar radiation and the malaria season of that month. Long-term averages, not a forecast.</li>
+            <li>Weather panel for your position; when online and on request, a 7-day forecast from Open-Meteo.</li>
+            <li><strong>Warnings:</strong> official travel warnings from Germany, the UK and the US, fetched automatically
+            whenever the Mac is online and readable offline. Warned districts are drawn as areas, and Safari Assistant
+            tells you whether your position is inside one; the full texts are under <strong>Travel Advisories</strong>.</li>
+            <li><strong>Hazards:</strong> hazard zones (malaria, tsetse, big game, crocodiles), plus national
+            park boundaries.</li>
+            <li><strong>About 90,000 places</strong> from OpenStreetMap ship with the app, one file per country, imported
+            once: campsites, fuel, water, workshops, hospitals, vets and border posts. Your own GPX, KML and
+            GeoJSON files can be imported too.</li>
+            <li>Offline place search; online street search only when you press Enter.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="part">
+        <h3>Emergency Card</h3>
+        <div>
+          <p>Works without AI.</p>
+          <ul class="dash">
+            <li>Emergency numbers per country, tappable, and German embassy numbers.</li>
+            <li>Your position as decimal degrees, degrees/minutes/seconds and Plus Code, for radio or
+            satellite messenger.</li>
+            <li>8 first-aid protocols as fixed text (<strong>Instant Protocols</strong>), readable in one tap.</li>
+            <li>Personal fields (medical, documents, vehicle, contacts), exchange rate, sun times and
+            document deadlines.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="part">
+        <h3>iPhone view</h3>
+        <div>
+          <p>On an iPhone in the same Wi-Fi you get the same modules, an emergency sheet and the map, all
+          through the Mac over HTTPS with an access code. The iPhone mode is off after every start and
+          switches itself off after 12 hours without requests from the phone and when Safari Assistant quits. Never switch it on in a
+          Wi-Fi you do not trust; use your own router or a phone hotspot.
+          <a href="https://github.com/DarkPirateGo/safari-assistant/blob/main/README.md#iphone-mode">Set up the iPhone mode</a></p>
+        </div>
+      </div>
+
+      <div class="part">
+        <h3>Languages</h3>
+        <div>
+          <p>The interface comes in English, German, French and Spanish; until you choose, Safari Assistant uses your
+          browser’s language if it is one of these four, otherwise English. AI answers follow the interface
+          language, and a separate row above the input box can set the answer language to German, English,
+          French, Spanish, Portuguese, Swahili or Afrikaans. The <span class="qmark">?</span>
+          icon on every page opens the guide in the chosen language, offline.</p>
+          <p class="small">German is the source language: anything not yet translated stays German, and the
+          system prompts are not translated.
+          <a href="https://github.com/DarkPirateGo/safari-assistant/blob/main/README.md#languages">Languages in the guide</a></p>
+        </div>
+      </div>
+
+      <div class="part">
+        <h3>Trip tools</h3>
+        <div>
+          <p>Checklists, document deadlines, a maintenance plan (a template for the Toyota HZJ78 / 1HZ, plus
+          your own items), a logbook for fuel and maintenance, notes, saved answers, chat history and backups.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="mac" aria-labelledby="mac-title">
+    <div class="wrap"><div class="read">
+      <h2 id="mac-title">Which Mac do I need?</h2>
+      <p>Safari Assistant runs on Macs with Apple Silicon only. All offline AI runs on the Mac, so its memory decides
+      which model you can use. Only 36 GB is measured, on one Mac (MacBook Pro M5 Max); everything else
+      is an estimate, not tested with Safari Assistant.</p>
+      <table class="tiers">
+        <thead><tr><th scope="col">Memory</th><th scope="col">Chat and photo model</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">8–16&nbsp;GB</th>
+            <td><code>gemma4:e4b</code> (light profile)
+            <span class="basis"><span class="tag">Estimate</span> 8&nbsp;GB: very tight, not recommended for the trip</span></td></tr>
+          <tr><th scope="row">24&nbsp;GB</th>
+            <td><code>gemma4:12b</code>
+            <span class="basis"><span class="tag">Estimate</span> untested</span></td></tr>
+          <tr><th scope="row">32&nbsp;GB</th>
+            <td><code>gemma4:26b</code>
+            <span class="basis"><span class="tag">Estimate</span> the default model probably does not fit fully on the GPU</span></td></tr>
+          <tr><th scope="row">36–48&nbsp;GB</th>
+            <td><code>qwen3.6:35b-a3b</code> (default)
+            <span class="basis"><span class="tag ok">Measured</span> on 36&nbsp;GB: 22&nbsp;GB in use, 100&nbsp;% GPU. 48&nbsp;GB: estimate</span></td></tr>
+          <tr><th scope="row">64&nbsp;GB or more</th>
+            <td><code>qwen3.6:35b-a3b</code> (default)
+            <span class="basis"><span class="tag">Estimate</span> room for both models</span></td></tr>
+        </tbody>
+      </table>
+      <p>Every Mac also needs the small <code>gemma4:e4b</code>. Downloads: 6.6–33.5 GB depending on your
+      Mac, 29.6–33.5 GB for the defaults. With the light profile, Medicine &amp; First Aid and Emergency
+      Chat also answer from the small model: shorter, less reliable answers.</p>
+      <p><a href="https://github.com/DarkPirateGo/safari-assistant#which-model-on-which-mac">Which model on which Mac: commands, sizes and settings</a></p>
+    </div></div>
+  </section>
+
+  <section id="start" aria-labelledby="start-title">
+    <div class="wrap">
+      <h2 id="start-title">How to start</h2>
+      <p class="read">Do the large downloads at home on a fast connection, well before you leave: the
+      models are 6.6–33.5 GB depending on your Mac, and the defaults (29.6–33.5 GB) take about
+      1.5 hours at 50 Mbit/s.</p>
+      <ol class="steps">
+        <li><div>
+          <h3>Install Ollama and pull the models</h3>
+          <p>Ollama 0.34 or newer, from <a href="https://ollama.com">ollama.com</a> or with
+          <code>brew install ollama</code>. These are the default models, for a Mac with 36 GB or more.
+          With less memory, pull the models for your Mac from
+          <a href="https://github.com/DarkPirateGo/safari-assistant#which-model-on-which-mac">Which model on which Mac</a>.</p>
+<pre><code>ollama pull qwen3.6:35b-a3b
+ollama pull gemma4:e4b</code></pre>
+        </div></li>
+        <li><div>
+          <h3>Get Safari Assistant and build the app</h3>
+<pre><code>git clone https://github.com/DarkPirateGo/safari-assistant.git
+cd safari-assistant
+./deploy.sh
+./build-app.sh</code></pre>
+          <p>This creates <code>Safari Assistant.app</code> on your Desktop.</p>
+        </div></li>
+        <li><div>
+          <h3>Start</h3>
+          <p>Double-click <code>Safari Assistant.app</code>. It starts Ollama if needed, starts the server and opens
+          <code>http://localhost:8765</code> in your browser.</p>
+        </div></li>
+      </ol>
+      <p class="read more">Updates, PDF documents and what the scripts do:
+      <a href="https://github.com/DarkPirateGo/safari-assistant/blob/main/README.md#quick-start">Quick start in the guide</a>.
+      The offline map (about 8 GB, about 80 GB free space while it builds) and offline Wikipedia:
+      <a href="https://github.com/DarkPirateGo/safari-assistant/blob/main/docs/SETUP.md">SETUP.md</a>.</p>
+    </div>
+  </section>
+
+  <section id="online" aria-labelledby="online-title">
+    <div class="wrap"><div class="read">
+      <h2 id="online-title">What goes online</h2>
+      <p>Offline, nothing leaves the Mac; with a connection, Safari Assistant fetches travel advisories, warning
+      areas, exchange rates and map tiles, and reaches the weather service, the place search or Anthropic
+      only when you use them. No telemetry, no analytics, no fonts from Google.</p>
+      <p><a href="https://github.com/DarkPirateGo/safari-assistant/blob/main/README.md#what-goes-online">Everything Safari Assistant sends, and how to avoid it</a></p>
+    </div></div>
+  </section>
+
+  <section id="safety" class="safety" aria-labelledby="safety-title">
+    <div class="wrap">
+      <h2 id="safety-title">Safety and limitations</h2>
+      <div class="panel">
+        <p class="lead">Safari Assistant gives advice about medicine, snakebite, vehicle repair, water crossings and
+        emergencies. The answers come from language models that can be confidently wrong.</p>
+        <ul class="musts">
+          <li>It is <strong>not</strong> a doctor, a mechanic, a vet or a guide. It does not replace
+          training, a first-aid kit, a satellite communicator or judgement.</li>
+          <li>Check anything that could hurt you against a printed manual, the offline Wikipedia or a person.</li>
+          <li>Safari Assistant cannot call for help. <strong>Carry a real emergency communicator.</strong></li>
+        </ul>
+        <h3>Also know this</h3>
+        <ul class="dash">
+          <li>No medication doses, by design. The prompts tell the model not to state or invent doses and
+          to refer to a doctor, a vet or the package insert.</li>
+          <li>Emergency numbers were checked in September 2026. Verify them before departure.</li>
+          <li>The embassy column lists German embassies, for German citizens. Everyone else uses their own
+          embassy or consulate.</li>
+          <li>Travel-warning areas are an automated reading of the official text, not official borders.
+          The official text always rules; each entry links to it.</li>
+          <li>The rain layer is a 2001–2020 climatology from NASA POWER, not a forecast. Rainy seasons
+          shift by weeks from year to year.</li>
+          <li>With the light profile, medical and emergency answers also come from the small model
+          <code>gemma4:e4b</code>. Macs below 36 GB are not tested with Safari Assistant; see
+          <a href="#mac">Which Mac do I need?</a></li>
+          <li>The system prompts are not translated. They are written for a German-speaking traveller: for
+          example, the embassy numbers are German, and the Languages module gives pronunciation for German
+          readers. Answers still come in the language you choose.</li>
+          <li>The Mechanics module and the maintenance plan target one vehicle, the Toyota HZJ78 / 1HZ.
+          A travel profile is on the <a href="https://github.com/DarkPirateGo/safari-assistant/blob/main/docs/ROADMAP.md">roadmap</a>.
+          Exchange rates use EUR as the base currency.</li>
+          <li>The English, French and Spanish first-aid protocols are translations of the German text, not yet
+          reviewed by first-aid professionals.</li>
+          <li>The prompts ask the model to state uncertainty and to say early when professional help is
+          needed. That reduces the risk; it does not remove it.</li>
+        </ul>
+        <p class="status"><strong>Status:</strong> used by the author for trip preparation. Not yet
+        field-tested. Tested on one machine (Apple Silicon, 36 GB).
+        <a href="https://github.com/DarkPirateGo/safari-assistant/blob/main/README.md#safety-and-limitations">Read the full section</a></p>
+      </div>
+    </div>
+  </section>
+
+  <section id="licence" aria-labelledby="licence-title">
+    <div class="wrap"><div class="read">
+      <h2 id="licence-title">Licence</h2>
+      <p>Safari Assistant’s code is licensed under the PolyForm Noncommercial License 1.0.0: you may use, change and
+      share it free of charge for any non-commercial purpose. It is a source-available licence, not an
+      open-source licence approved by the OSI. Commercial use needs a separate licence from DARK; ask in an
+      <a href="https://github.com/DarkPirateGo/safari-assistant/issues">issue</a>.
+      <a href="https://github.com/DarkPirateGo/safari-assistant/blob/main/LICENSE">LICENSE</a></p>
+      <p>Map data, place names, climate data, the bundled libraries and the QR code encoder keep their own
+      licences, listed in <a href="https://github.com/DarkPirateGo/safari-assistant/blob/main/NOTICE.md">NOTICE.md</a>.
+      The names “Safari Assistant” and “DARK” and their logos: all rights reserved; forks must replace them as the
+      name and logo of their version. The <code>Required Notice:</code> line in
+      <a href="https://github.com/DarkPirateGo/safari-assistant/blob/main/LICENSE">LICENSE</a>, which names DARK as the
+      copyright holder, stays: the licence requires passing it on.</p>
+    </div></div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="maker">
+      <img src="img/dark-logo.jpg" alt="DARK" width="166" height="76">
+      <span>Safari Assistant is made by <a href="https://github.com/DarkPirateGo">DARK</a></span>
+    </div>
+    <p><a href="https://github.com/DarkPirateGo/safari-assistant">Source code on GitHub</a>.
+    The guide in <a href="https://github.com/DarkPirateGo/safari-assistant/blob/main/README.md">English</a>,
+    <a href="https://github.com/DarkPirateGo/safari-assistant/blob/main/README.de.md" hreflang="de" lang="de">Deutsch</a>,
+    <a href="https://github.com/DarkPirateGo/safari-assistant/blob/main/README.fr.md" hreflang="fr" lang="fr">Français</a> and
+    <a href="https://github.com/DarkPirateGo/safari-assistant/blob/main/README.es.md" hreflang="es" lang="es">Español</a>.
+    © 2026 DARK, <a href="https://github.com/DarkPirateGo/safari-assistant/blob/main/LICENSE">PolyForm Noncommercial 1.0.0</a>.</p>
+    <p>Built on Ollama, Leaflet, Leaflet.markercluster, MapLibre GL JS, Planetiler, OpenMapTiles, Kiwix
+    and PyMuPDF. Data from OpenStreetMap contributors, GeoNames, NASA POWER and Open-Meteo. Travel advice
+    from the German Federal Foreign Office (<span lang="de">Auswärtiges Amt</span>), the UK FCDO and the US Department of State.
+    QR code encoder adapted from Project Nayuki.</p>
+  </div>
+</footer>
+
+</body>
+</html>

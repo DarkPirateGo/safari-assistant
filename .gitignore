@@ -1,0 +1,157 @@
+# Public .gitignore for Safari Assistant (2026-09-27, renamed 2026-10-04). NOTE: git has no inline comments - a "#" after a pattern
+# becomes part of the pattern. Every comment below sits on its own line.
+# Belt and braces only: the release is built by allowlist copy + tools/privacy_gate.py.
+
+# ── Large generated / downloaded artefacts ───────────────────
+*.mbtiles
+*.pmtiles
+*.zim
+*.osm.pbf
+*.jar
+fonts/
+data/sources/
+data/tmp/
+data/tile_weights.tsv.gz
+# Regenerated at runtime / not redistributable (AA terms: complete + current only)
+data/warnzonen.geojson
+data/verwaltungsgebiete.geojson
+icon.iconset/
+*.icns
+
+# ── Personal content — never commit ──────────────────────────
+A_docs/
+Wiki/
+rag-store.json
+rag-store.json.*
+*backup*.json
+# server.py stores uploaded documents in docs/<module>/ ; only docs/*.md, docs/img/, the GitHub Pages page docs/index.html
+# and docs/.nojekyll (empty; Pages then serves docs/ as it is instead of rendering docs/*.md as extra pages) are tracked
+docs/*
+!docs/*.md
+!docs/img/
+!docs/index.html
+!docs/.nojekyll
+# docs/img/ includes the app logo and icon (docs/img/logo/) and docs/img/social-preview.png.
+# GitHub Pages videos (rendered by ffmpeg, checked by the privacy gate): exactly these names, nothing else in
+# docs/video/: safari-assistant-promo-<xx> (30 s, vertical) and safari-assistant-desktop-<xx> (60 s, landscape),
+# <xx> = two lower-case letters. The folder must be re-included before files in it can be; the .mp4 lines follow
+# "*.mp4" further down.
+!docs/video/
+docs/video/*
+!docs/video/safari-assistant-promo-[a-z][a-z]-poster.jpg
+!docs/video/safari-assistant-promo-[a-z][a-z]-poster.png
+!docs/video/safari-assistant-desktop-[a-z][a-z]-poster.jpg
+!docs/video/safari-assistant-desktop-[a-z][a-z]-poster.png
+# iOverlander and other track/waypoint exports (licence + location history)
+*.gpx
+*.kml
+*.kmz
+*.fit
+*.tcx
+# Office documents, PDFs, mail, contacts, calendars
+*.pdf
+*.doc
+*.docx
+*.xls
+*.xlsx
+*.ppt
+*.pptx
+*.odt
+*.pages
+*.numbers
+*.eml
+*.vcf
+*.ics
+# Private notes and working files of the author
+TODO.md
+BUGLOG.md
+REVIEW-BERICHT*
+GITHUB-ANLEITUNG*
+MIGRATION_CLAUDE_CODE*
+OLLAMA-UPDATE-ANLEITUNG*
+*projektstand*
+*Projektdokumentation*
+_backup*/
+_to_delete/
+_ollama-test/
+ollama-test.sh
+ollama-test-bild.png
+build-app-intel.sh
+# the author's working copy of the icon, top level only (docs/img/logo/ must stay trackable)
+/safari-assistant-icon.png
+fauna-gbif-matrix.csv
+# AI-assistant memory/settings - contain personal context
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+.mcp.json
+.cursor/
+.aider*
+# Editor / merge backups
+*.bak
+*.orig
+*.rej
+# Privacy-gate term list (keep it OUTSIDE the repo; this is only a safety net)
+.privacy-denylist*
+*denylist*
+tools/private-terms.txt
+# deploy.sh auto-commit marker (maintainer's private working folder only)
+.deploy-commit
+
+# ── Secrets / keys / certificates ────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.csr
+*.srl
+secrets.json
+.safari-assistant-*
+
+# ── Archives, media, databases, logs ─────────────────────────
+*.tar.gz
+*.tgz
+*.zip
+*.7z
+*.dmg
+*.heic
+*.mov
+*.mp4
+# only exceptions: the two Pages videos (see docs/ above); must come after "*.mp4", the last matching line wins
+!docs/video/safari-assistant-promo-[a-z][a-z].mp4
+!docs/video/safari-assistant-desktop-[a-z][a-z].mp4
+*.sqlite
+*.db
+*.har
+*.log
+
+# ── Build output ─────────────────────────────────────────────
+*.app/
+build/
+dist/
+
+# ── Python / Node ────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.Python
+node_modules/
+npm-debug.log*
+
+# ── OS / editor ──────────────────────────────────────────────
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+Icon?
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
