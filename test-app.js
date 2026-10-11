@@ -6920,7 +6920,8 @@ test('NAME 2026-10-05: Versionsmarker v2026-10-05-1 oder neuer (index/mobile/poi
   return !fehler.length || fehler.join(' | ');
 });
 
-test('NAME 2026-10-05: öffentliche Doku (README in vier Sprachen, Website) — Name, Repo-Adresse, Logo-Dateien vorhanden; keine Videos im Release', () => {
+const VIDEO_NAME67 = /^safari-assistant-(?:promo|desktop)-[a-z]{2}(?:\.mp4|-poster\.(?:jpg|png))$/;
+test('NAME 2026-10-05: öffentliche Doku (README in vier Sprachen, Website) — Name, Repo-Adresse, Logo-Dateien vorhanden; Videos (seit 2026-10-11) nur auf der Website, nur unter den Namen der Gate-Ausnahme A-F06 und vorhanden', () => {
   const fehler = [];
   const docs = loadFile('release-docs/README.md') !== null ? 'release-docs/' : '';
   for (const n of ['README.md', 'README.de.md', 'README.fr.md', 'README.es.md', 'docs/index.html', 'CHANGELOG.md', 'CONTRIBUTING.md', 'SECURITY.md', 'NOTICE.md', 'docs/SETUP.md']) {
@@ -6930,7 +6931,12 @@ test('NAME 2026-10-05: öffentliche Doku (README in vier Sprachen, Website) — 
     const rest = ohneKennungen67(x).replace(/`safari-assistent`/g, '');
     const t = rest.match(/.{0,30}(?:Safari-Assistent|safari-assistent).{0,30}/g);
     if (t) fehler.push(`${n}: ` + t.slice(0, 2).map(s => JSON.stringify(s)).join(' | '));
-    if (/docs\/video\/|<video\b|\.mp4\b/.test(x) && !/^docs\/(?:PRIVACY-GATE|SETUP)/.test(n)) fehler.push(`${n}: verweist auf ein Video`);
+    if (n === 'docs/index.html') {
+      for (const ref of (x.match(/video\/[\w.-]+\.(?:mp4|jpg|png)/g) || [])) {
+        if (!VIDEO_NAME67.test(ref.slice(6))) fehler.push('docs/index.html: Video-Name nicht erlaubt: ' + ref);
+        else if (!fs.existsSync(path.join(__dirname, docs + 'docs/' + ref))) fehler.push('docs/index.html: fehlt ' + ref);
+      }
+    } else if (/docs\/video\/|<video\b|\.mp4\b/.test(x) && !/^docs\/(?:PRIVACY-GATE|SETUP)/.test(n)) fehler.push(`${n}: verweist auf ein Video`);
   }
   const site = loadFile(docs + 'docs/index.html');
   if (site !== null) {
@@ -6942,7 +6948,9 @@ test('NAME 2026-10-05: öffentliche Doku (README in vier Sprachen, Website) — 
     for (const ref of (readme.match(/docs\/img\/logo\/[\w.-]+/g) || [])) if (!fs.existsSync(path.join(__dirname, docs + ref))) fehler.push('README.md: fehlt ' + ref);
     if (!/^#.*Safari Assistant|alt="Safari Assistant"/m.test(readme)) fehler.push('README.md: Name nicht im Kopf');
   }
-  if (docs && fs.existsSync(path.join(__dirname, 'release-docs/docs/video'))) fehler.push('release-docs/docs/video/ ist noch da (Videos sollen vorerst nicht ins Release)');
+  // 2026-10-11: Videos wieder auf der Website — im Ordner docs/video/ nur, was die Gate-Ausnahme A-F06 erlaubt
+  const vdir = path.join(__dirname, docs + 'docs/video');
+  if (fs.existsSync(vdir)) for (const f of fs.readdirSync(vdir)) if (f !== '.DS_Store' && !VIDEO_NAME67.test(f)) fehler.push('docs/video/' + f + ': Name nicht erlaubt');
   return !fehler.length || fehler.join(' | ');
 });
 

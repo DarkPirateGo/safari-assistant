@@ -91,6 +91,19 @@ section+section{border-top:1px solid var(--line)}
 .see{padding-top:28px}
 .note{margin:14px 0 0;color:var(--muted);font-size:.9rem}
 
+/* Videos: trailer (16:9) and promo (9:16) side by side, same height */
+.films{display:grid;grid-template-columns:minmax(0,3.16fr) minmax(0,1fr);gap:24px;align-items:start;margin:26px 0 44px}
+.films figure{margin:0;min-width:0}
+.films video{display:block;width:100%;height:auto;background:#000}
+.films .wide video{aspect-ratio:16/9}
+.films .tall video{aspect-ratio:9/16}
+.films figcaption{margin-top:12px;font-weight:600;font-size:.97rem}
+.films figcaption span{margin-left:.45em;font-weight:400;color:var(--muted)}
+@media (max-width:720px){
+  .films{grid-template-columns:minmax(0,1fr);gap:28px}
+  .films .tall{max-width:300px}
+}
+
 /* Screenshots */
 .shots{margin:26px 0 0}
 .shots .row{display:flex;justify-content:center;gap:28px}
@@ -207,6 +220,26 @@ footer p{margin:0 0 .6em;max-width:72ch}
   <section class="see" aria-labelledby="see-title">
     <div class="wrap">
       <h2 id="see-title">See it in action</h2>
+      <div class="films">
+        <figure class="wide">
+          <div class="frame"><video controls playsinline preload="none" width="1280" height="720"
+            poster="video/safari-assistant-desktop-en-poster.jpg"
+            aria-label="Trailer: Safari Assistant on the Mac and the iPhone, with sample data">
+            <source src="video/safari-assistant-desktop-en.mp4" type="video/mp4">
+            <a href="video/safari-assistant-desktop-en.mp4">Watch the trailer (MP4, 12 MB)</a>
+          </video></div>
+          <figcaption>Trailer <span>1:39</span></figcaption>
+        </figure>
+        <figure class="tall">
+          <div class="frame"><video controls playsinline preload="none" width="720" height="1280"
+            poster="video/safari-assistant-promo-en-poster.jpg"
+            aria-label="Safari Assistant in 30 seconds, with sample data">
+            <source src="video/safari-assistant-promo-en.mp4" type="video/mp4">
+            <a href="video/safari-assistant-promo-en.mp4">Watch the short video (MP4, 6 MB)</a>
+          </video></div>
+          <figcaption>In 30 seconds <span>0:30</span></figcaption>
+        </figure>
+      </div>
       <figure class="shots">
         <div class="row">
           <figure>
