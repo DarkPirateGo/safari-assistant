@@ -3632,7 +3632,7 @@ test('SEC: Mutationen (shutdown/upload/extract-pdf/rag-sync/docs-delete) nur Loo
   if (fn[0].includes('ist_private_ip(')) return 'mutation_erlaubt darf nicht mehr auf „privat" vertrauen (DNS-Rebinding, K1)';
   if (!fn[0].includes('nur vom Mac selbst möglich')) return 'keine verständliche Begründung (nichts darf still scheitern)';
   const post = serverPy45.match(/def do_POST\(self\):[\s\S]*?if path == '\/api\/shutdown':/);
-  if (!post || !post[0].includes("if path in ('/api/shutdown', '/api/docs/upload', '/api/extract-pdf', '/api/rag/sync',\n                    '/api/netz/an', '/api/netz/aus', '/api/netz/neuer-code',\n                    '/api/reisewarnungen/aktualisieren', '/api/tls/zeigen'):")) return 'POST-Gate fehlt oder unvollständig';
+  if (!post || !post[0].includes("if path in ('/api/shutdown', '/api/docs/upload', '/api/extract-pdf', '/api/rag/sync',\n                    '/api/netz/an', '/api/netz/aus', '/api/netz/neuer-code',\n                    '/api/reisewarnungen/aktualisieren', '/api/tls/zeigen', '/api/tls/vorbereiten'):")) return 'POST-Gate fehlt oder unvollständig';
   const del = serverPy45.match(/if path == '\/api\/docs\/delete':[\s\S]*?safe_docs_path/);
   if (!del || !del[0].includes('self.mutation_erlaubt()')) return 'DELETE-Gate fehlt';
   // Lese-Endpunkte fürs iPhone bleiben offen (rag/search braucht das Telefon)
@@ -3773,7 +3773,9 @@ test('START: kein blockierendes alert() mehr beim Init — checkOllama(true) + S
   const fn = html46.match(/async function checkOllama\(silent\) \{[\s\S]*?\n\}/);
   if (!fn) return 'checkOllama(silent) fehlt';
   if (!/if \(!silent\) alert\(/.test(fn[0]) || (fn[0].match(/alert\(/g) || []).length !== 2) return 'alert() muss an silent hängen (genau 2 Stellen)';
-  const need = ['function fehlendeModelle()', 'function renderStartBanner()', 'ollama pull ${escHtml(m)}', 'setInterval(() => { checkOllama(true); ladeIphoneStatus(); }, 30000);', '🔴 Ollama nicht erreichbar (${escHtml(url)})'];
+  const need = ['function fehlendeModelle()', 'function renderStartBanner()', 'ollama pull ${escHtml(m)}', 'setInterval(() => { checkOllama(true); ladeIphoneStatus(); }, 30000);',
+    // 2026-11-14-2: der Hinweis heißt jetzt „Die lokale KI läuft nicht“; die Adresse und die Terminal-Befehle stehen im aufklappbaren Teil
+    '<span class="start-banner-title">Die lokale KI läuft nicht</span>', '<span class="start-banner-adresse" data-i18n-skip>${escHtml(url)}</span>'];
   const miss = need.filter(n => !html46.includes(n));
   return miss.length === 0 || 'fehlt: ' + miss.join(' | ');
 });
@@ -4143,8 +4145,9 @@ const mob50 = loadFile('mobile.html');
 
 test('iPHONE-MODUS: Server startet immer auf 127.0.0.1; LAN-Zugang nur zur Laufzeit per lan_an()/lan_aus() (zweiter Listener auf der Mac-IP, endet mit dem Prozess)', () => {
   if (!srv50) return 'server.py fehlt';
-  const need = ["LAN_STATE = {'an': False", 'def lan_an():', 'def lan_aus(grund=', 'def lan_status():', 'def starte_lan_wache():',
-    "srv = SafariServer((ip, port), SafariHandler, ssl_kontext=ctx)", "threading.Thread(target=srv.serve_forever", "srv.shutdown()", 'starte_lan_wache()\n'];
+  // 2026-10-18-1: lan_an(weg) — der Weg ('sicher'/'schnell') wird beim Freigeben gewählt; der Listener spricht beide Protokolle (lan=True)
+  const need = ["LAN_STATE = {'an': False", 'def lan_an(weg=None):', 'def lan_aus(grund=', 'def lan_status():', 'def starte_lan_wache():',
+    "srv = SafariServer((ip, port), SafariHandler, ssl_kontext=ctx, lan=True)", "threading.Thread(target=srv.serve_forever", "srv.shutdown()", 'starte_lan_wache()\n'];
   const miss = need.filter(n => !srv50.includes(n));
   if (miss.length) return 'fehlt: ' + miss.join(' | ');
   // beim Beenden aus: Shutdown-Route, SIGTERM und Ctrl-C rufen lan_aus
@@ -4164,7 +4167,9 @@ test('ZUGANG: jede Anfrage läuft durch zugang_pruefen() — Host-Header (Rebind
   const fn = srv50.match(/def zugang_pruefen\(self, path, params\):[\s\S]*?return False\n\n/);
   if (!fn) return 'zugang_pruefen fehlt';
   const need = ['if not self.host_ok():', "self._error(421", 'if ist_loopback(ip):\n            return True', "if not LAN_STATE['an']:", "iPhone-Modus ist aus",
-    "self._cookie('safari_zugang')", "params.get('t', [''])[0]", "self.headers.get('X-Safari-Zugang', '')", 'if token_gueltig(wert):'];
+    // 2026-10-18-1: über https das eigene Secure-Cookie (altes wird übernommen), über http nur das ohne Secure; Weg „sicher" lehnt http ab
+    "cookie = self._cookie(COOKIE_HTTPS) or self._cookie(COOKIE_HTTP)", "cookie = self._cookie(COOKIE_HTTP)", "params.get('t', [''])[0]", "self.headers.get('X-Safari-Zugang', '')", 'if token_gueltig(wert):',
+    "if LAN_STATE.get('weg') == 'sicher' and not verschluesselt:\n            self._nur_verschluesselt()\n            return False"];
   const miss = need.filter(n => !fn[0].includes(n));
   if (miss.length) return 'fehlt: ' + miss.join(' | ');
   for (const m of ['do_GET', 'do_POST', 'do_DELETE', 'do_OPTIONS']) {
@@ -4179,7 +4184,7 @@ test('ZUGANG: Zugangscode 0600 im Home, aus eindeutigem Alphabet, Vergleich zeit
   const need = ["TOKEN_DATEI = Path.home() / '.safari-assistant-zugang'", "TOKEN_ALPHABET = '23456789abcdefghjkmnpqrstuvwxyz'", 'secrets.choice(TOKEN_ALPHABET)',
     'secrets.compare_digest(wert, zugangs_token())', 'schreibe_privat(TOKEN_DATEI', "os.open(str(pfad), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)",
     "if path.startswith('/go/'):", "self.send_header('Location', '/mobile.html?t=' + code)",
-    "safari_zugang={self._cookie_setzen}; Path=/; Max-Age=31536000; SameSite=Lax; HttpOnly"];
+    "{name}={self._cookie_setzen}; Path=/; Max-Age={COOKIE_MAX_ALTER}; SameSite=Lax; HttpOnly{sicher}", "COOKIE_MAX_ALTER = 400 * 86400"];
   const miss = need.filter(n => !srv50.includes(n));
   return miss.length === 0 || 'fehlt: ' + miss.join(' | ');
 });
@@ -4261,7 +4266,7 @@ test('FRONTEND: iPhone-Modus-Schalter in den Einstellungen + Statuszeile in der 
   if (!idx50) return 'index.html fehlt';
   const need = ['id="iphone-toggle"', 'onclick="iphoneModusSchalten()"', 'id="iphone-modus-status"', 'id="iphone-dot"', 'id="iphone-status"',
     'function zeigeIphoneStatus(st)', 'async function ladeIphoneStatus()', 'async function iphoneModusSchalten()', 'async function iphoneCodeErneuern()',
-    "'/api/netz/status'", "(iphoneModusAn ? '/api/netz/aus' : '/api/netz/an')", "'/api/netz/neuer-code'", '  ladeIphoneStatus();\n', 'setInterval(() => { checkOllama(true); ladeIphoneStatus(); }, 30000);'];
+    "'/api/netz/status'", "if (iphoneModusAn) return iphoneFreigabeBeenden();", "getServerUrl() + '/api/netz/an', {", "getServerUrl() + '/api/netz/aus'", "'/api/netz/neuer-code'", '  ladeIphoneStatus();\n', 'setInterval(() => { checkOllama(true); ladeIphoneStatus(); }, 30000);'];
   const miss = need.filter(n => !idx50.includes(n));
   if (miss.length) return 'fehlt: ' + miss.join(' | ');
   if (idx50.includes('safari-assistant-network')) return 'Marker-Datei wird noch erwähnt';
@@ -4283,7 +4288,7 @@ test('MOBILE: die Karte ist vom iPhone aus erreichbar — 📍 in der Modul-Leis
   if (!server.includes("'/pois.html': '/pois.html'")) return 'der Server liefert pois.html nicht aus';
   // Ohne diesen Zweig setzt der Server beim Aufruf mit ?t= kein Cookie — dann scheitern die
   // Folge-Abrufe der Karte (/data/parks.geojson, /api/reisewarnungen).
-  return /if params\.get\('t'\) and not self\._cookie\('safari_zugang'\):/.test(server)
+  return (/if verschluesselt and not self\._cookie\(COOKIE_HTTPS\):/.test(server) && /elif not verschluesselt and params\.get\('t'\) and not self\._cookie\(COOKIE_HTTP\):/.test(server))
     || '?t= setzt kein Cookie — die Karte könnte ihre Daten nicht nachladen';
 });
 
@@ -4291,7 +4296,7 @@ test('MOBILE: Ollama nur noch über den Server-Proxy (SERVER_URL + /api/ollama),
   if (!mob50) return 'mobile.html fehlt';
   const need = ["const OLLAMA_URL = (location.protocol === 'http:' || location.protocol === 'https:') ? SERVER_URL + '/api/ollama' : 'http://' + HOST + ':11434';",
     "localStorage.setItem('safari-zugang', t)", "function zugangHeader(h)", "'X-Safari-Zugang': ZUGANG", 'if (e.httpStatus === 403) {', 'if (e.httpStatus === 502) {',
-    'iPhone-Modus am Mac eingeschaltet?'];
+    'Freigabe am Mac an?'];   // 2026-11-14-1: Wortlaut nach dem Ablauf vom 18.10. (vorher „iPhone-Modus am Mac eingeschaltet?")
   const miss = need.filter(n => !mob50.includes(n));
   if (miss.length) return 'fehlt: ' + miss.join(' | ');
   const direkt = (mob50.match(/fetch\(OLLAMA_URL[^)]*\)/g) || []).filter(s => !s.includes('zugangHeader'));
@@ -4534,7 +4539,7 @@ test('DATUM (ausgeführt): gueltigesDatum lehnt 2026-13-01/2026-02-30 ab; fristS
 test('FUNKTIONAL: Foto im Claude-Pfad (thisImage), Enter-Guard während Antwort (index + mobile), Claude-Kontext beginnt mit User (index + mobile), 25-s-Timeout (index + mobile), num_ctx explizit, Leisten überleben „Neuer Chat", eine position-card-ID, GPS zeigt vor dem Speichern, Ollama-URL-Prüfung', () => {
   if (!idx52 || !mob52) return 'Datei fehlt';
   const needI = ["sendClaudeMessage(text || null, thisImage || null, msgs, thisCtx, { ragContext })", "if (abortControllers[thisCtx]) { showToast('Antwort läuft noch",
-    "while (contextMsgs.length > 1 && contextMsgs[0].role !== 'user') contextMsgs = contextMsgs.slice(1);", "AbortSignal.any([controller.signal, AbortSignal.timeout(25000)])",
+    "while (contextMsgs.length > 1 && contextMsgs[0].role !== 'user') contextMsgs = contextMsgs.slice(1);", "claudeFristSignal(controller.signal, 25000)",
     'options: { num_ctx: Number(settings.numCtx) || 16384 }', 'function leisteHtml(ctx)', 'c.innerHTML = leisteHtml(currentCtx) +', "if (currentCtx === 'notfall') renderFristen();",
     'updateGpsStatus();                       // erst anzeigen', "settings.ollamaUrl = /^https?:\\/\\/[^\\s/]+/.test(ou) ? ou : '';"];
   const missI = needI.filter(n => !idx52.includes(n));
@@ -4542,7 +4547,7 @@ test('FUNKTIONAL: Foto im Claude-Pfad (thisImage), Enter-Guard während Antwort 
   if ((idx52.match(/id="position-card"/g) || []).length !== 0) return 'position-card-ID noch vorhanden (doppelt im DOM)';
   if (idx52.includes('pendingImage || null, msgs, thisCtx')) return 'Claude-Pfad nutzt weiter pendingImage (Foto ging verloren)';
   const needM = ["if (abortControllers[thisCtx]) { showToast('Antwort läuft noch", "while (ctxMsgs.length > 1 && ctxMsgs[0].role !== 'user') ctxMsgs = ctxMsgs.slice(1);",
-    "AbortSignal.any([controller.signal, AbortSignal.timeout(25000)])", 'options: { num_ctx: 16384 }', 'AKTUELLER STANDORT DES NUTZERS: Lat ${Number(mSettings.userLat).toFixed(3)}'];
+    "claudeFristSignal(controller.signal, 25000)", 'options: { num_ctx: 16384 }', 'AKTUELLER STANDORT DES NUTZERS: Lat ${Number(mSettings.userLat).toFixed(3)}'];
   const missM = needM.filter(n => !mob52.includes(n));
   return missM.length === 0 || 'mobile fehlt: ' + missM.join(' | ');
 });
@@ -4669,12 +4674,12 @@ test('MODELLWAHL: gemeinsamer Block (Standard, Stufen-Hinweis, Cache, API-Abruf)
   const a = idx54.match(BLK54), b = mob54.match(BLK54);
   if (!a || !b) return 'Block fehlt (' + [!!a, !!b].join('/') + ')';
   if (a[0] !== b[0]) return 'weicht ab';
-  const need = ["const CLAUDE_STANDARD_MODELL = 'claude-sonnet-4-6';", "fetch('https://api.anthropic.com/v1/models?limit=100'", "'anthropic-version': '2023-06-01'", "'anthropic-dangerous-direct-browser-access': 'true'",
+  const need = ["const CLAUDE_STANDARD_MODELL = 'claude-sonnet-5-5';", "fetch('https://api.anthropic.com/v1/models?limit=100'", "'anthropic-version': '2023-06-01'", "'anthropic-dangerous-direct-browser-access': 'true'",
     'AbortSignal.timeout(10000)', 'Array.isArray(j.data)', 'm.display_name || m.id', 'function claudeModellStufe(id)', 'function claudeModelleCache()'];
   const miss = need.filter(n => !a[0].includes(n));
   if (miss.length) return 'fehlt: ' + miss.join(' | ');
   // keine hart verdrahteten Modell-IDs außer dem Standard
-  const ids = [...a[0].matchAll(/claude-[a-z]+-\d[\w.-]*/g)].map(m => m[0]).filter(x => x !== 'claude-sonnet-4-6');
+  const ids = [...a[0].matchAll(/claude-[a-z]+-\d[\w.-]*/g)].map(m => m[0]).filter(x => x !== 'claude-sonnet-5-5');
   return ids.length === 0 || 'erfundene/feste Modell-IDs im Block: ' + ids.join(', ');
 });
 
@@ -4704,7 +4709,7 @@ test('MODELLWAHL Desktop: Auswahl in den Einstellungen + Schnellwahl im Chat, ge
   const miss = need.filter(n => !idx54.includes(n));
   if (miss.length) return 'fehlt: ' + miss.join(' | ');
   if ((idx54.match(/model: getClaudeModel\(\),/g) || []).length !== 3) return 'getClaudeModel nicht in allen drei Anfragen (Test + Chat + Komprimieren)';
-  if (/model: 'claude-sonnet-4-6',\n\s+max_tokens/.test(idx54)) return 'festes Modell in einer Anfrage';
+  if (/model: 'claude-sonnet-[\d-]+',\n\s+max_tokens/.test(idx54)) return 'festes Modell in einer Anfrage';
   return idx54.includes("if (!/^[a-z0-9][a-z0-9.\\-]{2,80}$/i.test(id))") || 'keine Prüfung der eingetippten Modell-ID';
 });
 
@@ -4714,7 +4719,7 @@ test('MODELLWAHL Mobile: Auswahl im Setup, gewähltes Modell in sendClaude, Stat
     'model: getClaudeModelMobil(),', "const suffix = isOnline ? ' · ' + getClaudeModelMobil()", 'renderClaudeModellMobil();\n}'];
   const miss = need.filter(n => !mob54.includes(n));
   if (miss.length) return 'fehlt: ' + miss.join(' | ');
-  return !/model: 'claude-sonnet-4-6',\n\s+max_tokens/.test(mob54) || 'festes Modell in der Anfrage';
+  return !/model: 'claude-sonnet-[\d-]+',\n\s+max_tokens/.test(mob54) || 'festes Modell in der Anfrage';
 });
 
 
@@ -4960,7 +4965,7 @@ const RW_BLOCK = /\/\/ ── REISEWARNUNGEN \(BYTEIDENTISCH[\s\S]*?\n\}\n(?=\n\
 
 test('REISEWARNUNGEN: nur amtliche Quellen (AA, FCDO, State Dept) — keine Blogs, Nachrichtenportale oder Aggregatoren', () => {
   if (!serverPy57) return 'server.py fehlt';
-  const block = serverPy57.match(/# ── REISEWARNUNGEN \(2026-09-13-1\)[\s\S]*?# ── SICHERHEIT/);
+  const block = serverPy57.match(/# ── REISEWARNUNGEN \(2026-09-13-1\)[\s\S]*?# ── (?:NACHRICHTEN AUS RSS-FEEDS|SICHERHEIT)/);
   if (!block) return 'Reisewarn-Block fehlt';
   const hosts = [...block[0].matchAll(/https?:\/\/([a-z0-9.-]+)/gi)].map(m => m[1].toLowerCase());
   const erlaubt = ['www.auswaertiges-amt.de', 'www.gov.uk', 'travel.state.gov'];
@@ -5067,7 +5072,7 @@ test('REISEWARNUNGEN: Abruf läuft im Hintergrund und blockiert nie eine Anfrage
   if (!serverPy57) return 'server.py fehlt';
   if (!serverPy57.includes("threading.Thread(target=reisewarnungen_aktualisieren, daemon=True).start()")) return 'kein Hintergrund-Thread';
   if (!/if path == '\/api\/reisewarnungen\/aktualisieren':\n\s+gestartet = reisewarnungen_anstossen\(\)/.test(serverPy57)) return 'POST-Route fehlt';
-  if (!serverPy57.includes("'/api/reisewarnungen/aktualisieren', '/api/tls/zeigen'):")) return 'Aktualisieren nicht im Mutations-Gate';
+  if (!serverPy57.includes("'/api/reisewarnungen/aktualisieren', '/api/tls/zeigen', '/api/tls/vorbereiten'):")) return 'Aktualisieren nicht im Mutations-Gate';
   if (!/if path == '\/api\/reisewarnungen':/.test(serverPy57)) return 'GET-Route fehlt';
   const get = serverPy57.match(/if path == '\/api\/reisewarnungen':[\s\S]*?return\n/);
   if (!get || /ist_loopback/.test(get[0])) return 'Lesen darf auch vom iPhone gehen';
@@ -5112,8 +5117,8 @@ test('HTTPS: eigene CA + Serverzertifikat nach Apples Vorgaben (SAN, ≤825 Tage
 
 test('HTTPS: nur der WLAN-Listener ist verschlüsselt, Loopback bleibt http (Launcher, Instanz-Übernahme und Lesezeichen unverändert)', () => {
   if (!serverPy58) return 'server.py fehlt';
-  if (!serverPy58.includes('def __init__(self, adresse, handler, ssl_kontext=None):')) return 'SafariServer kennt kein TLS';
-  if (!serverPy58.includes('srv = SafariServer((ip, port), SafariHandler, ssl_kontext=ctx)')) return 'LAN-Listener ohne Kontext';
+  if (!serverPy58.includes('def __init__(self, adresse, handler, ssl_kontext=None, lan=False):')) return 'SafariServer kennt kein TLS';
+  if (!serverPy58.includes('srv = SafariServer((ip, port), SafariHandler, ssl_kontext=ctx, lan=True)')) return 'LAN-Listener ohne Kontext';
   if (/oeffne_server[\s\S]{0,600}ssl_kontext/.test(serverPy58)) return 'der Hauptserver (Loopback) darf kein TLS bekommen';
   if (!serverPy58.includes("urlopen(f'http://127.0.0.1:{port}/api/ping'")) return 'Instanz-Übernahme spricht nicht mehr http auf Loopback';
   // 2026-09-27 (Audit H2): Handshake im Arbeits-Thread (finish_request), nicht im Accept-Thread (get_request)
@@ -5138,9 +5143,10 @@ test('HTTPS (ausgeführt, python3): Zertifikat erzeugen, Kette prüfen, echter H
 test('HTTPS: Adresse läuft über den Bonjour-Namen (überlebt Starlink ↔ Hotspot), IP nur wenn das Zertifikat sie deckt, Cookie über TLS mit Secure', () => {
   if (!serverPy58) return 'server.py fehlt';
   if (!serverPy58.includes("url_name = f'{schema}://{name}:{port}/go/{token}' if name else ''")) return 'Adresse nutzt nicht den Namen';
-  if (!serverPy58.includes("ip_gedeckt = (not st['tls']) or (ip and ip in (TLS_STATE.get('ips') or []))")) return 'IP-Adresse wird ungeprüft angeboten';
-  if (!serverPy58.includes("sicher = '; Secure' if isinstance(self.connection, ssl.SSLSocket) else ''")) return 'Cookie ohne Secure-Flag über TLS';
-  return /schema = 'https' if st\['tls'\] else 'http'/.test(serverPy58) || 'Schema wird nicht aus dem TLS-Zustand abgeleitet';
+  if (!serverPy58.includes("ip_gedeckt = (schema == 'http') or (ip and ip in (TLS_STATE.get('ips') or []))")) return 'IP-Adresse wird ungeprüft angeboten';
+  if (!serverPy58.includes("name, sicher = (COOKIE_HTTPS, '; Secure') if verschl else (COOKIE_HTTP, '')")) return 'Cookie ohne Secure-Flag über TLS';
+  // 2026-10-18-1: TLS-Zustand UND Weg — „schnell" ist http, auch wenn ein Zertifikat da wäre
+  return /schema = 'https' if \(st\['tls'\] and st\.get\('weg'\) != 'schnell'\) else 'http'/.test(serverPy58) || 'Schema wird nicht aus dem TLS-Zustand abgeleitet';
 });
 
 test('HTTPS: Einstellungen erklären Zustand und die einmalige Installation am iPhone — inkl. des gern vergessenen Vertrauens-Schalters', () => {
@@ -5917,7 +5923,7 @@ test('UMBENENNUNG (2026-10-04-2): sichtbarer Name Safari Assistant (Titel, Wortm
     if (!c.includes('font-weight: 700') || !c.includes("'Avenir Next'") || !/sans-serif;/.test(c) || /var\(--serif\)/.test(c)) return name + ': keine fette geometrische Sans: ' + c;
   }
   // bleiben, damit keine Daten verloren gehen: Speicher-Schlüssel, Cookie, Zertifikatsordner, Signatur, Bundle-ID, Ressourcenordner
-  const bleiben = [[idx62, "ladeJSON('safari-settings'"], [srv62, "safari_zugang="], [srv62, ".safari-assistant-tls"], [srv62, "APP_SIGNATUR = 'safari-assistent'"],
+  const bleiben = [[idx62, "ladeJSON('safari-settings'"], [srv62, "COOKIE_HTTP = 'safari_zugang'"], [srv62, ".safari-assistant-tls"], [srv62, "APP_SIGNATUR = 'safari-assistent'"],
     [bld62, '<string>com.safari-assistent.app</string>'], [bld62, 'RESOURCES="$CONTENTS/Resources/safari-assistant"'], [idx62, "onclick=\"DARK_I18N.set('de')\""]];
   const weg = bleiben.filter(([t, n]) => !t.includes(n)).map(([, n]) => n);
   return !weg.length || 'interne Kennung geändert (Datenverlust!): ' + weg.join(' | ');
@@ -6961,6 +6967,1882 @@ test('NAME 2026-10-05: Privacy-Gate nimmt Promo-Videos nur noch unter safari-ass
   if (!g.includes("PROMO_VIDEO = re.compile(r'docs/video/safari-assistant-(?:promo|desktop)-[a-z]{2}\\.mp4')")) fehler.push('PROMO_VIDEO');
   if (/docs\/video\/safari-assistent/.test(g)) fehler.push('alte Schreibweise noch ausgenommen');
   if (!g.includes('(^|/)safari-assist[ae]nt-backup-')) fehler.push('Backup-Muster');
+  return !fehler.length || fehler.join(' | ');
+});
+
+
+// =============================================
+console.log('\n=== 68. HANDYZUGANG WIE BEI WINGFOILSCOUT (2026-10-18-1): Weg sicher/schnell, ein Port für beide Protokolle, Schritte statt Schalter ===');
+// Wunsch vom 18.10.2026: „die gleiche Logik für den Handyzugang wie bei der Wingfoilscout-App". Übernommen aus
+// Wingfoilscout 2.5.0–2.6.0; die lokale CA bleibt (Entscheidung vom 18.10.). Ausgeführte Prüfungen in test-tls.py (4b).
+const srv68 = loadFile('server.py'), idx68 = loadFile('index.html'), mob68 = loadFile('mobile.html');
+
+test('HANDY 2026-10-18 (server): Wege sicher/schnell, ein Port zwei Protokolle (erstes Byte), http im Weg „sicher" abgelehnt bevor Code/Cookie gelesen werden, Secure-Cookie über https, nie still auf http ausweichen', () => {
+  if (!srv68) return 'server.py fehlt';
+  const need = ["WEGE = ('sicher', 'schnell')", "COOKIE_HTTPS = 'safari_zugang_https'", "erstes = request.recv(1, socket.MSG_PEEK)",
+    "if erstes != b'\\x16':", "handy_melden('abgebrochen')", 'def _nur_verschluesselt(self):',
+    "if weg == 'sicher' and ctx is None:", "self.lan = lan", "if not getattr(self, 'lan', False):"];
+  const miss = need.filter(n => !srv68.includes(n));
+  if (miss.length) return 'fehlt: ' + miss.join(' | ');
+  // Reihenfolge in zugang_pruefen: Weg-Prüfung VOR /api/ping, /go/ und dem Lesen von Cookie/Code
+  const fn = srv68.match(/def zugang_pruefen\(self, path, params\):[\s\S]*?return False\n\n/);
+  if (!fn) return 'zugang_pruefen fehlt';
+  const iWeg = fn[0].indexOf("if LAN_STATE.get('weg') == 'sicher' and not verschluesselt:");
+  const iPing = fn[0].indexOf("if path == '/api/ping':"), iCookie = fn[0].indexOf('cookie = self._cookie(');
+  if (iWeg < 0 || iWeg > iPing || iWeg > iCookie) return 'Weg „sicher" wird nicht vor /api/ping und Cookie geprüft';
+  // _nur_verschluesselt setzt kein Cookie und nennt keinen Code
+  const nv = srv68.match(/def _nur_verschluesselt\(self\):[\s\S]*?self\.wfile\.write\(body\)/);
+  if (!nv || /_cookie_setzen|zugangs_token/.test(nv[0])) return '_nur_verschluesselt setzt ein Cookie oder nennt den Code';
+  return true;
+});
+
+test('HANDY 2026-10-18 (server): /api/netz/stand und /api/tls/profil nur vom Mac, /api/tls/vorbereiten im Mutations-Gate, /sw.js + /api/netz/hinweis brauchen den Zugangscode, Zustandsdatei 0600 nur mit bekannten Feldern', () => {
+  if (!srv68) return 'server.py fehlt';
+  for (const r of ['/api/netz/stand', '/api/tls/profil']) {
+    const m = srv68.match(new RegExp("if path == '" + r.replace(/\//g, '\\/') + "':\\n\\s+if not ist_loopback\\(self\\.client_ip\\(\\)\\):"));
+    if (!m) return r + ' nicht auf den Mac begrenzt';
+  }
+  if (!/'\/api\/reisewarnungen\/aktualisieren', '\/api\/tls\/zeigen', '\/api\/tls\/vorbereiten'\):\n\s+ok, grund = self\.mutation_erlaubt\(\)/.test(srv68)) return '/api/tls/vorbereiten nicht im Mutations-Gate';
+  // /sw.js und /api/netz/hinweis stehen in do_GET NACH zugang_pruefen (kein eigener Freipass)
+  const fn = srv68.match(/def zugang_pruefen\(self, path, params\):[\s\S]*?return False\n\n/);
+  if (/sw\.js|netz\/hinweis/.test(fn[0])) return 'sw.js/hinweis haben einen Freipass in zugang_pruefen';
+  const need = ["ZUSTAND_DATEI = Path.home() / '.safari-assistant-iphone.json'", 'schreibe_privat(ZUSTAND_DATEI, json.dumps(neu))',
+    "if d.get('bewaehrt') in ('https', 'http'):", "_re.match(r'^[0-9a-f]{16}$', d[k])", "'PayloadType': 'com.apple.security.root'",
+    "self.send_header('Content-Type', 'application/x-apple-aspen-config')", "PROFIL_DATEINAME = 'Safari Assistant iPhone.mobileconfig'"];
+  const miss = need.filter(n => !srv68.includes(n));
+  if (miss.length) return 'fehlt: ' + miss.join(' | ');
+  // die Meldung an den Mac enthält nie den Code
+  const hm = srv68.match(/def handy_meldung\(\):[\s\S]*?\n\ndef /);
+  return (!!hm && !/zugangs_token|token/.test(hm[0])) || 'handy_meldung könnte den Code enthalten';
+});
+
+test('HANDY 2026-10-18 (server): bleibt wie bisher — nie automatisch an, aus beim Beenden, 12-h-Abschaltung, Neubinden beim Netzwechsel mit dem laufenden Weg, Beenden nur vom Mac', () => {
+  if (!srv68) return 'server.py fehlt';
+  const need = ["if lan_inaktiv_s() >= LAN_INAKTIV_H * 3600:", "ok, st = lan_an()\n", "weg = LAN_STATE.get('weg') if LAN_STATE.get('weg') in WEGE else 'sicher'",
+    "LAN_STATE.update({'an': False, 'ip': '', 'hinweis': grund, 'tls': False, 'weg': ''})"];
+  const miss = need.filter(n => !srv68.includes(n));
+  if (miss.length) return 'fehlt: ' + miss.join(' | ');
+  if (!/if path in \('\/api\/shutdown'/.test(srv68)) return '/api/shutdown nicht mehr im Mutations-Gate';
+  return (mob68 && !/api\/shutdown/.test(mob68)) || 'mobile.html ruft /api/shutdown';
+});
+
+test('HANDY 2026-10-18 (Mac-Seite): Schritte in der Reihenfolge, in der man sie braucht — Zertifikat, Profil, Installieren, Vertrauen, QR-Code zuletzt; der Weg ohne Zertifikat nur unter „Klappt nicht?"; live, was vom iPhone ankommt', () => {
+  if (!idx68) return 'index.html fehlt';
+  const need = ['function iphoneAnsicht(st)', 'function iphoneSicherHtml(st)', 'function iphoneSchnellHtml(st)', 'function iphoneFertigHtml(st)',
+    'function iphoneHilfeHtml(st)', 'function iphoneLiveStarten()', 'async function iphoneFreigeben(weg)', 'async function iphoneZertifikatErzeugen()',
+    "getServerUrl() + '/api/netz/stand'", "getServerUrl() + '/api/tls/profil'", "getServerUrl() + '/api/tls/vorbereiten'", 'Klappt nicht?',
+    "body: JSON.stringify({ weg: weg === 'schnell' ? 'schnell' : 'sicher' })"];
+  const miss = need.filter(n => !idx68.includes(n));
+  if (miss.length) return 'fehlt: ' + miss.join(' | ');
+  const sicher = idx68.match(/function iphoneSicherHtml\(st\) \{[\s\S]*?\n\}/);
+  if (!sicher) return 'iphoneSicherHtml nicht lesbar';
+  const reihe = ['Zertifikat für diesen Mac:', 'Das Profil laden', 'Installieren: Einstellungen', 'Vertrauen einschalten:', 'QR-Code zeigen, dann'].map(t => sicher[0].indexOf(t));
+  if (reihe.some(i => i < 0) || reihe.some((v, i) => i && v < reihe[i - 1])) return 'Schritte fehlen oder in falscher Reihenfolge: ' + reihe.join(',');
+  // Der Weg ohne Zertifikat ist nur aus „Klappt nicht?" (iphoneHilfeHtml) zu erreichen
+  const schnellLinks = (idx68.match(/iphoneAnsichtWaehlen\('schnell'\)/g) || []).length;
+  const hilfe = idx68.match(/function iphoneHilfeHtml\(st\) \{[\s\S]*?\n\}/);
+  if (schnellLinks !== 1 || !hilfe || !hilfe[0].includes("iphoneAnsichtWaehlen('schnell')")) return 'Weg ohne Zertifikat nicht (nur) unter „Klappt nicht?"';
+  return true;
+});
+
+test('HANDY 2026-10-18 (ausgeführt): iphoneAnsicht — gleich der QR-Code nur, wenn der Weg mit DIESER CA geklappt hat; http eingerichtet, außer danach wurde das Profil geladen; gewählter Weg geht vor', () => {
+  if (!idx68) return 'index.html fehlt';
+  const src = idx68.match(/function iphoneAnsicht\(st\) \{[\s\S]*?\n\}/);
+  if (!src) return 'iphoneAnsicht fehlt';
+  const mach = wunsch => new Function('iphoneAnsichtWunsch', src[0] + '\nreturn iphoneAnsicht;')(wunsch);
+  const f = mach('');
+  const faelle = [
+    [{}, 'sicher'],
+    [{ gemerkt: { bewaehrt: 'https', kennung: 'aaaaaaaaaaaaaaaa' }, ca: { kennung: 'aaaaaaaaaaaaaaaa' } }, 'fertig'],
+    [{ gemerkt: { bewaehrt: 'https', kennung: 'aaaaaaaaaaaaaaaa' }, ca: { kennung: 'bbbbbbbbbbbbbbbb' } }, 'sicher'],
+    [{ gemerkt: { bewaehrt: 'https', kennung: 'aaaaaaaaaaaaaaaa' }, ca: {} }, 'sicher'],
+    [{ gemerkt: { bewaehrt: 'http', zeit: 10 }, ca: {} }, 'fertig'],
+    [{ gemerkt: { bewaehrt: 'http', zeit: 10, profil: 'aaaaaaaaaaaaaaaa', profil_zeit: 20 }, ca: { kennung: 'aaaaaaaaaaaaaaaa' } }, 'sicher'],
+    [{ gemerkt: { bewaehrt: 'http', zeit: 30, profil: 'aaaaaaaaaaaaaaaa', profil_zeit: 20 }, ca: { kennung: 'aaaaaaaaaaaaaaaa' } }, 'fertig'],
+  ];
+  const fehler = faelle.filter(([st, soll]) => f(st) !== soll).map(([st, soll]) => JSON.stringify(st) + ' → ' + f(st) + ' statt ' + soll);
+  if (mach('schnell')(faelle[1][0]) !== 'schnell') fehler.push('gewählter Weg geht nicht vor');
+  return !fehler.length || fehler.join(' | ');
+});
+
+test('HANDY 2026-10-18 (iPhone): mobile.html meldet den Service Worker nur über https und nie am Mac an; der Hinweis kommt in vier Sprachen und lädt nichts von außen (was sw.js ablegt und wann: Sektion 72, ausgeführt)', () => {
+  if (!mob68 || !srv68) return 'Datei fehlt';
+  const need = ["navigator.serviceWorker.register('/sw.js', { scope: '/' })", "location.protocol !== 'https:'", "h === 'localhost' || h === '127.0.0.1'"];
+  const miss = need.filter(n => !mob68.includes(n));
+  if (miss.length) return 'mobile.html fehlt: ' + miss.join(' | ');
+  const sw = srv68.match(/SW_JS = "{3}([\s\S]*?)"{3}/);
+  if (!sw) return 'SW_JS fehlt';
+  if (!sw[1].includes("if (anfrage.method !== 'GET') return;")) return 'sw.js greift nach Anfragen, die keine GET sind';
+  if (!sw[1].includes('kasten.put(HINWEIS, antwort)')) return 'sw.js legt den Hinweis nicht ab';
+  if (!sw[1].includes('mitFrist(fetch(anfrage)).catch(hinweisSeite)')) return 'sw.js zeigt den Hinweis nicht nur bei fehlender Antwort';
+  const h = srv68.match(/HINWEIS_HTML = "{3}([\s\S]*?)"{3}/);
+  if (!h) return 'HINWEIS_HTML fehlt';
+  for (const l of ['de', 'en', 'fr', 'es']) if (!h[1].includes(`data-l="${l}"`)) return 'Hinweis ohne Sprache ' + l;
+  return !/https?:\/\/(?!localhost)/.test(h[1]) || 'Hinweis lädt etwas von außen';
+});
+
+test('HANDY 2026-10-18 (i18n): jeder neue Text der Handy-Einrichtung ist in en, fr UND es übersetzt', () => {
+  const texte = ['Freigabe beenden', 'Sicher einrichten', 'Zertifikat für diesen Mac:', 'Noch kein Zertifikat.', 'Zertifikat „{0}“, gültig bis {1}.',
+    'Profil laden', 'QR-Code zeigen', 'Geht, sobald Schritt 1 erledigt ist.', 'Ohne Zertifikat einrichten', 'Verschlüsselt einrichten (empfohlen)',
+    'Vertrauen einschalten: Einstellungen → Allgemein → Info → ganz unten „Zertifikatsvertrauenseinstellungen“ → „{0}“ einschalten → Fortfahren.',
+    'Installieren: Einstellungen öffnen → ganz oben „Profil geladen“ → Installieren → Code eingeben → Installieren → Fertig.',
+    'Eingerichtet: verschlüsselt (hat am {0} geklappt).', 'Eingerichtet: unverschlüsselt (hat am {0} geklappt).', 'Weiteres iPhone einrichten',
+    'Klappt nicht?', 'Warte auf dein iPhone …', 'Verbunden — verschlüsselt, um {0}.', 'Verbunden — unverschlüsselt, um {0}.',
+    'Dein iPhone hat die verschlüsselte Verbindung abgebrochen ({0}) — meist, weil es dem Zertifikat noch nicht vertraut: Ist das Profil installiert und das Vertrauen eingeschaltet?',
+    'Ein Gerät kam ohne gültigen Zugangscode ({0}) — den QR-Code neu scannen.', 'Der Safari Assistant antwortet nicht — läuft er noch?',
+    'Nur im eigenen WLAN (Starlink, Hotspot) — nicht in Lodge-, Camp- oder Grenz-WLANs. Die Freigabe endet, wenn du den Safari Assistant beendest, und nach {0} h ohne Anfrage vom iPhone.'];
+  const fehler = [];
+  for (const t of texte) if (!idx68.includes(t.replace(/\{0\}.*$/, '').slice(0, 30))) fehler.push('nicht in index.html: ' + t.slice(0, 40));
+  for (const l of SPR64) {
+    if (wb64[l].fehler) { fehler.push(wb64[l].fehler); continue; }
+    const fehlt = texte.filter(t => !hat64(wb64[l].w, kompakt64(t)));
+    if (fehlt.length) fehler.push(`${l}: ${fehlt.length} ohne Übersetzung, z. B. ${JSON.stringify(fehlt[0].slice(0, 60))}`);
+  }
+  return !fehler.length || fehler.join(' | ');
+});
+
+console.log('\n=== 69. NACHRICHTEN AUS RSS-FEEDS NACH THEMEN (2026-10-18-2): amtliche Stellen, je Land eine Zeitung, Stichwortsuche, eigene Quellen ===');
+// Wunsch vom 18.10.2026: RSS-Feeds, die „uns regelmäßig zu wichtigen Themen auf dem Laufenden halten" — vor allem
+// länderspezifisch, nach Themen sortiert, dazu eigene Quellen. Ohne KI: Themen, Länder und „wichtig" per Stichwortliste
+// (EN/DE/PT/FR); das Land, in dem man gerade ist, steht zuerst. Ausgeführte Prüfungen des Servers in test-nachrichten.py.
+const srv69 = loadFile('server.py'), idx69 = loadFile('index.html'), mob69 = loadFile('mobile.html');
+const NB_BLOCK69 = /\/\/ ── NACHRICHTEN \(BYTEIDENTISCH in index\.html und mobile\.html\) ──\n[\s\S]*?\n\}\n(?=\n\/\/ ── SOFORT-PROTOKOLLE OHNE KI)/;
+const SRV_BLOCK69 = /# ── NACHRICHTEN AUS RSS-FEEDS, NACH THEMEN \(2026-10-18-2\)[\s\S]*?(?=# ── SICHERHEIT \(2026-09-05-1\))/;
+const python69 = () => { try { return require('child_process').execSync('command -v python3', { encoding: 'utf8' }).trim(); } catch (e) { return ''; } };
+
+test('NACHRICHTEN (ausgeführt, python3): test-nachrichten.py — kein Abruf ins eigene Netz (auch nicht per Weiterleitung), Abruf bedingt/gzip/mit Größendeckel und gegen Zip-Bomben, RSS 2.0/RDF/Atom/GDACS, Datumsformate, Themen/Länder/wichtig, eigene Quellen, Gesamtabruf mit Doppelten und Offline-Abbruch, iPhone liest nur', () => {
+  const py = python69();
+  if (!py) { console.log('    (python3 nicht gefunden — übersprungen)'); return true; }
+  const t = path.join(__dirname, 'test-nachrichten.py');
+  if (!fs.existsSync(t)) return 'test-nachrichten.py fehlt';
+  const script = fs.readFileSync(t, 'utf8').replace('SERVER_PFAD', JSON.stringify(path.join(__dirname, 'server.py')));
+  try {
+    const out = require('child_process').execSync(py + ' -', { input: script, encoding: 'utf8', timeout: 150000 }).trim();
+    return out.split('\n').pop().startsWith('OK') || out.split('\n').pop();
+  } catch (e) {
+    return ((e.stdout || '').toString().trim().split('\n').pop()) || e.message;
+  }
+});
+
+test('NACHRICHTEN (ausgeführt, python3): 50 eingebaute Quellen — GDACS + CDC, je Routen-Land das FCDO (Ersatzthema Einreise), eine Zeitung (nur passende Meldungen) und die Stichwortsuche bei Google News (als ungeprüft markiert); nur https, Kennungen eindeutig, Themen gültig', () => {
+  const py = python69();
+  if (!py) { console.log('    (python3 nicht gefunden — übersprungen)'); return true; }
+  const skript = ['import sys, json, importlib.util', 'sys.dont_write_bytecode = True', "sys.argv = ['server.py']",
+    `spec = importlib.util.spec_from_file_location('srv', ${JSON.stringify(path.join(__dirname, 'server.py'))})`,
+    'm = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)',
+    "print(json.dumps({'quellen': m.NACHRICHTEN_QUELLEN, 'laender': sorted(m.LAND_NAME), 'themen': m.THEMEN_IDS}))"].join('\n');
+  let d;
+  try { d = JSON.parse(require('child_process').execSync(py + ' -', { input: skript, encoding: 'utf8', timeout: 60000 }).trim().split('\n').pop()); }
+  catch (e) { return 'server.py nicht ladbar: ' + ((e.stderr || '').toString().trim().split('\n').pop() || e.message); }
+  const q = d.quellen, fehler = [];
+  if (q.length !== 50) fehler.push(`${q.length} statt 50 Quellen`);
+  if (d.laender.length !== 16) fehler.push(`${d.laender.length} statt 16 Länder`);
+  const ids = q.map(x => x.id);
+  if (new Set(ids).size !== ids.length) fehler.push('doppelte Kennung');
+  q.filter(x => !/^https:\/\/[a-z0-9.-]+\//.test(x.url)).forEach(x => fehler.push(x.id + ': keine https-Adresse'));
+  q.filter(x => (x.thema && !d.themen.includes(x.thema)) || (x.ersatz && !d.themen.includes(x.ersatz))).forEach(x => fehler.push(x.id + ': unbekanntes Thema'));
+  const nach = Object.fromEntries(q.map(x => [x.id, x]));
+  for (const [id, thema] of [['gdacs', 'natur'], ['cdc', 'gesundheit']]) {
+    const x = nach[id];
+    if (!x || x.art !== 'amtlich' || x.thema !== thema || !x.nur_route) fehler.push(id + ' fehlt oder ist falsch eingestellt');
+  }
+  for (const c of d.laender) {
+    const k = c.toLowerCase(), f = nach['fcdo-' + k], z = nach['zeitung-' + k], g = nach['gnews-' + k];
+    if (!f || f.art !== 'amtlich' || f.land !== c || f.ersatz !== 'einreise' || !/^https:\/\/www\.gov\.uk\/foreign-travel-advice\/[a-z-]+\.atom$/.test(f.url)) fehler.push(c + ': FCDO-Quelle fehlt oder falsch');
+    if (!z || z.art !== 'zeitung' || z.land !== c || z.filter !== true || z.geprueft !== true) fehler.push(c + ': Zeitung fehlt oder ohne Filter');
+    if (!g || g.art !== 'suche' || g.land !== c || g.filter !== true || g.geprueft !== false || !g.url.startsWith('https://news.google.com/rss/search?')) fehler.push(c + ': Stichwortsuche fehlt oder nicht als ungeprüft markiert');
+  }
+  return !fehler.length || fehler.slice(0, 6).join(' | ');
+});
+
+test('NACHRICHTEN (server): GET /api/nachrichten auch vom iPhone, /api/nachrichten/quellen nur vom Mac, jeder POST unter /api/nachrichten/ im Mutations-Gate VOR den Routen; Speicher im Home (privat, atomar), Wache gestartet; keine KI und keine Entity-Deklarationen', () => {
+  if (!srv69) return 'server.py fehlt';
+  const gate = "if path.startswith('/api/nachrichten/'):\n            ok, grund = self.mutation_erlaubt()\n            if not ok:\n                self._error(403, grund)\n                return";
+  const need = ["if path == '/api/nachrichten':\n            self._json(nachrichten_antwort())",
+    "if path == '/api/nachrichten/quellen':\n            if not ist_loopback(self.client_ip()):\n                self._error(403,", gate,
+    "NACHRICHTEN_DATEI = Path.home() / '.safari-assistant-nachrichten.json'", "FEEDS_DATEI = Path.home() / '.safari-assistant-feeds.json'",
+    '_schreibe_privat_atomar(NACHRICHTEN_DATEI, json.dumps(', '_schreibe_privat_atomar(FEEDS_DATEI, json.dumps(',
+    "if _re.search(rb'<!ENTITY', daten, _re.I):", '    starte_nachrichten_wache()\n'];
+  const miss = need.filter(n => !srv69.includes(n));
+  if (miss.length) return 'fehlt: ' + miss.map(n => n.split('\n')[0]).join(' | ');
+  const iGate = srv69.indexOf(gate), iPost = srv69.indexOf('def do_POST(self');
+  if (iPost < 0 || iGate < iPost) return 'Mutations-Gate nicht in do_POST';
+  const routen = ["if path == '/api/nachrichten/aktualisieren':", "if path in ('/api/nachrichten/quelle', '/api/nachrichten/quelle/loeschen', '/api/nachrichten/quelle/schalten',"];
+  if (routen.some(r => srv69.indexOf(r) < iGate)) return 'eine Nachrichten-Route steht vor dem Mutations-Gate';
+  const block = srv69.match(SRV_BLOCK69);
+  if (!block) return 'Nachrichten-Block fehlt';
+  if (/OLLAMA_|11434|anthropic\.com|ANTHROPIC|\/api\/(?:chat|generate)\b/.test(block[0])) return 'der Nachrichten-Block ruft eine KI';
+  // Länderzuordnung in allen vier Sprachen, wichtig nur für ernste Lagen (Beispiele aus jeder Sprache)
+  const woerter = ['moçambique', 'zambie', 'sambia', 'áfrica do sul', 'afrique du sud'];
+  const fehlt = woerter.filter(w => !block[0].includes(`'${w}'`));
+  return !fehlt.length || 'Länderwörter fehlen: ' + fehlt.join(', ');
+});
+
+test('NACHRICHTEN (Oberfläche): gemeinsamer Block BYTEIDENTISCH in index.html und mobile.html (vor den Sofort-Protokollen, außerhalb des Reisewarn-Blocks); Mac: 📰 in der Notfall-Gruppe mit Abzeichen, „Quellen" und „Jetzt holen"; iPhone: 📰 in der Modul-Leiste mit Zahl der neuen wichtigen Meldungen, liest nur (keine Route unter /api/nachrichten/)', () => {
+  if (!idx69 || !mob69) return 'Datei fehlt';
+  const a = idx69.match(NB_BLOCK69), b = mob69.match(NB_BLOCK69);
+  if (!a || !b) return 'Block fehlt in ' + (!a ? 'index.html' : 'mobile.html');
+  if (a[0] !== b[0]) return 'Block nicht byteidentisch';
+  const need = ["const NACHRICHTEN_KEY = 'safari-nachrichten';", 'function nachrichtEsc(s) {', 'function nachrichtenCache() {',
+    'async function ladeNachrichten(serverUrl) {', 'function nachrichtenGruppieren(c, opt) {', 'function nachrichtenZaehlen(c, opt) {',
+    'function nachrichtHtml(e, c, gesehenBis) {', 'function nachrichtenListeHtml(c, gruppen, opt) {'];
+  const miss = need.filter(n => !a[0].includes(n));
+  if (miss.length) return 'Block: fehlt ' + miss.join(' | ');
+  const code = a[0].split('\n').filter(z => !/^\s*\/\//.test(z)).join('\n');   // ohne Kommentarzeilen
+  if (/escHtml|\.innerHTML|DARK_I18N/.test(code)) return 'Block nutzt escHtml/innerHTML/i18n — Feed-Text muss mit nachrichtEsc maskiert werden';
+  // nicht im Reisewarn-Block (der ist zusätzlich mit pois.html byteidentisch)
+  const rw = idx69.match(/\/\/ ── REISEWARNUNGEN \(BYTEIDENTISCH[\s\S]*?\n\}\n(?=\n\/\/ ── POSITION)/);
+  if (rw && rw[0].includes('NACHRICHTEN')) return 'Nachrichten-Block steht im Reisewarn-Block';
+  const iNav = idx69.indexOf('data-module="nachrichten"'), iRw = idx69.indexOf('data-module="reisewarnungen"');
+  if (iNav < 0 || iRw < 0 || iNav < iRw) return 'Navigationseintrag nicht nach den Reisewarnungen';
+  const needIdx = ['id="nachrichten-badge"', 'id="panel-nachrichten"', 'id="nachrichten-quellen-knopf"', 'onclick="nachrichtenAktualisieren()"',
+    "if (mod === 'nachrichten') { nachrichtenAnsicht.gesehenBis = null; renderNachrichten(); }", 'setInterval(ladeNachrichtenStart, 10 * 60 * 1000);',
+    "getServerUrl() + '/api/nachrichten/quellen'", "nachrichtenPost('/api/nachrichten/aktualisieren'", "nachrichtenPost('/api/nachrichten/quelle'",
+    "nachrichtenPost('/api/nachrichten/pruefen'", "nachrichtenPost('/api/nachrichten/quelle/loeschen'", "nachrichtenPost('/api/nachrichten/quelle/schalten'"];
+  const missIdx = needIdx.filter(n => !idx69.includes(n));
+  if (missIdx.length) return 'index.html: fehlt ' + missIdx.join(' | ');
+  const needMob = ['onclick="openNachrichten()"', 'id="nachrichten-overlay"', 'function renderNachrichtenMobil() {', 'ladeNachrichten(SERVER_URL)',
+    'id="m-nachrichten-badge"', 'function zeigeNachrichtenBadgeMobil() {', 'e.kritisch && (Number(e.gesehen) || 0) > bis'];
+  const missMob = needMob.filter(n => !mob69.includes(n));
+  if (missMob.length) return 'mobile.html: fehlt ' + missMob.join(' | ');
+  return !/\/api\/nachrichten\//.test(mob69) || 'mobile.html ruft eine Verwaltungs-Route';
+});
+
+test('NACHRICHTEN (ausgeführt): nachrichtenGruppieren — Themen in der Reihenfolge des Servers, jede Meldung unter ihrem ersten Thema, gewähltes Thema zeigt alle mit diesem Thema; wichtige zuerst, dann das aktuelle Land, dann die neuesten; Filter Land / nur wichtige; Zähler passen zur Liste', () => {
+  const blk = idx69 && idx69.match(NB_BLOCK69);
+  if (!blk) return 'Block fehlt';
+  const speicher = new Map();
+  const ls = { getItem: k => (speicher.has(k) ? speicher.get(k) : null), setItem: (k, v) => speicher.set(k, String(v)) };
+  const N = new Function('localStorage', blk[0] + '\nreturn { nachrichtenGruppieren, nachrichtenZaehlen, nachrichtenCache, nachrichtenGesehenBis, nachrichtenAlsGesehen };')(ls);
+  const c = {
+    themen: [{ id: 'sicherheit', name: 'Sicherheit', icon: '🛡️' }, { id: 'treibstoff', name: 'Treibstoff & Versorgung', icon: '⛽' }, { id: 'sonstiges', name: 'Weitere Meldungen', icon: '📰' }],
+    laender: { MW: 'Malawi', ZM: 'Sambia' },
+    eintraege: [
+      { id: 'a', titel: 'A', zeit: 100, themen: ['treibstoff'], laender: ['MW'] },
+      { id: 'b', titel: 'B', zeit: 300, themen: ['treibstoff', 'sicherheit'], laender: ['ZM'] },
+      { id: 'c', titel: 'C', zeit: 50, themen: ['treibstoff'], laender: ['ZM'], kritisch: true },
+      { id: 'd', titel: 'D', zeit: 200, themen: ['sicherheit'], laender: ['MW'] },
+      { id: 'e', titel: 'E', zeit: 400, themen: [], laender: [] },
+      { id: 'f', titel: '', zeit: 500, themen: ['sicherheit'], laender: ['MW'] }
+    ]
+  };
+  const kurz = g => g.map(x => x.thema.id + ':' + x.eintraege.map(e => e.id).join('')).join(' ');
+  const faelle = [
+    [{}, 'sicherheit:d treibstoff:cba sonstiges:e'],
+    [{ hier: 'MW' }, 'sicherheit:d treibstoff:cab sonstiges:e'],
+    [{ thema: 'sicherheit' }, 'sicherheit:bd'],
+    [{ land: 'ZM' }, 'treibstoff:cb'],
+    [{ nurWichtig: true }, 'treibstoff:c'],
+    [{ thema: 'gibtsnicht' }, ''],
+    [{ land: 'KE' }, '']
+  ];
+  const fehler = faelle.filter(([o, soll]) => kurz(N.nachrichtenGruppieren(c, o)) !== soll)
+    .map(([o, soll]) => `${JSON.stringify(o)} → ${JSON.stringify(kurz(N.nachrichtenGruppieren(c, o)))} statt ${JSON.stringify(soll)}`);
+  const z = N.nachrichtenZaehlen(c, {});
+  if (z.treibstoff !== 3 || z.sicherheit !== 2 || z.sonstiges) fehler.push('Zähler ' + JSON.stringify(z));
+  // Zähler je Thema = Länge der Liste, wenn man das Thema wählt
+  for (const t of ['sicherheit', 'treibstoff']) {
+    const g = N.nachrichtenGruppieren(c, { thema: t });
+    if ((g[0] ? g[0].eintraege.length : 0) !== z[t]) fehler.push(`Zähler ${t} passt nicht zur Liste`);
+  }
+  if (kurz(N.nachrichtenGruppieren(null, {})) !== '' || kurz(N.nachrichtenGruppieren({ eintraege: [{ titel: 'x', themen: ['a'] }] }, {})) !== '') fehler.push('ohne Themen nicht leer');
+  speicher.set('safari-nachrichten', '{kaputt');
+  if (N.nachrichtenCache() !== null) fehler.push('kaputter Speicher nicht abgefangen');
+  speicher.set('safari-nachrichten', JSON.stringify({ eintraege: [] }));
+  if (!N.nachrichtenCache()) fehler.push('gültiger Speicher nicht gelesen');
+  N.nachrichtenAlsGesehen();
+  if (Math.abs(N.nachrichtenGesehenBis() - Date.now() / 1000) > 5) fehler.push('„gesehen" nicht in Sekunden gespeichert');
+  return !fehler.length || fehler.join(' | ');
+});
+
+test('NACHRICHTEN (ausgeführt): nachrichtHtml/nachrichtenListeHtml maskieren Titel, Anriss, Quelle, Land und Thema, lassen nur http(s)-Links zu (kein javascript:), öffnen extern mit noopener, Feed-Text nie übersetzt (data-i18n-skip); „Alle … zeigen" nur mit gültigem Funktionsnamen und gültiger Themen-Kennung', () => {
+  const blk = idx69 && idx69.match(NB_BLOCK69);
+  if (!blk) return 'Block fehlt';
+  const N = new Function('localStorage', blk[0] + '\nreturn { nachrichtHtml, nachrichtenListeHtml };')({ getItem: () => null, setItem: () => {} });
+  const c = { themen: [{ id: 'sicherheit', name: '<b>Sicherheit</b>', icon: '🛡️' }], laender: { MW: 'Malawi<i>' } };
+  const fehler = [];
+  const boese = { titel: '<img src=x onerror=alert(1)>', text: '<script>alert(2)</script>', quelle_name: '"><svg onload=alert(3)>',
+    link: 'javascript:alert(4)', laender: ['MW', '<u>'], themen: ['x', 'sicherheit'], zeit: Math.floor(Date.now() / 1000) - 7200, gesehen: 10 };
+  const h = N.nachrichtHtml(boese, c, 5);
+  if (/<img|<script|<svg|<b>|<i>|<u>/i.test(h)) fehler.push('Fremdtext unmaskiert');
+  if (/href=/.test(h)) fehler.push('javascript:-Link wird verlinkt');
+  if (!h.includes('&lt;img src=x onerror=alert(1)&gt;') || !h.includes('&quot;&gt;&lt;svg')) fehler.push('Titel/Quelle nicht maskiert angezeigt');
+  if (!h.includes('<span data-i18n-skip>&lt;img') || !/<div data-i18n-skip[^>]*>&lt;script/.test(h)) fehler.push('Titel/Anriss nicht von der Übersetzung ausgenommen');
+  if (!h.includes('>Neu<')) fehler.push('„Neu" fehlt, obwohl nach dem letzten Öffnen geholt');
+  if (N.nachrichtHtml(Object.assign({}, boese, { gesehen: 3 }), c, 5).includes('>Neu<')) fehler.push('„Neu" bei schon gesehener Meldung');
+  if (!h.includes('vor 2 h')) fehler.push('Zeit fehlt');
+  const gut = N.nachrichtHtml({ titel: 'T', link: 'https://example.org/a?x="1"&y=2', laender: [], themen: [], kritisch: true }, c, 0);
+  if (!gut.includes('href="https://example.org/a?x=&quot;1&quot;&amp;y=2"') || !gut.includes('target="_blank" rel="noopener noreferrer"')) fehler.push('https-Link nicht sicher verlinkt');
+  if (!gut.includes('>Wichtig<')) fehler.push('„Wichtig" fehlt');
+  if (N.nachrichtHtml({ titel: 'T', link: ' JAVASCRIPT:alert(1)' }, c, 0).includes('href=')) fehler.push('javascript: mit Leerzeichen verlinkt');
+  // Liste: Kopf maskiert, „Alle … zeigen"
+  const eintraege = [1, 2, 3].map(i => ({ titel: 'M' + i, themen: ['sicherheit'], gesehen: i }));
+  const g = [{ thema: c.themen[0], eintraege }];
+  const l1 = N.nachrichtenListeHtml(c, g, { max: 2, mehr: 'nachrichtenMehr', gesehenBis: 1 });
+  if (/<b>Sicherheit/.test(l1)) fehler.push('Themenname unmaskiert');
+  if (!l1.includes(`onclick="nachrichtenMehr('sicherheit')"`) || !l1.includes('Alle 3 zeigen') || l1.includes('M3')) fehler.push('„Alle 3 zeigen" fehlt oder zeigt zu viel');
+  if (!l1.includes('>2 neu<')) fehler.push('Zahl der neuen Meldungen fehlt');
+  const l2 = N.nachrichtenListeHtml(c, g, { max: 2, mehr: 'nachrichtenMehr', offen: { sicherheit: true } });
+  if (!l2.includes('Weniger zeigen') || !l2.includes('M3')) fehler.push('aufgeklappt nicht alle Meldungen');
+  if (N.nachrichtenListeHtml(c, g, { max: 2, mehr: 'alert(1)//' }).includes('<button')) fehler.push('beliebiger Funktionsname im onclick');
+  if (N.nachrichtenListeHtml(c, [{ thema: { id: "x');alert(1);//", name: 'X', icon: '' }, eintraege }], { max: 2, mehr: 'nachrichtenMehr' }).includes('<button')) fehler.push('Themen-Kennung ungeprüft im onclick');
+  return !fehler.length || fehler.join(' | ');
+});
+
+test('NACHRICHTEN (i18n, ausgeführt über i18n.js): jeder neue Text — Bereich, Filter, Quellen-Formular, Themen, Status- und Fehlermeldungen des Servers, auch mit Zahlen und Emoji davor — ist in en, fr UND es übersetzt, ohne deutsche Reste', () => {
+  if (!i18n64 || !srv69) return 'Datei fehlt';
+  const block = srv69.match(SRV_BLOCK69);
+  if (!block) return 'Nachrichten-Block fehlt';
+  // Meldungen des Servers aus dem Quelltext: Fehler (raise ValueError), Gründe der Adressprüfung, feste Themennamen
+  const ausServer = [...new Set([
+    ...[...block[0].matchAll(/raise ValueError\('([^'{}]+)'\)/g)].map(m => m[1]),
+    ...[...block[0].matchAll(/^\s+return '([A-ZÄÖÜ][^'{}]{3,})'$/gm)].map(m => m[1]),
+    ...[...block[0].matchAll(/^\s+grund = '([^'{}]+)'$/gm)].map(m => m[1]),
+    ...[...block[0].matchAll(/\{'id': '[a-z]+', 'name': '([^']+)', 'icon'/g)].map(m => m[1])])];
+  if (ausServer.length < 25) return `nur ${ausServer.length} Servertexte gefunden — Muster veraltet?`;
+  const texte = ausServer.concat([
+    // Mac
+    '📰 Nachrichten', 'Nach Themen — offline lesbar', 'Meldungen aus RSS-Feeds, nach Themen — die Zahl zählt neue wichtige Meldungen',
+    'Quellen', 'Meldungen', 'Jetzt holen', 'Wichtig', 'Neu', '3 neu', '1 neu', 'Alle 12 zeigen', 'Weniger zeigen', 'Stand: noch nie abgerufen',
+    'Stand: 18 Oct 2026, 20:15 (vor 2 h)', '38 von 50 Quellen erreichbar', '12 mit Fehler', 'Abruf läuft …',
+    'Der Assistent holt die Feeds automatisch alle 6 Stunden, sobald der Mac online ist, und behält Meldungen 30 Tage.',
+    'Themen und Länder ordnet eine feste Stichwortliste zu, keine KI — eine Meldung kann deshalb auch im falschen Thema landen. Titel und Anriss stammen unverändert von der Quelle; für Entscheidungen den Originalartikel lesen.',
+    'Alle Länder', '📍 Simbabwe', 'Nur wichtige', 'Alle Themen', '🛡️ Sicherheit', 'vor 3 Tagen',
+    'Noch keine Meldungen. Der Assistent holt die Feeds, sobald der Mac online ist — oder jetzt mit „Jetzt holen“.',
+    'Keine Meldungen für diese Auswahl.', 'Nachrichten werden geholt …', 'Nachrichten aktualisiert', 'Nachrichten: HTTP 403',
+    'Abruf läuft noch — die Anzeige aktualisiert sich beim nächsten Öffnen.',
+    // Quellen
+    'Amtliche Stellen', 'Zeitungen — eine je Land', 'Stichwortsuche bei Google News', 'Eigene Quellen', '3 von 16 an',
+    'Inoffizielle Suche, von Google nicht dokumentiert, nur für den privaten Gebrauch. Die Links führen über news.google.com.',
+    'Von Zeitungen bleibt nur, was zu einem Thema passt. Wo es keinen erreichbaren Zeitungs-Feed gab, kommt der Länder-Feed von AllAfrica.',
+    'Noch keine — oben hinzufügen (höchstens 40).', 'abgeschaltet', 'unverändert seit dem letzten Abruf', '25 passende von 40 Meldungen', '1 passende von 40 Meldungen', 'Feed gefunden: 25 Meldungen, davon 1 passend',
+    'noch nicht abgerufen', 'Adresse ungeprüft', 'Wird geprüft …', 'Feed gefunden: 25 Meldungen, davon 4 passend', 'Neueste Meldung:',
+    'Davon passt gerade keine Meldung (Land, Thema oder Alter).',
+    'Keine Meldung passt zu einem Thema. Ohne den Haken bei „Nur Meldungen übernehmen, die zu einem Thema passen“ kämen sie unter „Weitere Meldungen“ — oder ein Thema fest wählen.',
+    'Prüfen', 'Entfernen', 'An oder aus', 'Eigene Quelle hinzufügen', 'Feed-Adresse', 'Land', 'Thema', 'Kein bestimmtes Land',
+    'Automatisch nach Stichwörtern', 'z. B. Blog einer Overland-Reisenden', 'Nur Meldungen übernehmen, die zu einem Thema passen',
+    'Ohne Haken landet alles, was zu keinem Thema passt, unter „Weitere Meldungen“. Ein fest gewähltes Thema gilt für alle Meldungen der Quelle. Viele Webseiten haben ihren Feed unter /feed/ oder /rss.',
+    'Hinzufügen', 'Quellen werden geladen …', 'Quellen:',
+    'Feeds holt der Mac selbst; das iPhone zeigt die Meldungen nur an. Abgeschaltete Quellen werden nicht mehr geholt, ihre Meldungen verschwinden aus der Liste.',
+    'Adressen im eigenen Netz (localhost, .local, private IP-Adressen) holt der Assistent nicht — auch nicht über eine Weiterleitung. Gespeichert werden nur Titel, ein kurzer Anriss und der Link.',
+    'Bitte zuerst eine Feed-Adresse eintragen.', 'Quelle hinzugefügt — sie wird gleich abgerufen.', 'Quelle: Diese Adresse ist schon eingetragen.',
+    'Diese eigene Quelle entfernen? Ihre Meldungen verschwinden aus der Liste.',
+    // iPhone
+    'Nachrichten nach Themen', 'Nachrichten nach Themen — die Zahl zählt neue wichtige Meldungen', 'Letzter Abruf am Mac:', 'noch keiner', 'Noch keine Meldungen. Der Mac holt sie, sobald er online ist.',
+    'Themen und Länder ordnet eine feste Stichwortliste zu, keine KI. Titel und Anriss stammen unverändert von der Quelle; für Entscheidungen den Originalartikel lesen. Die Quellen verwaltest du am Mac.',
+    // Server mit Werten
+    'Abruf abgeschlossen: 38 Quellen erreicht, 12 mit Fehler, 41 neue Meldungen.', 'Abruf abgeschlossen: 50 Quellen erreicht, 7 neue Meldungen.',
+    'Keine Quelle erreichbar — vermutlich offline. Der letzte Stand bleibt gespeichert.', 'Keine aktive Quelle.',
+    'HTTP 404 — nicht gefunden', 'HTTP 403 — Zugriff verweigert', 'HTTP 410 — entfernt', 'HTTP 429 — zu viele Anfragen',
+    'HTTP 500 — Fehler beim Anbieter', 'HTTP 503 — Anbieter nicht erreichbar', 'Name nicht auflösbar — offline?',
+    'Verschlüsselung fehlgeschlagen (Zertifikat?)', 'Weiterleitung abgelehnt: Das Ziel liegt im eigenen Netz.',
+    'Weiterleitung abgelehnt: Nur http- und https-Adressen.', 'Feed größer als 3 MB.', 'Feed größer als 3 MB (entpackt).',
+    'Höchstens 40 eigene Quellen.', 'Nur vom Mac selbst abrufbar.', 'Ungültige Kennung.']);
+  // Wörter, die in einer Übersetzung nicht mehr stehen dürfen
+  const DEUTSCH = /(?:^|[^\p{L}])(?:Quellen?|Meldung(?:en)?|nicht|und|mit|von|Fehler|Abruf|neue?|zeigen|Weniger|Länder|Themen?|holt|eigenen?|Ziel|Stunden|Tagen?|Zeitungen?|wichtige?|Haken|Stichw\w+|Prüfen|Entfernen|Hinzufügen|gefunden|keine?)(?![\p{L}])/u;
+  const fehler = [];
+  for (const l of SPR64) {
+    const sb = i18nSandbox64(JSON.stringify(l));
+    sb.ladeWb(l);
+    const t = sb.ctx.DARK_I18N.t;
+    const falsch = texte.filter(s => { const r = t(s); return r === s.trim() || DEUTSCH.test(r); });
+    if (falsch.length) fehler.push(`${l}: ${falsch.length} ohne (vollständige) Übersetzung, z. B. ${JSON.stringify(falsch[0].slice(0, 50))} → ${JSON.stringify(t(falsch[0]).slice(0, 60))}`);
+  }
+  return !fehler.length || fehler.join(' | ');
+});
+
+console.log('\n=== 70. VPN-PRÜFUNG (2026-10-30-1, Anbieter-Erkennung Mullvad 2026-11-02-1): online mit oder ohne VPN — deutlich am Mac und am iPhone ===');
+// Wunsch vom 30.10.2026: „deutlich (!) darstellen, wenn ich online bin und EINE aktive VPN-Verbindung habe bzw. KEINE".
+// Das VPN läuft am Reiserouter; server.py misst von außen, mit welcher Adresse und über welches Netz (AS) der Mac ins
+// Internet geht — IPv4 und IPv6 getrennt — und vergleicht mit den gemerkten Netzen des VPNs. Ausgeführte Prüfungen
+// des Servers in test-vpn.py; hier Routen, Anzeige (ausgeführt mit Attrappen-DOM), Escaping und Übersetzungen.
+const srv70 = loadFile('server.py'), idx70 = loadFile('index.html'), mob70 = loadFile('mobile.html');
+const VPN_BLOCK70 = /\/\/ ── VPN-ANZEIGE \(BYTEIDENTISCH in index\.html und mobile\.html\) ──\n[\s\S]*?\n\/\/ ── ENDE VPN-ANZEIGE ──\n/;
+const VPN_MAC70 = /\/\/ ── VPN-PRÜFUNG am Mac \(2026-10-30-1\)[\s\S]*?(?=\/\/ ── NACHRICHTEN: Bereich am Mac)/;
+const VPN_MOB70 = /\/\/ ── VPN-PRÜFUNG am iPhone \(2026-10-30-1\)[\s\S]*?(?=\/\/ ── NACHRICHTEN am iPhone)/;
+const VPN_SRV70 = /# ── VPN-PRÜFUNG \(2026-10-30-1\)[\s\S]*?(?=\nclass SafariHandler\()/;
+const python70 = () => { try { return require('child_process').execSync('command -v python3', { encoding: 'utf8' }).trim(); } catch (e) { return ''; } };
+// Attrappen-DOM: nur getElementById und die Felder, die die VPN-Anzeige anfasst
+function vpnDom70(ids) {
+  const els = {};
+  for (const id of ids) els[id] = { id, textContent: '', innerHTML: '', className: '', title: '', value: '', style: { display: 'none' }, scrollIntoView() {} };
+  return { els, document: { title: 'Safari Assistant', getElementById: id => els[id] || null, addEventListener() {} } };
+}
+const WEG70 = (familie, asn, name, land, vpn, zugang = '') => ({ familie, asn, name, land, land_app: '', vpn, zugang, ip: familie === 'IPv4' ? '8.8.4.4' : '2c0f::1' });
+
+test('VPN (ausgeführt, python3): test-vpn.py — grün nur mit Beleg (jeder Weg im gemerkten Netz), Leck IPv4/IPv6, Starlink nie VPN, alte Messung/Netzwechsel → „pruefe", Datei 0600 ohne Adressen, Merken nur für aktuelle Ausgänge, echte https-Messung (Familie erzwungen, Zertifikat, private/falsche Adresse, Weiterleitung, Ersatzdienst, IPv6), Anmeldeseite, RIPEstat mit Zwischenspeicher, Wache nur bei Bedarf, iPhone liest nur', () => {
+  const py = python70();
+  if (!py) { console.log('    (python3 nicht gefunden — übersprungen)'); return true; }
+  const t = path.join(__dirname, 'test-vpn.py');
+  if (!fs.existsSync(t)) return 'test-vpn.py fehlt';
+  const script = fs.readFileSync(t, 'utf8').replace('SERVER_PFAD', JSON.stringify(path.join(__dirname, 'server.py')));
+  try {
+    const out = require('child_process').execSync(py + ' -', { input: script, encoding: 'utf8', timeout: 150000 }).trim();
+    return out.split('\n').pop().startsWith('OK') || out.split('\n').pop();
+  } catch (e) {
+    return ((e.stdout || '').toString().trim().split('\n').pop()) || e.message;
+  }
+});
+
+test('VPN (server): Stand unter GET /api/vpn/status auch fürs iPhone (dann ohne Adressen), jeder POST unter /api/vpn/ im Mutations-Gate, Wache gestartet, Datei im Home, nur https mit Systemzertifikaten — die Anmeldeseite (http) nur, wenn kein Weg ging; server.py und test-vpn.py laufen mit Python 3.9 (macOS)', () => {
+  if (!srv70) return 'server.py fehlt';
+  const blk = srv70.match(VPN_SRV70);
+  if (!blk) return 'VPN-Block fehlt (vor class SafariHandler)';
+  const need = ["VPN_DATEI = Path.home() / '.safari-assistant-vpn.json'", 'import http.client',
+    "if path == '/api/vpn/status':\n            self._json(vpn_status(fuer_mac=ist_loopback(self.client_ip())))",
+    "        if path.startswith('/api/vpn/'):\n            ok, grund = self.mutation_erlaubt()\n            if not ok:\n                self._error(403, grund)\n                return\n",
+    "if path == '/api/vpn/pruefen':", "if path in ('/api/vpn/merken', '/api/vpn/vergessen', '/api/vpn/einstellungen', '/api/vpn/anbieter'):",
+    "def vpn_anbieter_pruefen(name, ip, familie):", "def vpn_anbieter_einstellen(name, an):", "VPN_ANBIETER = {'mullvad': {'name': 'Mullvad'",
+    "d.get(a['feld']) is True and _vpn_adresse(d.get('ip'), familie) == ip",
+    '    starte_nachrichten_wache()\n    starte_vpn_wache()\n'];
+  const miss = need.filter(n => !srv70.includes(n));
+  if (miss.length) return 'fehlt: ' + miss.map(m => JSON.stringify(m.slice(0, 60))).join(' | ');
+  const b = blk[0];
+  if (/CERT_NONE|check_hostname\s*=\s*False|_create_unverified_context/.test(b)) return 'Zertifikatsprüfung abgeschaltet';
+  if (!/def vpn_ssl_kontext\(\):\n    return ssl\.create_default_context\(\)/.test(b)) return 'Kontext nicht der Systemstandard';
+  if (!/VPN_RIPE_NETZ = 'https:\/\/stat\.ripe\.net\//.test(b) || !/VPN_RIPE_NAME = 'https:\/\/stat\.ripe\.net\//.test(b)) return 'RIPEstat nicht über https';
+  if ((b.match(/http\.client\.HTTPConnection\(/g) || []).length !== 1 || !b.includes('captive = vpn_anmeldung_noetig() if not ausgaenge else None')) return 'unverschlüsselte Anfrage außerhalb der Anmeldeseiten-Prüfung';
+  if (!/fuer_mac:\s+# Adressen nur am Mac selbst/.test(b)) return 'Adressen nicht auf den Mac beschränkt';
+  // Anbieter-Erkennung (2026-11-02-1): Abfrage nur über _vpn_holen (https, Systemzertifikate, erzwungene Familie), Hosts fest im Code
+  if (!/def vpn_anbieter_pruefen\(name, ip, familie\):[\s\S]*?_vpn_holen\([\s\S]*?\n\n\n/.test(b)) return 'Anbieter-Abfrage nicht über _vpn_holen (https mit Zertifikatsprüfung)';
+  if (!/'hosts': \{socket\.AF_INET: 'ipv4\.am\.i\.mullvad\.net', socket\.AF_INET6: 'ipv6\.am\.i\.mullvad\.net'\}/.test(b)) return 'Mullvad-Hosts nicht fest im Code';
+  if (/https?:\/\/[^'"\s]*mullvad/.test(b.replace(/#.*$/gm, ''))) return 'Mullvad-Adresse als URL im Code (Abfrage nur über feste Hosts)';
+  const py = python70();
+  if (!py) return true;
+  const skript = 'import ast, sys\nfor p in sys.argv[1:]:\n    ast.parse(open(p, encoding="utf-8").read().replace("SERVER_PFAD", "None"), p, feature_version=(3, 9))\nprint("OK")';
+  try {
+    const out = require('child_process').execFileSync(py, ['-c', skript, path.join(__dirname, 'server.py'), path.join(__dirname, 'test-vpn.py')], { encoding: 'utf8', timeout: 30000 }).trim();
+    return out === 'OK' || out;
+  } catch (e) { return 'Python-3.9-Syntax: ' + ((e.stderr || '').toString().trim().split('\n').pop() || e.message); }
+});
+
+test('VPN (Oberfläche): gemeinsamer Block BYTEIDENTISCH in index.html und mobile.html; Mac: Kachel oben in der Seitenleiste, rotes Band über allen Bereichen, Bereich in ⚙️ Einstellungen, Stand alle 10 s; iPhone: Leiste unter der Modulleiste, alle 15 s, nur lesen (keine Route unter /api/vpn/ außer dem Stand)', () => {
+  if (!idx70 || !mob70) return 'Datei fehlt';
+  const a = idx70.match(VPN_BLOCK70), b = mob70.match(VPN_BLOCK70);
+  if (!a || !b) return 'Block fehlt in ' + (!a ? 'index.html' : 'mobile.html');
+  if (a[0] !== b[0]) return 'Block nicht byteidentisch';
+  const code = a[0].split('\n').filter(z => !/^\s*\/\//.test(z)).join('\n');
+  if (/escHtml|\.innerHTML|DARK_I18N\.t\(/.test(code)) return 'Block nutzt escHtml/innerHTML/i18n.t — Netznamen müssen mit vpnEsc maskiert werden';
+  const needIdx = ['id="vpn-kachel"', 'onclick="oeffneVpnEinstellungen()"', 'id="vpn-band"', 'role="alert"', 'onclick="vpnBandAusblenden()"',
+    'id="vpn-einstellungen"', 'id="vpn-takt"', 'onclick="vpnSchalten()"', 'id="vpn-wege"', 'id="vpn-gemerkt"', 'vpnStart();',
+    'setInterval(ladeVpnStatus, 10000);', "getServerUrl() + '/api/vpn/status'", "vpnPost('/api/vpn/pruefen'", "vpnPost('/api/vpn/merken'",
+    "vpnPost('/api/vpn/vergessen'", "vpnPost('/api/vpn/einstellungen'", "vpnPost('/api/vpn/anbieter'", 'id="vpn-anbieter"', 'async function vpnAnbieterSchalten(id, an) {', "if (mod === 'settings') { loadSettings(); vpnEinstGezeigt = ''; renderVpnEinstellungen(); }"];
+  const missIdx = needIdx.filter(n => !idx70.includes(n));
+  if (missIdx.length) return 'index.html: fehlt ' + missIdx.join(' | ');
+  // Kachel direkt unter dem Logo (vor der Navigation), Band als erstes in .main (vor allen Bereichen)
+  const iLogo = idx70.indexOf('<div class="logo">'), iK = idx70.indexOf('id="vpn-kachel"'), iNav = idx70.indexOf('<div class="nav-section">');
+  if (!(iLogo < iK && iK < iNav)) return 'Kachel nicht zwischen Logo und Navigation';
+  const iMain = idx70.indexOf('<div class="main">'), iBand = idx70.indexOf('id="vpn-band"'), iPanel = idx70.indexOf('<div class="panel', iMain);
+  if (!(iMain < iBand && iBand < iPanel)) return 'Band nicht vor den Bereichen';
+  const needMob = ['id="vpn-leiste"', 'onclick="vpnLeisteUmschalten()"', "SERVER_URL + '/api/vpn/status'", 'ladeVpnMobil();',
+    "setInterval(() => { if (document.visibilityState === 'visible') ladeVpnMobil(); }, 15000);"];
+  const missMob = needMob.filter(n => !mob70.includes(n));
+  if (missMob.length) return 'mobile.html: fehlt ' + missMob.join(' | ');
+  if (mob70.indexOf('id="vpn-leiste"') < mob70.indexOf('id="mod-bar"') || mob70.indexOf('id="vpn-leiste"') > mob70.indexOf('id="chat-area"')) return 'Leiste nicht zwischen Modulleiste und Chat';
+  return !/\/api\/vpn\/(?!status)/.test(mob70) || 'mobile.html ruft eine Verwaltungs-Route';
+});
+
+test('VPN (ausgeführt): vpnAnzeige — grün nur bei „vpn", rot (mit Satz fürs Band) bei „kein_vpn" und „leck", gelb/grau sonst; unbekannte Stufe → „wird geprüft"; Starlink als Zugang; Einrichten nur am Mac; Netzname und Land maskiert; Alter in Worten', () => {
+  const blk = idx70 && idx70.match(VPN_BLOCK70);
+  if (!blk) return 'Block fehlt';
+  const V = new Function('window', blk[0] + '\nreturn { vpnAnzeige, vpnAlterText, vpnLandName, vpnAusgangHtml, VPN_STUFEN };')({ DARK_I18N: { lang: 'de' } });
+  const f = [];
+  const st = (stufe, ausgaenge, extra) => Object.assign({ stufe, ausgaenge: ausgaenge || [], zuletzt: '', leck: '' }, extra || {});
+  const erwartet = { vpn: 'gruen', kein_vpn: 'rot', leck: 'rot', einrichten: 'gelb', unklar: 'gelb', anmeldung: 'gelb', offline: 'grau', pruefe: 'grau', aus: 'grau' };
+  for (const [stufe, farbe] of Object.entries(erwartet)) {
+    const a = V.vpnAnzeige(st(stufe, [WEG70('IPv4', '9009', 'M247 Europe SRL', 'DE', stufe === 'vpn')]), 'mac');
+    if (a.farbe !== farbe || a.rot !== (farbe === 'rot') || (a.rot && !a.band) || (!a.rot && a.band)) f.push(`${stufe}: ${a.farbe}/${a.rot}/${!!a.band}`);
+    if (!a.titel || !a.icon || !a.zeile) f.push(`${stufe}: Titel/Symbol/Zeile fehlt`);
+  }
+  for (const komisch of [null, undefined, {}, { stufe: '__proto__' }, { stufe: 'toString' }, { stufe: 'gruen' }]) {
+    if (V.vpnAnzeige(komisch, 'mac').stufe !== 'pruefe') f.push('unbekannte Stufe ' + JSON.stringify(komisch) + ' nicht „pruefe"');
+  }
+  const gruen = V.vpnAnzeige(st('vpn', [WEG70('IPv4', '9009', 'M247 Europe SRL', 'DE', true)]), 'mac');
+  if (!gruen.zeile.includes('M247 Europe SRL · Deutschland') || !gruen.zeile.includes('data-i18n-skip')) f.push('grün: Ausgang fehlt ' + gruen.zeile);
+  const star = V.vpnAnzeige(st('kein_vpn', [WEG70('IPv4', '14593', 'SPACEX-STARLINK - Space Exploration Technologies Corporation', 'NA', false, 'Starlink')]), 'mac');
+  if (star.zeile !== 'Direkt über Starlink — ohne Tunnel') f.push('Starlink: ' + star.zeile);
+  const leck = V.vpnAnzeige(st('leck', [WEG70('IPv4', '9009', 'M247', 'DE', true), WEG70('IPv6', '36996', 'Telecom Namibia', 'NA', false)], { leck: 'IPv6' }), 'mac');
+  if (!leck.zeile.startsWith('IPv6 läuft am VPN vorbei: ') || !leck.zeile.includes('Telecom Namibia')) f.push('Leck: ' + leck.zeile);
+  const mac = V.vpnAnzeige(st('einrichten', [WEG70('IPv4', '36996', 'Telecom Namibia', 'NA', false)]), 'mac');
+  const iph = V.vpnAnzeige(st('einrichten', [WEG70('IPv4', '36996', 'Telecom Namibia', 'NA', false)]), 'iphone');
+  if (!mac.zeile.includes('„Das ist mein VPN“') || iph.zeile.includes('Das ist mein VPN') || !iph.zeile.includes('Einrichten am Mac')) f.push('Einrichten: Mac/iPhone falsch');
+  if (!mac.kurz.includes('Telecom Namibia') || !mac.kurz.includes('Zum Einrichten hier klicken.') || mac.kurz.includes('Router')) f.push('Kachel (einrichten) nicht kurz: ' + mac.kurz);
+  const off = V.vpnAnzeige(st('offline'), 'mac');
+  if (off.kurz !== 'Keine Internetverbindung.' || !off.zeile.includes('Sperre für Verkehr ohne VPN')) f.push('offline: kurz/zeile ' + off.kurz);
+  if (gruen.kurz !== gruen.zeile) f.push('grün: Kachel zeigt nicht den Ausgang');
+  const boese = V.vpnAnzeige(st('kein_vpn', [WEG70('IPv4', '1', '<img src=x onerror=alert(1)>"\'&', 'D<', false)]), 'mac');
+  if (/<img|onerror=alert\(1\)>/.test(boese.zeile) || !boese.zeile.includes('&lt;img src=x onerror=alert(1)&gt;&quot;&#39;&amp;')) f.push('Netzname nicht maskiert: ' + boese.zeile);
+  if (V.vpnLandName('D<') !== '' || V.vpnLandName('de') !== '' || V.vpnLandName('NA') !== 'Namibia') f.push('Ländercode ungeprüft');
+  const zugang = V.vpnAnzeige(st('kein_vpn', [WEG70('IPv4', '1', 'x', '', false, '<b>')]), 'mac');
+  if (zugang.zeile.includes('<b>')) f.push('Zugangsname nicht maskiert');
+  // Anbieter-Erkennung (2026-11-02-1): bestätigter Ausgang zeigt den Anbieternamen statt des Netznamens + „vom Anbieter bestätigt"
+  const WEGA70 = Object.assign(WEG70('IPv4', '31173', 'ESAB-AS 31173 Services AB', 'DE', true), { anbieter: 'Mullvad' });
+  const anb = V.vpnAnzeige(st('vpn', [WEGA70]), 'mac');
+  if (!anb.zeile.includes('Mullvad · Deutschland') || anb.zeile.includes('ESAB') || !anb.zeile.includes('vom Anbieter bestätigt')) f.push('Anbieter-Ausgang: ' + anb.zeile);
+  const anbBoese = V.vpnAnzeige(st('vpn', [Object.assign({}, WEGA70, { anbieter: '<img src=x onerror=alert(1)>' })]), 'mac');
+  if (/<img/.test(anbBoese.zeile)) f.push('Anbietername nicht maskiert: ' + anbBoese.zeile);
+  const ohneAnb = V.vpnAnzeige(st('kein_vpn', [WEG70('IPv4', '31173', 'ESAB-AS 31173 Services AB', 'DE', false)]), 'mac');
+  if (ohneAnb.zeile.includes('vom Anbieter bestätigt') || !ohneAnb.zeile.includes('ESAB-AS 31173') || !ohneAnb.zeile.includes('nicht als dein VPN bekannt')) f.push('nicht bestätigter Ausgang: ' + ohneAnb.zeile);
+  const alter = [[0, 'gerade eben'], [9, 'gerade eben'], [45, 'vor 45 s'], [119, 'vor 119 s'], [180, 'vor 3 Min.'], [7300, 'vor 2 h'], [-1, ''], [NaN, ''], [null, '']];
+  for (const [s, soll] of alter) if (V.vpnAlterText(s) !== soll) f.push(`Alter ${s} → ${V.vpnAlterText(s)}`);
+  if (V.vpnAnzeige(st('pruefe', [], { zuletzt: 'vpn' }), 'mac').zeile === V.vpnAnzeige(st('pruefe'), 'mac').zeile) f.push('„pruefe" unterscheidet erste Messung und veraltete nicht');
+  return !f.length || f.join(' | ');
+});
+
+test('VPN (ausgeführt, Mac mit Attrappen-DOM): rot → Kachel rot, Band sichtbar, Fenstertitel „⚠️ Kein VPN"; Ausblenden gilt nur für diesen Stand; grün → Band weg; Server stumm → „unbekannt"; Einstellungen: „Das ist mein VPN" nur bei einem Netz, das nicht schon VPN und kein Zugang ist (nur Ziffern im onclick), Entfernen je gemerktem Netz', () => {
+  const blk = idx70 && idx70.match(VPN_BLOCK70), mac = idx70 && idx70.match(VPN_MAC70);
+  if (!blk || !mac) return 'Block fehlt';
+  const ids = ['vpn-kachel', 'vpn-kachel-icon', 'vpn-kachel-titel', 'vpn-kachel-zeile', 'vpn-band', 'vpn-band-titel', 'vpn-band-text', 'vpn-band-zeile',
+    'vpn-detail', 'vpn-detail-titel', 'vpn-detail-zeile', 'vpn-detail-alter', 'vpn-takt', 'vpn-schalter', 'vpn-wege', 'vpn-gemerkt', 'vpn-anbieter'];
+  const d = vpnDom70(ids);
+  const M = new Function('document', 'window', 'currentPanel', blk[0] + mac[0] + '\nreturn { zeigeVpn, renderVpnEinstellungen, vpnBandAusblenden, setze: s => { vpnStand = s; } };')(d.document, { DARK_I18N: { lang: 'de', t: s => s } }, 'settings');
+  const f = [], E = d.els;
+  const rot = { stufe: 'kein_vpn', aktiv: true, intervall_s: 60, geprueft: 1, alter_s: 12, laeuft: false, leck: '', zuletzt: 'kein_vpn', fehler: { IPv6: 'kein_netz' },
+    ausgaenge: [WEG70('IPv4', '36996', 'Telecom <b>Namibia</b>', 'NA', false)], gemerkt: [{ asn: '9009', name: 'M247 Europe SRL', land: 'DE', seit: 1793350954 }] };
+  M.setze(rot); M.zeigeVpn();
+  if (E['vpn-kachel'].className !== 'vpn-kachel rot' || E['vpn-kachel-titel'].textContent !== 'Kein VPN') f.push('Kachel: ' + E['vpn-kachel'].className + '/' + E['vpn-kachel-titel'].textContent);
+  if (E['vpn-band'].style.display !== 'flex' || !E['vpn-band-text'].textContent.startsWith('Online ohne VPN')) f.push('Band nicht sichtbar');
+  if (!d.document.title.startsWith('⚠️ Kein VPN · Safari Assistant')) f.push('Fenstertitel: ' + d.document.title);
+  if (E['vpn-kachel-zeile'].innerHTML.includes('<b>')) f.push('Netzname in der Kachel nicht maskiert');
+  const wege = E['vpn-wege'].innerHTML;
+  if (!wege.includes(`onclick="vpnMerken('36996')"`) || !wege.includes('nicht dein VPN') || !wege.includes('<b>IPv6</b> · nicht vorhanden') || wege.includes('<b>Namibia')) f.push('Wege: ' + wege.slice(0, 200));
+  if (!E['vpn-gemerkt'].innerHTML.includes(`onclick="vpnVergessen('9009')"`) || !E['vpn-gemerkt'].innerHTML.includes('gemerkt am')) f.push('gemerkte Netze: ' + E['vpn-gemerkt'].innerHTML.slice(0, 160));
+  if (E['vpn-takt'].value !== '60' || E['vpn-schalter'].textContent !== 'Ausschalten' || E['vpn-detail-alter'].textContent !== 'Geprüft vor 12 s') f.push('Einstellungen: Takt/Schalter/Alter');
+  M.vpnBandAusblenden(); M.zeigeVpn();
+  if (E['vpn-band'].style.display !== 'none') f.push('Ausblenden wirkt nicht');
+  M.setze(Object.assign({}, rot, { stufe: 'leck', leck: 'IPv6', ausgaenge: [WEG70('IPv4', '9009', 'M247', 'DE', true), WEG70('IPv6', '36996', 'TN', 'NA', false)] })); M.zeigeVpn();
+  if (E['vpn-band'].style.display !== 'flex' || E['vpn-band-titel'].textContent !== 'VPN-Leck') f.push('neuer roter Stand zeigt das Band nicht wieder');
+  const w2 = E['vpn-wege'].innerHTML;
+  if (w2.includes(`vpnMerken('9009')`) || !w2.includes(`vpnMerken('36996')`) || !w2.includes('✓ dein VPN')) f.push('Knopf beim VPN-Netz oder fehlt beim anderen');
+  M.setze(Object.assign({}, rot, { stufe: 'kein_vpn', ausgaenge: [WEG70('IPv4', '14593', 'SPACEX-STARLINK', 'NA', false, 'Starlink'), WEG70('IPv6', "1');alert(1);//", 'x', '', false)] })); M.zeigeVpn();
+  const w3 = E['vpn-wege'].innerHTML;
+  if (w3.includes('vpnMerken(') || !w3.includes('Zugang, kein VPN')) f.push('Knopf bei Starlink oder bei ungültiger Netznummer: ' + w3.slice(0, 200));
+  M.setze(Object.assign({}, rot, { stufe: 'vpn', ausgaenge: [WEG70('IPv4', '9009', 'M247', 'DE', true)] })); M.zeigeVpn();
+  if (E['vpn-kachel'].className !== 'vpn-kachel gruen' || E['vpn-band'].style.display !== 'none' || d.document.title !== 'Safari Assistant') f.push('grün: Band/Titel bleiben');
+  // Anbieter-Erkennung (2026-11-02-1): bestätigter Ausgang mit Anbietername, Schalter nur mit geprüfter Kennung, Namen maskiert
+  const mitAnb = Object.assign({}, rot, { stufe: 'vpn', ausgaenge: [Object.assign(WEG70('IPv4', '31173', 'ESAB-AS 31173 Services AB', 'DE', true), { anbieter: 'Mullvad' })], anbieter: [{ id: 'mullvad', name: 'Mullvad', an: true }] });
+  M.setze(mitAnb); M.zeigeVpn();
+  const wa = E['vpn-wege'].innerHTML, aa = E['vpn-anbieter'].innerHTML;
+  if (!wa.includes('✓ dein VPN') || !wa.includes('Mullvad · Deutschland') || wa.includes('ESAB') || !wa.includes('vom Anbieter bestätigt') || wa.includes('vpnMerken(')) f.push('bestätigter Ausgang in den Wegen: ' + wa.slice(0, 260));
+  if (!aa.includes('Mullvad') || !aa.includes('erkennt alle Ausgänge dieses Anbieters') || !aa.includes('eingeschaltet') || !aa.includes(`onclick="vpnAnbieterSchalten('mullvad', false)"`) || !aa.includes('>Ausschalten<')) f.push('Anbieter-Zeile (an): ' + aa.slice(0, 260));
+  M.setze(Object.assign({}, mitAnb, { stufe: 'einrichten', ausgaenge: [WEG70('IPv4', '31173', 'ESAB-AS 31173 Services AB', 'DE', false)], anbieter: [{ id: 'mullvad', name: 'Mullvad', an: false }] })); M.zeigeVpn();
+  const ab2 = E['vpn-anbieter'].innerHTML;
+  if (!ab2.includes('ausgeschaltet') || !ab2.includes(`vpnAnbieterSchalten('mullvad', true)`) || !ab2.includes('>Einschalten<')) f.push('Anbieter-Zeile (aus): ' + ab2.slice(0, 260));
+  M.setze(Object.assign({}, mitAnb, { anbieter: [{ id: "x');alert(1);//", name: 'Boese', an: true }, { id: 'ok', name: '<b>Boese</b>', an: false }] })); M.zeigeVpn();
+  const ab3 = E['vpn-anbieter'].innerHTML;
+  if (ab3.includes('alert(1)') || ab3.includes('<b>Boese') || !ab3.includes('&lt;b&gt;Boese')) f.push('Anbieter-Kennung/-Name nicht abgesichert: ' + ab3.slice(0, 260));
+  M.setze(rot); M.zeigeVpn();
+  if (E['vpn-anbieter'].innerHTML !== '—') f.push('ohne Anbieterliste vom Server: ' + E['vpn-anbieter'].innerHTML);
+  M.setze(null); M.zeigeVpn();
+  if (E['vpn-kachel-titel'].textContent !== 'VPN-Stand unbekannt' || E['vpn-kachel'].className !== 'vpn-kachel grau') f.push('Server stumm: ' + E['vpn-kachel-titel'].textContent);
+  M.setze(Object.assign({}, rot, { stufe: 'aus', aktiv: false, ausgaenge: [] })); M.zeigeVpn();
+  if (E['vpn-schalter'].textContent !== 'Einschalten') f.push('abgeschaltet: Schalter sagt nicht „Einschalten"');
+  return !f.length || f.join(' | ');
+});
+
+test('VPN (ausgeführt, Mac): vpnAnbieterSchalten — Einschalten fragt erst nach (Anbietername, „gilt nur für diesen Anbieter", „erfährt der Anbieter dabei deine echte Adresse") und sendet nur nach „OK" {anbieter, an:true} an /api/vpn/anbieter; Ausschalten ohne Rückfrage; „an" nur bei echtem true; ungültige, unbekannte Kennung oder fehlender Stand senden nichts', () => {
+  const blk = idx70 && idx70.match(VPN_BLOCK70), mac = idx70 && idx70.match(VPN_MAC70);
+  if (!blk || !mac) return 'Block fehlt';
+  const d = vpnDom70([]);
+  const gesendet = [], fragen = [], toasts = [];
+  let antwort = false;
+  const M = new Function('document', 'window', 'currentPanel', 'confirm', 'showToast', 'setTimeout', 'gesendet',
+    blk[0] + mac[0] + '\nvpnPost = async (pfad, daten) => { gesendet.push([pfad, daten]); return { geprueft: 2, anbieter: [] }; };\nreturn { vpnAnbieterSchalten, setze: s => { vpnStand = s; } };')(
+    d.document, { DARK_I18N: { lang: 'de', t: s => s } }, 'chat', t => { fragen.push(t); return antwort; }, t => toasts.push(t), () => 0, gesendet);
+  const f = [];
+  const stand = an => ({ stufe: 'einrichten', geprueft: 1, anbieter: [{ id: 'mullvad', name: 'Mullvad', an }] });
+  M.setze(stand(false));
+  M.vpnAnbieterSchalten('mullvad', true);                      // Rückfrage → „Abbrechen"
+  if (fragen.length !== 1 || gesendet.length) f.push('ohne OK gesendet oder nicht gefragt: ' + fragen.length + '/' + gesendet.length);
+  const q = fragen[0] || '';
+  for (const teil of ['Anbieter-Erkennung einschalten?', 'Mullvad', 'Das gilt nur für diesen Anbieter.', 'erfährt der Anbieter dabei deine echte Adresse']) if (!q.includes(teil)) f.push('Rückfrage ohne „' + teil + '"');
+  antwort = true;
+  M.vpnAnbieterSchalten('mullvad', true);                      // OK
+  if (gesendet.length !== 1 || gesendet[0][0] !== '/api/vpn/anbieter' || JSON.stringify(gesendet[0][1]) !== '{"anbieter":"mullvad","an":true}') f.push('POST nach OK: ' + JSON.stringify(gesendet));
+  M.setze(stand(true)); fragen.length = 0; gesendet.length = 0;
+  M.vpnAnbieterSchalten('mullvad', false);                     // ausschalten: ohne Rückfrage
+  if (fragen.length || gesendet.length !== 1 || JSON.stringify(gesendet[0][1]) !== '{"anbieter":"mullvad","an":false}') f.push('Ausschalten: ' + fragen.length + ' Fragen, ' + JSON.stringify(gesendet));
+  gesendet.length = 0; fragen.length = 0;
+  M.vpnAnbieterSchalten('mullvad', 'true');                    // „an" nur bei echtem true
+  if (fragen.length || gesendet.length !== 1 || JSON.stringify(gesendet[0][1]) !== '{"anbieter":"mullvad","an":false}') f.push('„an" als Text: ' + JSON.stringify(gesendet));
+  gesendet.length = 0; fragen.length = 0;
+  for (const boese of ["x');alert(1);//", 'Mullvad', '', null, undefined, 5, 'a'.repeat(30), 'anderer']) M.vpnAnbieterSchalten(boese, true);
+  if (gesendet.length || fragen.length) f.push('ungültige oder unbekannte Kennung: ' + fragen.length + ' Fragen, ' + JSON.stringify(gesendet));
+  M.setze(null); M.vpnAnbieterSchalten('mullvad', true);
+  if (gesendet.length || fragen.length) f.push('ohne Stand vom Server gesendet');
+  return !f.length || f.join(' | ');
+});
+
+test('VPN (ausgeführt, iPhone mit Attrappen-DOM): ohne Stand vom Mac keine Leiste; rot groß mit Satz und Ausgang; grün knapp mit Land; antippen zeigt Alter und „Gilt fürs iPhone nur …"; fremder Text maskiert', () => {
+  const blk = mob70 && mob70.match(VPN_BLOCK70), mob = mob70 && mob70.match(VPN_MOB70);
+  if (!blk || !mob) return 'Block fehlt';
+  const d = vpnDom70(['vpn-leiste']);
+  const M = new Function('document', 'window', blk[0] + mob[0] + '\nreturn { zeigeVpnMobil, vpnLeisteUmschalten, setze: s => { vpnStandMobil = s; } };')(d.document, { DARK_I18N: { lang: 'de' } });
+  const f = [], L = d.els['vpn-leiste'];
+  M.setze(null); M.zeigeVpnMobil();
+  if (L.style.display !== 'none') f.push('Leiste ohne Stand sichtbar');
+  M.setze({ stufe: 'kein_vpn', geprueft: 1, alter_s: 40, ausgaenge: [{ familie: 'IPv4', asn: '36996', name: 'Telecom <script>x</script>', land: 'NA', vpn: false, zugang: '' }] }); M.zeigeVpnMobil();
+  if (L.style.display !== 'flex' || L.className !== 'vpn-leiste rot' || !L.innerHTML.includes('Online ohne VPN') || !L.innerHTML.includes('Telecom &lt;script&gt;')) f.push('rot: ' + L.className + ' ' + L.innerHTML.slice(0, 160));
+  if (L.innerHTML.includes('<script>')) f.push('Netzname nicht maskiert');
+  M.vpnLeisteUmschalten();
+  if (!L.innerHTML.includes('Gemessen am Mac vor 40 s.') || !L.innerHTML.includes('Gilt fürs iPhone nur, solange es im selben WLAN ist.')) f.push('Details fehlen: ' + L.innerHTML.slice(-200));
+  M.vpnLeisteUmschalten();
+  M.setze({ stufe: 'vpn', geprueft: 1, alter_s: 5, ausgaenge: [{ familie: 'IPv4', asn: '9009', name: 'M247', land: 'DE', vpn: true, zugang: '' }] }); M.zeigeVpnMobil();
+  if (L.className !== 'vpn-leiste gruen' || !L.innerHTML.includes('Deutschland') || L.innerHTML.includes('Ausgang:')) f.push('grün nicht knapp: ' + L.innerHTML);
+  M.setze({ stufe: 'vpn', geprueft: 1, alter_s: 5, ausgaenge: [{ familie: 'IPv4', asn: '31173', name: 'ESAB-AS 31173 Services AB', land: 'DE', vpn: true, zugang: '', anbieter: 'Mullvad' }] }); M.zeigeVpnMobil();
+  if (L.className !== 'vpn-leiste gruen' || !L.innerHTML.includes('Mullvad · Deutschland') || L.innerHTML.includes('ESAB')) f.push('Anbieter am iPhone: ' + L.innerHTML);
+  M.setze({ stufe: 'einrichten', geprueft: 1, alter_s: 5, ausgaenge: [{ familie: 'IPv4', asn: '36996', name: 'TN', land: 'NA', vpn: false, zugang: '' }] }); M.vpnLeisteUmschalten();
+  if (!L.innerHTML.includes('Einrichten am Mac') || L.className !== 'vpn-leiste gelb') f.push('einrichten: ' + L.innerHTML);
+  return !f.length || f.join(' | ');
+});
+
+test('VPN (i18n, ausgeführt über i18n.js): jeder neue Text — Kachel, Band, Einstellungen, Leiste am iPhone, Rückfragen, Meldungen und Fehler des Servers, auch mit Zahlen, Emoji und Satzzeichen davor/dahinter — ist in en, fr UND es übersetzt, ohne deutsche Reste', () => {
+  if (!i18n64 || !srv70 || !idx70) return 'Datei fehlt';
+  const blk = srv70.match(VPN_SRV70);
+  if (!blk) return 'VPN-Block fehlt';
+  // nur die Fehler, die bis in die Oberfläche kommen (Merken, Vergessen, Einstellen) — die der Messung werden zu Codes
+  const nutzer = blk[0].slice(blk[0].indexOf('def vpn_merken('));
+  const ausServer = [...new Set([...nutzer.matchAll(/raise ValueError\('([^'{}]+)'\)/g)].map(m => m[1]))];
+  if (ausServer.length < 6) return `nur ${ausServer.length} Servertexte gefunden — Muster veraltet?`;
+  const texte = ausServer.concat(['Höchstens 30 VPN-Netze.',
+    // Stufen (Kachel, Band, Leiste)
+    'VPN aktiv', 'Kein VPN', 'VPN-Leck', 'VPN-Prüfung einrichten', 'VPN unklar', 'WLAN-Anmeldung', 'VPN wird geprüft …', 'VPN-Prüfung aus',
+    // Zeilen, so wie sie als Textknoten neben dem maskierten Netznamen stehen
+    'Ausgang: ', ' — nicht als dein VPN bekannt', 'Direkt über Starlink — ohne Tunnel', 'IPv4 läuft am VPN vorbei: ', 'IPv6 läuft am VPN vorbei: ', 'Online über ',
+    'VPN am Router einschalten, dann in ⚙️ Einstellungen → VPN-Prüfung „Das ist mein VPN“ drücken.', 'Einrichten am Mac: ⚙️ Einstellungen → VPN-Prüfung.',
+    'Ein Ausgang ließ sich keinem Netz zuordnen (RIPEstat nicht erreichbar?).', 'Internet erreichbar, aber die Prüfdienste antworten nicht.',
+    'Das WLAN verlangt eine Anmeldung. Erst im Browser anmelden, dann das VPN am Router einschalten.',
+    'Keine Internetverbindung. Ist am Router eine Sperre für Verkehr ohne VPN an, kann auch ein getrenntes VPN die Ursache sein.',
+    'Netz gewechselt oder letzte Messung zu alt — wird neu geprüft.', 'Erste Messung läuft.', 'Einschalten in ⚙️ Einstellungen → VPN-Prüfung.',
+    'Einschalten am Mac: ⚙️ Einstellungen → VPN-Prüfung.', 'Online ohne VPN — dein Internetverkehr läuft nicht durch dein VPN.',
+    'VPN-Leck — ein Teil deines Internetverkehrs läuft am VPN vorbei.',
+    // Mac: Kachel, Band, Einstellungen
+    'VPN-Prüfung — Details und Einrichtung in ⚙️ Einstellungen', 'Jetzt prüfen', 'Details', 'Ausblenden, bis sich der Stand ändert', '🔒 VPN-Prüfung',
+    'Prüfung', 'Takt — geprüft wird nur, solange die App offen ist', 'Takt der VPN-Prüfung', 'alle 30 s', 'jede Minute', 'alle 2 Min.', 'alle 5 Min.', 'alle 15 Min.',
+    'Wege ins Internet (letzte Messung)', 'Netze deines VPNs', 'So prüft die App', 'Einmal einrichten:', 'Grenzen:',
+    'Der Mac fragt über eine verschlüsselte Verbindung, mit welcher Adresse er im Internet erscheint (Cloudflare, ersatzweise ipify), getrennt für IPv4 und IPv6, und bei RIPE NCC (RIPEstat), zu welchem Netz diese Adresse gehört. Grün heißt: Bei der letzten Prüfung lief jeder Weg über ein Netz deines VPNs.',
+    'VPN am Router einschalten, „Jetzt prüfen“, dann beim Ausgang „Das ist mein VPN“ drücken. Wechselst du auf einen VPN-Server in einem anderen Netz, meldet die App „Kein VPN“, bis du auch dieses Netz merkst. Starlink lässt sich nicht merken — es ist dein Zugang, nicht dein VPN.',
+    'Gemessen wird am Mac — fürs iPhone gilt das Ergebnis nur, solange es im selben WLAN ist. Zwischen zwei Prüfungen kann das VPN unbemerkt abbrechen; dagegen hilft am Router eine Sperre für Verkehr ohne VPN (Kill-Switch), falls die Firmware sie bietet. Jede Prüfung braucht nur wenige Kilobyte.',
+    'Geprüft vor 12 s', 'Geprüft gerade eben', 'Geprüft vor 3 Min. · Messung läuft …', 'Messung läuft …', 'Einschalten', 'Ausschalten',
+    'nicht vorhanden', 'keine Antwort (Zeitüberschreitung)', 'Verschlüsselung fehlgeschlagen (Zertifikat?)', 'Verbindung abgelehnt', 'unerwartete Antwort',
+    'kein Ergebnis', 'noch nicht gemessen', 'Zugang, kein VPN', '✓ dein VPN', 'nicht dein VPN', 'nicht zuzuordnen', 'Das ist mein VPN', ' · gemerkt am 30.10.2026',
+    'Entfernen', 'Noch keins gemerkt. VPN am Router einschalten, „Jetzt prüfen“, dann oben beim Ausgang „Das ist mein VPN“.',
+    'VPN-Stand unbekannt', 'Der lokale Server antwortet nicht.', 'Die VPN-Prüfung ist ausgeschaltet.', 'Als VPN gemerkt',
+    'Dieses Netz als dein VPN merken?', 'Nur bestätigen, wenn das VPN am Router gerade eingeschaltet ist — sonst zeigt die App später ein Netz ohne VPN als „VPN aktiv“.',
+    'Achtung: Der Ausgang liegt in dem Land, in dem du gerade bist. Das spricht eher gegen ein VPN.', 'Dieses Netz nicht mehr als dein VPN zählen?',
+    // iPhone
+    'Gemessen am Mac vor 40 s.', 'Gemessen am Mac gerade eben.', 'Gilt fürs iPhone nur, solange es im selben WLAN ist.',
+    // Kurzfassungen für die Kachel
+    'Keine Internetverbindung.', 'Das WLAN verlangt eine Anmeldung.', 'Zum Einrichten hier klicken.',
+    // Anbieter-Erkennung (2026-11-02-1): Block in den Einstellungen, Kennzeichnung beim Ausgang, Rückfrage, Meldungen
+    'Anbieter-Erkennung — gilt nur für den genannten Anbieter', 'erkennt alle Ausgänge dieses Anbieters', 'eingeschaltet', 'ausgeschaltet',
+    '· vom Anbieter bestätigt', 'vom Anbieter bestätigt',
+    'Ist die Erkennung an, fragt die App für jeden Ausgang beim Anbieter selbst nach, ob die Adresse zu einem seiner VPN-Server gehört (verschlüsselt, getrennt für IPv4 und IPv6). So zählt jeder Server dieses Anbieters als dein VPN, ohne dass du jedes Netz einzeln merken musst.',
+    'Das gilt nur für den genannten Anbieter. Andere VPNs bleiben „nicht als dein VPN bekannt“, bis du ihr Netz oben merkst. Ist das VPN aus, erfährt der Anbieter bei der Abfrage deine echte Adresse — wie jede Webseite, die du aufrufst.',
+    'Angenommen wird nur eine Antwort über https mit gültigem Zertifikat, die genau die Adresse nennt, die die App selbst gemessen hat.',
+    'Anbieter-Erkennung einschalten?',
+    'Die App fragt dann bei jeder Prüfung diesen Anbieter, ob dein Ausgang einer seiner VPN-Server ist. Das gilt nur für diesen Anbieter. Ist das VPN aus, erfährt der Anbieter dabei deine echte Adresse.',
+    'Anbieter-Erkennung eingeschaltet', 'Anbieter-Erkennung ausgeschaltet']);
+  // Was in einer Übersetzung nicht mehr stehen darf (ganze Wörter)
+  const DEUTSCH = /(?:^|[^\p{L}])(?:Prüfung|geprüft|Netze?|Ausgang|gemerkt|merken|Messung|Einstellungen|nicht|und|oder|deine?s?|vorbei|Anmeldung|einschalten|Wege?|Zugang|ohne|über|läuft|bekannt|gerade|eben|alle|jede|Takt|Grenzen|unbekannt|antwortet|Verbindung|abgelehnt|Leck|Sperre|[Gg]ilt|selben|zuordnen|zählen|Achtung|vor)(?![\p{L}])/u;
+  const GLEICH = { en: new Set(['Details']) };   // im Englischen dasselbe Wort
+  const fehler = [];
+  for (const l of SPR64) {
+    const sb = i18nSandbox64(JSON.stringify(l));
+    sb.ladeWb(l);
+    const t = sb.ctx.DARK_I18N.t;
+    const falsch = texte.filter(s => { const r = t(s); return (r === s.trim() && !(GLEICH[l] && GLEICH[l].has(s))) || DEUTSCH.test(r); });
+    if (falsch.length) fehler.push(`${l}: ${falsch.length} ohne (vollständige) Übersetzung, z. B. ${JSON.stringify(falsch[0].slice(0, 60))} → ${JSON.stringify(t(falsch[0]).slice(0, 70))}`);
+  }
+  return !fehler.length || fehler.join(' | ');
+});
+
+test('iPhone-Zugang bei laufendem VPN am Mac (2026-11-02-2): lan_ip() nimmt die Adresse des WLANs statt des Tunnels (ausgeführt: test-vpn.py 9b); iPhone-Zugang, Zertifikat und LAN-Wache nutzen lan_ip(), die VPN-Wache die Adresse der Route (lan_ip_route) — sonst fiele „VPN am Mac aus" erst nach dem Takt auf', () => {
+  if (!srv70) return 'server.py fehlt';
+  const need = ['def lan_ip_route():', 'def lan_ip():', 'TUNNEL_SCHNITTSTELLEN = _re.compile(', 'def _lan_ip_ohne_tunnel(route_ip):', "['netstat', '-rn', '-f', 'inet']",
+    'def _schnittstellen_aus_text(text):', 'def _standardroute_schnittstellen(text):'];
+  const miss = need.filter(n => !srv70.includes(n));
+  if (miss.length) return 'fehlt: ' + miss.map(m => JSON.stringify(m.slice(0, 60))).join(' | ');
+  const lanWache = srv70.match(/def starte_lan_wache\(\):[\s\S]*?threading\.Thread\(target=wache/);
+  if (!lanWache || !lanWache[0].includes('ip = lan_ip()') || lanWache[0].includes('lan_ip_route')) return 'LAN-Wache bindet nicht nach lan_ip()';
+  const vpnWache = srv70.match(/def starte_vpn_wache\(\):[\s\S]*?threading\.Thread\(target=wache/);
+  if (!vpnWache || !vpnWache[0].includes('ip = lan_ip_route()')) return 'VPN-Wache achtet nicht auf lan_ip_route()';
+  const an = srv70.match(/def lan_an\(weg=None\):[\s\S]*?ip = lan_ip\(\)\n/);
+  if (!an) return 'lan_an bindet nicht an lan_ip()';
+  // lan_ip_route behält den UDP-connect (sendet nichts, geht auch am Reiserouter ohne Internet)
+  const route = srv70.match(/def lan_ip_route\(\):[\s\S]*?\n\n\n/);
+  if (!route || !route[0].includes("s.connect(('8.8.8.8', 80))")) return 'lan_ip_route ohne UDP-connect';
+  return true;
+});
+
+console.log('\n=== 71. CLAUDE-AUFWAND (effort) für die Online-Module (2026-11-03-1) ===');
+// =============================================
+// Anforderung: bei der Modellwahl der Online-Module (Claude, Sicherheitslage, Wetter-online) auch den Aufwand wählen.
+// Die API nimmt ihn als output_config.effort; gesendet wird nur, wenn eine Stufe gewählt ist. Die Stufen pro Modell kommen
+// aus capabilities.effort der Modell-Liste (fehlt die Angabe: unbekannt, die App probiert es und fällt bei Ablehnung zurück).
+// Dazu: die 25-s-Frist gilt nur noch bis die Antwort beginnt (AbortSignal.timeout hätte auch den Strom abgebrochen).
+const idx71 = loadFile('index.html');
+const mob71 = loadFile('mobile.html');
+const BLK71 = /\/\/ ── CLAUDE-AUFWAND \(BYTEIDENTISCH[\s\S]*?\/\/ ── ENDE CLAUDE-AUFWAND ──/;
+// Modell-Block (für claudeModelleCache) + Aufwand-Block zusammen ausführbar machen
+function lade71(extra) {
+  const a = idx71.match(BLK54)[0], b = idx71.match(BLK71)[0];
+  const stubs = `var localStorage = { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = v; } }; var AbortSignal = globalThis.AbortSignal; var fetch = null;`;
+  return (store, ...args) => new Function('store', 'tools', stubs + a + b + extra)(store, ...args);
+}
+
+test('AUFWAND: gemeinsamer Block byteidentisch in index + mobile, sendet output_config.effort nur über claudeAnfrageMitAufwand, keine festen Modell-IDs; Modell-Liste liest capabilities.effort', () => {
+  if (!idx71 || !mob71) return 'Datei fehlt';
+  const a = idx71.match(BLK71), b = mob71.match(BLK71);
+  if (!a || !b) return 'Block fehlt (' + [!!a, !!b].join('/') + ')';
+  if (a[0] !== b[0]) return 'weicht ab';
+  const need = ["const CLAUDE_AUFWAND_STUFEN = ['low', 'medium', 'high', 'xhigh', 'max'];", 'const CLAUDE_AUFWAND_ABGELEHNT = new Set();', 'function claudeAufwandWirksam(wahl, modellId)',
+    'function claudeAnfrageMitAufwand(body, stufe)', 'output_config: Object.assign({}, body.output_config, { effort: stufe })', 'function claudeAufwandFehlerText(text)',
+    'function claudeAufwandOptionenHtml(modellId, wahl)', 'function claudeAufwandHinweis(modellId, wahl)', 'function claudeFristSignal(userSignal, ms)', "fehler.name = 'TimeoutError';"];
+  const miss = need.filter(n => !a[0].includes(n));
+  if (miss.length) return 'fehlt: ' + miss.join(' | ');
+  if (/claude-[a-z]+-\d/.test(a[0])) return 'feste Modell-ID im Aufwand-Block';
+  // die Modell-Liste liest die Fähigkeiten (im Modell-Block, damit der ausführbare Modell-Test ohne den Aufwand-Block läuft)
+  for (const [n, t] of [['index', idx71], ['mobile', mob71]]) {
+    if (!t.includes('function claudeAufwandAusFaehigkeiten(cap)') || !t.includes('aufwand: claudeAufwandAusFaehigkeiten(m.capabilities)')) return n + ': Modell-Liste liest capabilities.effort nicht';
+    // output_config gibt es nur im Block — sonst würde irgendwo Aufwand an der Auswahl vorbei gesendet
+    const ohneBlock = t.replace(BLK71, '');
+    if (/output_config/.test(ohneBlock.replace(/\/\/[^\n]*/g, ''))) return n + ': output_config außerhalb des Blocks';
+    // Test-Aufruf (max_tokens 20) und Zusammenfassung (max_tokens 300) bekommen keinen Aufwand
+    if ((ohneBlock.match(/claudeAnfrageMitAufwand\(/g) || []).length !== 1) return n + ': claudeAnfrageMitAufwand nicht genau einmal (Hauptanfrage) aufgerufen';
+    // die Frist gilt nur bis die Antwort beginnt
+    if (/AbortSignal\.timeout\(25000\)/.test(ohneBlock)) return n + ': AbortSignal.timeout(25000) bricht den laufenden Strom ab';
+    if (!ohneBlock.includes('claudeFristSignal(controller.signal, 25000)') || !ohneBlock.includes('} finally { frist.fertig(); }')) return n + ': Frist nur bis zum Antwort-Beginn fehlt';
+  }
+  return true;
+});
+
+test('AUFWAND (ausgeführt): Fähigkeiten der Modell-Liste → Stufen ([] = kein Aufwand, null = unbekannt); wirksame Stufe (ungültig, vom Modell nicht gekonnt, abgelehnt → nichts senden); Anfrage-Kopie mit output_config, max_tokens bei Sehr hoch/Maximal; Fehlertext-Erkennung', () => {
+  if (!idx71) return 'index.html fehlt';
+  const store = {};
+  const r = lade71(`
+    const F = claudeAufwandAusFaehigkeiten;
+    const fae = [F(null), F({}), F({ effort: 'x' }), F({ effort: { supported: false } }), F({ effort: { supported: true } }),
+      F({ effort: { supported: true, low: { supported: true }, medium: { supported: true }, high: { supported: true }, xhigh: { supported: false }, max: { supported: true } } })];
+    store['safari-claude-modelle'] = JSON.stringify(claudeModelleAusAntwort({ data: [
+      { id: 'm-a', capabilities: { effort: { supported: true, low: { supported: true }, high: { supported: true } } } },
+      { id: 'm-b', capabilities: { effort: { supported: false } } },
+      { id: 'm-c' },
+      { id: 'm-d', capabilities: null }] }));
+    const cache = JSON.parse(store['safari-claude-modelle']).liste.map(e => e.aufwand);
+    const W = claudeAufwandWirksam;
+    const wirksam = { aA: W('low', 'm-a'), aMax: W('max', 'm-a'), b: W('low', 'm-b'), cHoch: W('high', 'm-c'), unbek: W('max', 'm-unbekannt'), leer: W('', 'm-c'), muell: W('bogus', 'm-c'),
+      ctor: W('constructor', 'm-c'), zahl: W(5, 'm-c'), nichts: W(undefined, 'm-c') };
+    CLAUDE_AUFWAND_ABGELEHNT.add('m-a|low');
+    const nachAblehnung = [W('low', 'm-a'), W('high', 'm-a'), W('low', 'm-c')];
+    // alter Cache ohne Feld "aufwand" → unbekannt, nicht kaputt
+    store['safari-claude-modelle'] = JSON.stringify({ liste: [{ id: 'alt', name: 'alt', seit: '' }], geholt: 1 });
+    const alt = [claudeAufwandMoeglich('alt'), W('max', 'alt')];
+    const orig = { model: 'x', max_tokens: 1024, messages: [] };
+    const A = claudeAnfrageMitAufwand;
+    const k = { hoch: A(orig, 'high'), xh: A(orig, 'xhigh'), mx: A({ ...orig, max_tokens: 2048 }, 'max'), gross: A({ ...orig, max_tokens: 16000 }, 'max'), leer: A(orig, ''), muell: A(orig, 'x'),
+      mitOut: A({ ...orig, output_config: { format: 'f' } }, 'low') };
+    const unveraendert = JSON.stringify(orig) === '{"model":"x","max_tokens":1024,"messages":[]}' && !('output_config' in orig);
+    const fehler = [claudeAufwandFehlerText('This model does not support the effort parameter'), claudeAufwandFehlerText('output_config.effort: Input should be low'), claudeAufwandFehlerText('max_tokens: too large'), claudeAufwandFehlerText(undefined), claudeAufwandFehlerText(null)];
+    return { fae, cache, wirksam, nachAblehnung, alt, k, orig, unveraendert, fehler, leerSame: k.leer === orig && k.muell === orig };`)(store);
+  const j = JSON.stringify;
+  if (j(r.fae) !== j([null, null, null, [], null, ['low', 'medium', 'high', 'max']])) return 'Fähigkeiten: ' + j(r.fae);
+  if (j(r.cache) !== j([['low', 'high'], [], null, null])) return 'Modell-Liste speichert aufwand: ' + j(r.cache);
+  const w = r.wirksam;
+  if (w.aA !== 'low' || w.aMax !== '' || w.b !== '' || w.cHoch !== 'high' || w.unbek !== 'max' || w.leer !== '' || w.muell !== '' || w.ctor !== '' || w.zahl !== '' || w.nichts !== '') return 'wirksam: ' + j(w);
+  if (j(r.nachAblehnung) !== j(['', 'high', 'low'])) return 'nach Ablehnung (gilt nur für Modell+Stufe): ' + j(r.nachAblehnung);
+  if (j(r.alt) !== j([null, 'max'])) return 'alter Cache ohne aufwand: ' + j(r.alt);
+  if (!r.unveraendert) return 'Original-Anfrage wurde verändert';
+  if (!r.leerSame) return 'ohne gültige Stufe muss die Anfrage unverändert bleiben';
+  if (j(r.k.hoch.output_config) !== '{"effort":"high"}' || r.k.hoch.max_tokens !== 1024) return 'high: ' + j(r.k.hoch);
+  if (r.k.xh.max_tokens !== 8192 || r.k.mx.max_tokens !== 8192 || r.k.gross.max_tokens !== 16000) return 'max_tokens bei xhigh/max: ' + [r.k.xh.max_tokens, r.k.mx.max_tokens, r.k.gross.max_tokens].join('/');
+  if (j(r.k.mitOut.output_config) !== '{"format":"f","effort":"low"}') return 'vorhandenes output_config nicht ergänzt: ' + j(r.k.mitOut.output_config);
+  return j(r.fehler) === '[true,true,false,false,false]' || 'Fehlertext: ' + j(r.fehler);
+});
+
+test('AUFWAND (ausgeführt): Optionen und Hinweis richten sich nach dem Modell — unbekannt: alle Stufen; Liste: nur die gekonnten; kein Aufwand: nur Standard; gewählte, aber nicht verfügbare Stufe bleibt sichtbar; genau eine Auswahl', () => {
+  if (!idx71) return 'index.html fehlt';
+  const store = {};
+  const r = lade71(`
+    store['safari-claude-modelle'] = JSON.stringify(claudeModelleAusAntwort({ data: [
+      { id: 'm-a', capabilities: { effort: { supported: true, low: { supported: true }, high: { supported: true } } } },
+      { id: 'm-b', capabilities: { effort: { supported: false } } }] }));
+    const werte = h => [...h.matchAll(/<option value="([^"]*)"( selected)?>([^<]*)<\\/option>/g)].map(m => [m[1], !!m[2], m[3]]);
+    return { unbek: werte(claudeAufwandOptionenHtml('m-x', 'medium')), a: werte(claudeAufwandOptionenHtml('m-a', '')), b: werte(claudeAufwandOptionenHtml('m-b', 'high')),
+      muell: werte(claudeAufwandOptionenHtml('m-x', '<b>')), aMax: werte(claudeAufwandOptionenHtml('m-a', 'max')),
+      hX: claudeAufwandHinweis('m-x', ''), hA: claudeAufwandHinweis('m-a', 'low'), hB: claudeAufwandHinweis('m-b', ''), hAmax: claudeAufwandHinweis('m-a', 'max'), hXmax: claudeAufwandHinweis('m-x', 'xhigh'),
+      namen: ['', 'low', 'medium', 'high', 'xhigh', 'max', 'zzz'].map(claudeAufwandName) };`)(store);
+  const j = JSON.stringify, sel = o => o.filter(x => x[1]).map(x => x[0]);
+  if (j(r.namen) !== j(['Standard', 'Niedrig', 'Mittel', 'Hoch', 'Sehr hoch', 'Maximal', 'Standard'])) return 'Namen: ' + j(r.namen);
+  if (j(r.unbek.map(x => x[0])) !== j(['', 'low', 'medium', 'high', 'xhigh', 'max']) || j(sel(r.unbek)) !== '["medium"]') return 'unbekanntes Modell: ' + j(r.unbek);
+  if (j(r.a.map(x => x[0])) !== j(['', 'low', 'high']) || j(sel(r.a)) !== '[""]') return 'Modell mit Liste: ' + j(r.a);
+  if (j(r.b.map(x => x[0])) !== j(['', 'high']) || j(sel(r.b)) !== '["high"]' || !/nicht verfügbar/.test(r.b[1][2])) return 'Modell ohne Aufwand, Stufe gewählt: ' + j(r.b);
+  if (j(sel(r.muell)) !== '[""]' || r.muell.length !== 6) return 'ungültiger Wert: ' + j(r.muell);
+  if (j(r.aMax.map(x => x[0])) !== j(['', 'low', 'high', 'max']) || j(sel(r.aMax)) !== '["max"]' || !/nicht verfügbar/.test(r.aMax[3][2])) return 'Stufe außerhalb der Liste: ' + j(r.aMax);
+  if (!/^Standard: /.test(r.hX[0]) || !/weiß die App noch nicht/.test(r.hX[1]) || r.hX.length !== 2) return 'Hinweis unbekannt: ' + j(r.hX);
+  if (!/^Niedrig: /.test(r.hA[0]) || !/unterstützt den Aufwand/.test(r.hA[1]) || r.hA.length !== 2) return 'Hinweis Liste: ' + j(r.hA);
+  if (!/keinen Aufwand/.test(r.hB[1])) return 'Hinweis kein Aufwand: ' + j(r.hB);
+  if (!/gibt es laut Modell-Liste bei diesem Modell nicht/.test(r.hAmax[1]) || r.hAmax.length !== 3) return 'Hinweis Stufe fehlt: ' + j(r.hAmax);
+  return (r.hXmax.length === 3 && /8192 Tokens/.test(r.hXmax[2])) || 'Hinweis Sehr hoch: ' + j(r.hXmax);
+});
+
+test('AUFWAND (ausgeführt): claudeFristSignal — Frist löst TimeoutError aus, Abbruch durch den Nutzer bleibt AbortError, fertig() räumt den Timer ab', () => {
+  if (!idx71) return 'index.html fehlt';
+  const r = lade71(`
+    let gesetzt = null, geloescht = [];
+    var setTimeout = (fn, ms) => { gesetzt = { fn, ms }; return 42; };
+    var clearTimeout = id => geloescht.push(id);
+    const nutzer = new AbortController();
+    const f = claudeFristSignal(nutzer.signal, 25000);
+    const vorher = f.signal.aborted;
+    gesetzt.fn();
+    const grund = f.signal.reason || {};
+    f.fertig();
+    const n2 = new AbortController(); const f2 = claudeFristSignal(n2.signal, 25000); n2.abort();
+    return { ms: gesetzt.ms, vorher, nachher: f.signal.aborted, name: grund.name, text: String(grund.message), geloescht, nutzerAbbruch: f2.signal.aborted, nutzerName: (f2.signal.reason || {}).name };`)({});
+  if (r.ms !== 25000 || r.vorher !== false || r.nachher !== true) return 'Frist: ' + JSON.stringify(r);
+  if (r.name !== 'TimeoutError' || !/25 s/.test(r.text)) return 'Fehlerart/Text: ' + r.name + ' / ' + r.text;
+  if (JSON.stringify(r.geloescht) !== '[42]') return 'Timer nicht abgeräumt: ' + JSON.stringify(r.geloescht);
+  return (r.nutzerAbbruch === true && r.nutzerName === 'AbortError') || 'Nutzer-Abbruch: ' + JSON.stringify(r);
+});
+
+test('AUFWAND (ausgeführt, echter Code aus index + mobile in einem Node-Prozess mit Attrappen): sendet nur gewählten Aufwand; 400 wegen effort/output_config → einmal ohne wiederholen und merken; andere Fehler und 429 ohne Wiederholen; Fehlerantwort bleibt lesbar; Timer immer abgeräumt', () => {
+  if (!idx71 || !mob71) return 'Datei fehlt';
+  const SCHLEIFE = /\/\/ Aufwand \(output_config\.effort\) nur senden[\s\S]*?\n      renderClaudeAufwand(?:Mobil)?\(\);\n    \}\n/;
+  const sI = idx71.match(SCHLEIFE), sM = mob71.match(SCHLEIFE);
+  if (!sI || !sM) return 'Anfrage-Schleife nicht gefunden (' + [!!sI, !!sM].join('/') + ')';
+  const script = `(function () {
+const store = {};
+var localStorage = { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = v; } };
+${idx71.match(BLK54)[0]}
+${idx71.match(BLK71)[0]}
+const offen = new Set(); const st0 = setTimeout, ct0 = clearTimeout;
+globalThis.setTimeout = (fn, ms) => { const id = st0(fn, ms); offen.add(id); return id; };
+globalThis.clearTimeout = id => { offen.delete(id); ct0(id); };
+function antwort(status, body) { let gelesen = false; return { ok: status >= 200 && status < 300, status, clone() { return antwort(status, body); }, async json() { if (gelesen) throw new TypeError('body used already'); gelesen = true; return body; } }; }
+const CODE = { index: async function (ctx) { const { controller, key, requestBody, aufwandWunsch, fetch, showToast, renderClaudeAufwand } = ctx;
+${sI[0]}
+  return { res, aufwand }; },
+  mobile: async function (ctx) { const { controller, key, body, mSettings, fetch, showToast, renderClaudeAufwandMobil } = ctx;
+${sM[0]}
+  return { res, aufwand }; } };
+async function szenario(variante, wahl, modell, antworten) {
+  const aufrufe = [], toasts = [], controller = new AbortController();
+  const f = async (url, opt) => { aufrufe.push({ url, body: JSON.parse(opt.body), signal: opt.signal, kopf: opt.headers }); const a = antworten.shift(); if (a instanceof Error) throw a; return a; };
+  const rumpf = { model: modell, max_tokens: 1024, stream: true, messages: [] };
+  const ctx = { controller, key: 'k', requestBody: rumpf, body: rumpf, aufwandWunsch: claudeAufwandWirksam(wahl, modell), mSettings: { claudeEffort: wahl },
+    fetch: f, showToast: t => toasts.push(t), renderClaudeAufwand: () => {}, renderClaudeAufwandMobil: () => {} };
+  let ergebnis = null, fehler = null;
+  try { ergebnis = await CODE[variante](ctx); } catch (e) { fehler = e.message; }
+  const abgebrochen0 = aufrufe[0] ? aufrufe[0].signal.aborted : null;
+  controller.abort();
+  return { n: aufrufe.length, effort: aufrufe.map(a => a.body.output_config ? a.body.output_config.effort : null), tokens: aufrufe.map(a => a.body.max_tokens), ok: ergebnis ? ergebnis.res.ok : null,
+    status: ergebnis ? ergebnis.res.status : null, gesendet: ergebnis ? ergebnis.aufwand : null, lesbar: ergebnis && !ergebnis.res.ok ? await ergebnis.res.json() : null,
+    toasts, fehler, abgebrochen0, abgebrochen1: aufrufe[0] ? aufrufe[0].signal.aborted : null, abgelehnt: [...CLAUDE_AUFWAND_ABGELEHNT], kopf: aufrufe[0] ? aufrufe[0].kopf['anthropic-dangerous-direct-browser-access'] : null };
+}
+(async () => {
+  const aus = {};
+  for (const v of ['index', 'mobile']) {
+    CLAUDE_AUFWAND_ABGELEHNT.clear();
+    const e = {};
+    e.s1 = await szenario(v, 'high', 'm-1', [antwort(200, {})]);
+    e.s2 = await szenario(v, 'xhigh', 'm-2', [antwort(400, { error: { message: 'output_config.effort is not supported by this model' } }), antwort(200, {})]);
+    e.s3 = await szenario(v, 'high', 'm-3', [antwort(400, { error: { message: 'max_tokens: too large' } })]);
+    e.s4 = await szenario(v, '', 'm-4', [antwort(400, { error: { message: 'effort not supported' } })]);
+    e.s5 = await szenario(v, 'max', 'm-5', [antwort(429, { error: { message: 'effort rate limit reached' } })]);
+    e.s6 = await szenario(v, 'high', 'm-6', [new Error('Failed to fetch')]);
+    e.s7 = await szenario(v, 'xhigh', 'm-2', [antwort(200, {})]);
+    e.s8 = await szenario(v, 'high', 'm-8', [antwort(400, { error: { message: 'effort bad' } }), antwort(400, { error: { message: 'effort bad again' } })]);
+    aus[v] = e;
+  }
+  aus.timerOffen = offen.size;
+  console.log(JSON.stringify(aus));
+  process.exit(0);
+})();
+})();`;
+  let out;
+  try { out = require('child_process').execFileSync(process.execPath, ['-e', script], { encoding: 'utf8', timeout: 20000 }).trim().split('\n').pop(); }
+  catch (e) { return 'Skript-Fehler: ' + String(e.stderr || e.message).slice(0, 400); }
+  const r = JSON.parse(out), j = JSON.stringify, fehler = [];
+  if (r.timerOffen !== 0) fehler.push('Timer nicht abgeräumt: ' + r.timerOffen);
+  for (const v of ['index', 'mobile']) {
+    const e = r[v], p = v + ': ';
+    if (e.s1.n !== 1 || j(e.s1.effort) !== '["high"]' || e.s1.ok !== true || e.s1.toasts.length || e.s1.gesendet !== 'high' || e.s1.tokens[0] !== 1024) fehler.push(p + 'Normalfall ' + j(e.s1));
+    if (e.s1.abgebrochen0 !== false || e.s1.abgebrochen1 !== true || e.s1.kopf !== 'true') fehler.push(p + 'Signal/Kopf ' + j([e.s1.abgebrochen0, e.s1.abgebrochen1, e.s1.kopf]));
+    if (e.s2.n !== 2 || j(e.s2.effort) !== '["xhigh",null]' || e.s2.ok !== true || e.s2.toasts.length !== 1 || e.s2.gesendet !== '' || j(e.s2.abgelehnt) !== '["m-2|xhigh"]') fehler.push(p + 'Wiederholen ohne Aufwand ' + j(e.s2));
+    if (e.s2.tokens[0] !== 8192 || e.s2.tokens[1] !== 1024) fehler.push(p + 'max_tokens erst 8192, beim Wiederholen wieder 1024 ' + j(e.s2.tokens));
+    if (e.s3.n !== 1 || e.s3.status !== 400 || !e.s3.lesbar || e.s3.lesbar.error.message !== 'max_tokens: too large' || e.s3.toasts.length) fehler.push(p + 'fremder 400-Fehler ' + j(e.s3));
+    if (e.s4.n !== 1 || e.s4.effort[0] !== null) fehler.push(p + 'ohne Aufwand wiederholt oder gesendet ' + j(e.s4));
+    if (e.s5.n !== 1 || e.s5.status !== 429) fehler.push(p + '429 wiederholt ' + j(e.s5));
+    if (e.s6.fehler !== 'Failed to fetch' || e.s6.n !== 1) fehler.push(p + 'Netzfehler ' + j(e.s6));
+    if (e.s7.n !== 1 || e.s7.effort[0] !== null || e.s7.tokens[0] !== 1024) fehler.push(p + 'abgelehnte Stufe wird wieder gesendet ' + j(e.s7));
+    if (e.s8.n !== 2 || e.s8.status !== 400 || e.s8.effort[1] !== null) fehler.push(p + 'zweiter 400 nach Wiederholen ' + j(e.s8));
+  }
+  return !fehler.length || fehler.join(' | ');
+});
+
+test('AUFWAND Desktop + iPhone: Auswahl in den Einstellungen, Schnellwahl im Chat (nur Online-Module), Modellwechsel zeichnet die Stufen neu, Wert wird geprüft + gespeichert; Hauptanfrage nimmt den Aufwand, Test-Aufruf und Zusammenfassung nicht', () => {
+  if (!idx71 || !mob71) return 'Datei fehlt';
+  const needI = ['id="claude-aufwand-select"', 'onchange="setzeClaudeAufwand(this.value)"', 'id="claude-aufwand-quick"', 'id="claude-aufwand-hint"', 'function renderClaudeAufwand()', 'function setzeClaudeAufwand(wert)',
+    "const caq = document.getElementById('claude-aufwand-quick');", "caq.style.display = (!isThinking && isClaudeApiCtx) ? 'inline-block' : 'none'", 'claudeAufwandOptionenHtml(getClaudeModel(), settings.claudeEffort)',
+    "const aufwandWunsch = claudeAufwandWirksam(settings.claudeEffort, getClaudeModel());", 'body: JSON.stringify(claudeAnfrageMitAufwand(requestBody, aufwand)),',
+    "'claudeModelLabel', 'claudeEffort']"];
+  const missI = needI.filter(n => !idx71.includes(n));
+  if (missI.length) return 'index fehlt: ' + missI.join(' | ');
+  if (!/function renderClaudeModellAuswahl\(\) \{[\s\S]*?\n  renderClaudeAufwand\(\);\n\}\n/.test(idx71)) return 'index: Modellwechsel zeichnet den Aufwand nicht neu';
+  const needM = ['id="m-claude-aufwand"', 'onchange="setzeClaudeAufwandMobil(this.value)"', 'id="m-claude-aufwand-hint"', 'function renderClaudeAufwandMobil()', 'function setzeClaudeAufwandMobil(wert)',
+    'let aufwand = claudeAufwandWirksam(mSettings.claudeEffort, body.model);', 'body: JSON.stringify(claudeAnfrageMitAufwand(body, aufwand)),'];
+  const missM = needM.filter(n => !mob71.includes(n));
+  if (missM.length) return 'mobile fehlt: ' + missM.join(' | ');
+  if (!/function renderClaudeModellMobil\(\) \{[\s\S]*?\n  renderClaudeAufwandMobil\(\);\n\}\n/.test(mob71)) return 'mobile: Modellwechsel zeichnet den Aufwand nicht neu';
+  // Schnellwahl und Einstellungen gehören zu den Online-Modulen: die Schnellwahl bleibt verborgen, solange kein Online-Modul offen ist
+  if (!/id="claude-aufwand-quick"[^>]*display:none/.test(idx71)) return 'Schnellwahl nicht standardmäßig verborgen';
+  // ausgeführt: Mac
+  const store = {};
+  const mac = idx71.match(/function renderClaudeAufwand\(\) \{[\s\S]*?\nfunction setzeClaudeAufwand\(wert\) \{[\s\S]*?\n\}\n/);
+  const mob = mob71.match(/function renderClaudeAufwandMobil\(\) \{[\s\S]*?\nfunction setzeClaudeAufwandMobil\(wert\) \{[\s\S]*?\n\}\n/);
+  if (!mac || !mob) return 'Funktionen nicht gefunden';
+  const r = lade71(`
+    const el = {}; ['claude-aufwand-select', 'claude-aufwand-quick', 'claude-aufwand-hint', 'm-claude-aufwand', 'm-claude-aufwand-hint'].forEach(id => el[id] = { innerHTML: '' });
+    const document = { getElementById: id => el[id] || null };
+    const settings = {}, mSettings = {}, gespeichert = [], toasts = [];
+    const speichereJSON = (k, v) => gespeichert.push([k, JSON.stringify(v)]);
+    const showToast = t => toasts.push(t);
+    const getClaudeModel = () => 'm-x', getClaudeModelMobil = () => 'm-x';
+    ${mac[0]}
+    ${mob[0]}
+    setzeClaudeAufwand('high');
+    const m1 = { eff: settings.claudeEffort, sel: el['claude-aufwand-select'].innerHTML, quick: el['claude-aufwand-quick'].innerHTML, hint: el['claude-aufwand-hint'].innerHTML, toast: toasts.slice(), gesp: gespeichert.slice() };
+    setzeClaudeAufwand('bogus'); const m2 = { eff: settings.claudeEffort, toasts: toasts.length, gesp: gespeichert.length };
+    setzeClaudeAufwand(''); const m3 = { hat: 'claudeEffort' in settings, toast: toasts[toasts.length - 1] };
+    setzeClaudeAufwandMobil('max');
+    const i1 = { eff: mSettings.claudeEffort, sel: el['m-claude-aufwand'].innerHTML, hint: el['m-claude-aufwand-hint'].innerHTML, gesp: store['safari-mobile-settings'] || null, toast: toasts[toasts.length - 1] };
+    setzeClaudeAufwandMobil('<script>'); const i2 = mSettings.claudeEffort;
+    setzeClaudeAufwandMobil(''); const i3 = 'claudeEffort' in mSettings;
+    return { m1, m2, m3, i1, i2, i3 };`)(store);
+  const f = [];
+  if (r.m1.eff !== 'high' || !r.m1.sel.includes('<option value="high" selected>Aufwand: Hoch</option>') || r.m1.sel !== r.m1.quick || !r.m1.hint.includes('<br>') || r.m1.toast[0] !== 'Aufwand: Hoch') f.push('Mac setzen ' + JSON.stringify(r.m1).slice(0, 300));
+  if (r.m1.gesp.length !== 1 || r.m1.gesp[0][0] !== 'safari-settings' || !r.m1.gesp[0][1].includes('"claudeEffort":"high"')) f.push('Mac speichert nicht in safari-settings');
+  if (r.m2.eff !== 'high' || r.m2.toasts !== 1 || r.m2.gesp !== 1) f.push('Mac: ungültiger Wert wurde übernommen ' + JSON.stringify(r.m2));
+  if (r.m3.hat || r.m3.toast !== 'Aufwand: Standard') f.push('Mac: Standard löscht die Einstellung nicht ' + JSON.stringify(r.m3));
+  if (r.i1.eff !== 'max' || !r.i1.sel.includes('<option value="max" selected>Aufwand: Maximal</option>') || !/^<div>.*<\/div><div>/.test(r.i1.hint) || !/"claudeEffort":"max"/.test(r.i1.gesp || '') || r.i1.toast !== 'Aufwand: Maximal') f.push('iPhone setzen ' + JSON.stringify(r.i1).slice(0, 300));
+  if (r.i2 !== 'max' || r.i3 !== false) f.push('iPhone: ungültig/leer ' + JSON.stringify([r.i2, r.i3]));
+  return !f.length || f.join(' | ');
+});
+
+test('AUFWAND (i18n, ausgeführt über i18n.js): jeder Text, den die Auswahl erzeugen kann — Optionen, Hinweise für jede Stufe und jeden Modell-Zustand, Meldungen, Frist-Fehler — ist in en, fr UND es übersetzt, ohne deutsche Reste', () => {
+  if (!i18n64 || !idx71) return 'Datei fehlt';
+  const store = {};
+  const gesammelt = lade71(`
+    store['safari-claude-modelle'] = JSON.stringify(claudeModelleAusAntwort({ data: [
+      { id: 'm-a', capabilities: { effort: { supported: true, low: { supported: true }, high: { supported: true } } } },
+      { id: 'm-b', capabilities: { effort: { supported: false } } }] }));
+    const texte = new Set();
+    const stufen = [''].concat(CLAUDE_AUFWAND_STUFEN);
+    for (const m of ['m-x', 'm-a', 'm-b']) for (const w of stufen) {
+      for (const o of claudeAufwandOptionenHtml(m, w).matchAll(/>([^<]+)</g)) texte.add(o[1]);
+      for (const z of claudeAufwandHinweis(m, w)) texte.add(z);
+    }
+    CLAUDE_AUFWAND_ABGELEHNT.add('m-x|high');
+    for (const z of claudeAufwandHinweis('m-x', 'high')) texte.add(z);
+    for (const s of CLAUDE_AUFWAND_STUFEN) { texte.add('Aufwand: ' + claudeAufwandName(s)); texte.add('Aufwand: Standard'); }
+    return [...texte];`)(store);
+  const statisch = ['Aufwand', 'wie gründlich Claude arbeitet', 'Claude-Aufwand (Online-Module)',
+    'Aufwand: wie gründlich Claude in den Online-Modulen arbeitet (mehr Aufwand = langsamer und teurer)',
+    'Dieses Modell nimmt den gewählten Aufwand nicht an — die Anfrage läuft ohne',
+    '⚠️ Claude API: Zeitüberschreitung: Anthropic hat in 25 s nicht geantwortet — Internet prüfen?'];
+  const texte = gesammelt.concat(statisch);
+  if (gesammelt.length < 20) return `nur ${gesammelt.length} Texte erzeugt — Block geändert?`;
+  const DEUTSCH = /(?:^|[^\p{L}])(?:Aufwand|Stufe|Modell|gründlich|Nachdenken|nicht|und|oder|ohne|wird|gesendet|dieses?|diese|laut|Anfrage|abgelehnt|Niedrig|Mittel|Hoch|Maximal|schnell|sparsam|weniger|für|einfache|ausgewogen|Geld|langsamsten|teuersten|Zeitüberschreitung|geantwortet|prüfen|verfügbar|keinen|kann|weiß|läuft|automatisch|Fragen|erlaubt|Antworten|angerechnet|Sehr|hoch|Dokumentation|Bei|Modell-Liste|Neuladen|gewählten?)(?![\p{L}])/u;
+  const fehler = [];
+  for (const l of SPR64) {
+    const sb = i18nSandbox64(JSON.stringify(l));
+    sb.ladeWb(l);
+    const t = sb.ctx.DARK_I18N.t, tm = sb.ctx.DARK_I18N.tMulti;
+    const falsch = texte.filter(s => { const r = s.startsWith('⚠️') ? tm(s) : t(s); return r === s.trim() || DEUTSCH.test(r); });
+    if (falsch.length) fehler.push(`${l}: ${falsch.length} ohne (vollständige) Übersetzung, z. B. ${JSON.stringify(falsch[0].slice(0, 70))} → ${JSON.stringify((falsch[0].startsWith('⚠️') ? tm : t)(falsch[0]).slice(0, 90))}`);
+  }
+  return !fehler.length || fehler.join(' | ');
+});
+
+// =============================================
+console.log('\n=== 72. REVIEW 13.11.2026 — Sicherheit und Notfall-Festigkeit (2026-11-14-1) ===');
+// =============================================
+// Befunde des Reviews vom 13.11.2026 (Projektdokument claude/review-2026-11-13-sicherheit-bedienung.md):
+// S1 gespeichertes XSS über kmDatum · S2 Ollama-Durchgriff von fremden Seiten · S3 Wikipedia auf eigener Herkunft ·
+// S5 CDN-Rückfall mit Prüfsumme · S6 Feed-Abruf (test-nachrichten.py) · S7 Attribute · S8 Backup mit Passwort ·
+// U1 Notfall am iPhone ohne Mac · U2 Sicherung der Browser-Daten · U4 Sofort-Protokoll statt KI.
+// Der Server-Teil (S2, S3, U2, U1-Route) läuft ausgeführt in test-sicherheit.py (Abschnitte 8–10).
+const idx72 = loadFile('index.html'), mob72 = loadFile('mobile.html'), poi72 = loadFile('pois.html'), srv72 = loadFile('server.py'), dep72 = loadFile('deploy.sh');
+const js72 = idx72 ? idx72.slice(idx72.indexOf('<script>', idx72.indexOf('</style>'))) : '';
+function fn72(quelle, name) {
+  // ganze Funktion (auch async) bis zur schließenden Klammer in Spalte 0
+  const m = quelle.match(new RegExp('(?:async )?function ' + name + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}'));
+  return m ? m[0] : null;
+}
+function einzeiler72(quelle, name) {
+  const m = quelle.match(new RegExp('^(?:async )?function ' + name + '\\(.*\\}$', 'm'));
+  return m ? m[0] : null;
+}
+function node72(skript) {
+  const r = require('child_process').spawnSync(process.execPath, ['-e', skript], { encoding: 'utf8', timeout: 60000 });
+  return (r.stdout || '').trim() + ((r.stderr || '').trim() ? ' STDERR: ' + r.stderr.trim().slice(0, 400) : '');
+}
+
+test('S1 (ausgeführt): kmDatum ist ein Datum oder leer — der Prüfer verwirft Markup aus einem Backup, und keine Stelle setzt wartung.kmDatum ungeschützt ins HTML', () => {
+  if (!idx72) return 'index.html fehlt';
+  if (!pruefer64 || typeof pruefer64['safari-wartung'] !== 'function') return 'SPEICHER_PRUEFER[safari-wartung] fehlt';
+  const boese = '<img src=x onerror=alert(1)>';
+  const v = pruefer64['safari-wartung']({ km: 5, kmDatum: boese, custom: [], done: {} });
+  if (v.kmDatum !== '') return 'Prüfer lässt Markup in kmDatum durch: ' + v.kmDatum;
+  if (pruefer64['safari-wartung']({ km: 5, kmDatum: '2026-11-14', custom: [], done: {} }).kmDatum !== '2026-11-14') return 'Prüfer verwirft ein gültiges Datum';
+  if (pruefer64['safari-wartung']({ km: 5, kmDatum: '2026-13-40', custom: [], done: {} }).kmDatum !== '') return 'Prüfer nimmt ein unmögliches Datum';
+  const roh = (idx72.match(/\$\{[^{}]*kmDatum[^{}]*\}/g) || []).filter(a => !/escHtml\(|escAttr\(/.test(a));
+  return roh.length === 0 || 'ungeschützt im HTML: ' + roh.join(' | ');
+});
+
+test('S2/S3 (server.py): Ollama-Durchgriff und Dokumentensuche prüfen die Herkunft (fremde_seite), die Deckel gelten für jede Anfrage; die Wikipedia hat einen eigenen Listener, der App-Port leitet nur um', () => {
+  if (!srv72) return 'server.py fehlt';
+  const need = ['def fremde_seite(self):', "(self.headers.get('Sec-Fetch-Site') or '').strip().lower() == 'cross-site'",
+    'def wiki_server_oeffnen(hauptport', 'srv.nur_wiki = True', 'def _wiki_umleiten(self, path, query):', 'def _wiki_lan_oeffnen(ip, ctx):',
+    "'wiki_port': self.wiki_port_fuer_anfrage() if KIWIX_ROOT else 0", "'offen_im_netz':"];
+  const miss = need.filter(n => !srv72.includes(n));
+  if (miss.length) return 'fehlt: ' + miss.join(' | ');
+  for (const route of ["if path == '/api/ollama/api/tags':", "if path == '/api/ollama/api/chat':", "if path == '/api/rag/search':"]) {
+    const i = srv72.indexOf(route);
+    if (i < 0 || !srv72.slice(i, i + 160).includes('self._fremde_seite_abweisen()')) return 'ohne Herkunftsprüfung: ' + route;
+  }
+  if (/if not ist_loopback\(self\.client_ip\(\)\):\s*\n\s*erlaubt = ollama_optionen_begrenzen/.test(srv72)) return 'die Deckel gelten weiter nur fürs WLAN';
+  const get = srv72.slice(srv72.indexOf('    def do_GET(self):'), srv72.indexOf('    def _statik_pfad_ok'));
+  const iWiki = get.indexOf("if getattr(self.server, 'nur_wiki', False):"), iPing = get.indexOf("if path == '/api/ping':");
+  if (iWiki < 0 || iWiki > iPing) return 'der Wikipedia-Port wird nicht VOR allen Routen abgefangen';
+  for (const m of ['do_POST', 'do_DELETE', 'do_OPTIONS']) {
+    const k = srv72.slice(srv72.indexOf('    def ' + m + '(self):'));
+    if (!k.slice(0, 700).includes("if getattr(self.server, 'nur_wiki', False):")) return m + ' auf dem Wikipedia-Port nicht gesperrt';
+  }
+  return srv72.includes('_wiki_lan_schliessen()\n    srv = LAN_STATE[\'server\']') || 'der Wikipedia-Listener im WLAN bleibt nach „Freigabe beenden" offen';
+});
+
+test('S3 (Seiten): openWikipedia öffnet die Wikipedia auf ihrem eigenen Port (s.wiki_port) — in index und mobile gleich; ohne Port wie bisher über den App-Port', () => {
+  const wiki = /async function openWikipedia\(\) \{[\s\S]*?\n\}/;
+  const a = idx72.match(wiki), b = mob72.match(wiki);
+  if (!a || !b || a[0] !== b[0]) return 'openWikipedia weicht ab';
+  if (!a[0].includes("if (s.proxy && s.wiki_port) url = location.protocol + '//' + location.hostname + ':' + s.wiki_port + s.proxy;")) return 'eigener Port wird nicht genutzt';
+  return a[0].indexOf('s.wiki_port') < a[0].indexOf('else if (s.proxy) url = location.origin + s.proxy;') || 'Reihenfolge: erst der eigene Port';
+});
+
+test('S5: jeder CDN-Rückfall in pois.html trägt die Prüfsumme aus deploy.sh (integrity + crossorigin) — sieben Bibliotheken, keine ohne', () => {
+  if (!poi72 || !dep72) return 'Datei fehlt';
+  const pins = {};
+  for (const m of dep72.matchAll(/vendor_fetch ([\w.-]+)\s+"https:\/\/unpkg\.com\/([^"]+)"\s+\d+\s+([0-9a-f]{64})\b/g)) pins[m[2]] = 'sha256-' + Buffer.from(m[3], 'hex').toString('base64');
+  if (Object.keys(pins).length !== 7) return 'deploy.sh nennt nicht sieben Bibliotheken';
+  const zeilen = poi72.split('\n').filter(z => z.includes('https://unpkg.com/'));
+  const ohne = [];
+  for (const [pfad, sri] of Object.entries(pins)) {
+    const z = zeilen.filter(x => x.includes('https://unpkg.com/' + pfad));
+    if (!z.length) { ohne.push(pfad + ' (fehlt)'); continue; }
+    for (const x of z) {
+      const i = poi72.indexOf(x);
+      const umfeld = poi72.slice(Math.max(0, i - 220), i + x.length);
+      if (!umfeld.includes(sri)) ohne.push(pfad);
+      else if (!/crossorigin="anonymous"|crossOrigin = 'anonymous'/.test(umfeld)) ohne.push(pfad + ' (crossorigin)');
+    }
+  }
+  if (ohne.length) return 'ohne passende Prüfsumme: ' + ohne.join(', ');
+  return zeilen.length === 7 || `${zeilen.length} Zeilen mit unpkg.com statt 7`;
+});
+
+test('S7: Attributwerte der Modell-Auswahlen am iPhone maskieren auch Anführungszeichen (nachrichtEsc), nirgends value="${escHtml(…)}"', () => {
+  if (!mob72) return 'mobile.html fehlt';
+  const schlecht = [...(mob72 + idx72).matchAll(/[a-z-]+="\$\{escHtml\([^}]*\}/g)].map(m => m[0]);
+  return schlecht.length === 0 || 'escHtml in einem Attribut: ' + schlecht.slice(0, 3).join(' | ');
+});
+
+test('S8 (ausgeführt, eigener Node-Prozess): Backup mit Passwort — verschlüsseln und wieder öffnen ergibt denselben Inhalt, falsches Passwort und veränderte Datei werden abgelehnt, die Datei enthält keinen Klartext; ohne Passwort fehlt das Schlüssel-Versteck', () => {
+  const teile = ['b64', 'b64zu'].map(n => einzeiler72(js72, n)).concat(['backupSchluessel', 'backupVerschluesseln', 'backupEntschluesseln', 'backupOhneVersteck'].map(n => fn72(js72, n)));
+  const rund = js72.match(/const BACKUP_KDF_RUNDEN = (\d+);/);
+  if (teile.some(t => !t) || !rund) return 'Funktionen nicht gefunden';
+  if (Number(rund[1]) < 200000) return 'zu wenige PBKDF2-Runden: ' + rund[1];
+  const skript = rund[0] + '\n' + teile.join('\n') + `
+(async () => {
+  const f = [];
+  const nk = { personen: [], fahrzeug: { Kennzeichen: 'X', 'Schlüssel-Versteck': 'hinten links am Rahmen' } };
+  const backup = { version: 2, created: 'jetzt', localStorage: { 'safari-notfallkarte': JSON.stringify(nk), 'safari-notes': JSON.stringify([{ id: 1, title: 'Geheimnotiz Ä€', body: 'x'.repeat(200000) }]) }, docs: [], chunks: [] };
+  const h = await backupVerschluesseln(backup, 'richtig-langes-passwort');
+  const text = JSON.stringify(h);
+  if (h.verschluesselt !== true || h.version !== 3 || h.kdf !== 'PBKDF2-SHA256' || h.runden !== BACKUP_KDF_RUNDEN) f.push('Hülle unvollständig');
+  if (text.includes('Geheimnotiz') || text.includes('hinten links') || text.includes('safari-notes')) f.push('Klartext in der verschlüsselten Datei');
+  const h2 = await backupVerschluesseln(backup, 'richtig-langes-passwort');
+  if (h2.salz === h.salz || h2.iv === h.iv || h2.daten === h.daten) f.push('Salz/IV nicht zufällig');
+  const zurueck = await backupEntschluesseln(JSON.parse(text), 'richtig-langes-passwort');
+  if (JSON.stringify(zurueck) !== JSON.stringify(backup)) f.push('entschlüsselt ≠ Original');
+  try { await backupEntschluesseln(JSON.parse(text), 'falsch'); f.push('falsches Passwort angenommen'); } catch (e) { if (!/Passwort/.test(e.message)) f.push('falsche Meldung: ' + e.message); }
+  const kaputt = JSON.parse(text); kaputt.daten = kaputt.daten.slice(0, 40) + (kaputt.daten[40] === 'A' ? 'B' : 'A') + kaputt.daten.slice(41);
+  try { await backupEntschluesseln(kaputt, 'richtig-langes-passwort'); f.push('veränderte Datei angenommen'); } catch (e) {}
+  for (const schlecht of [{ kdf: 'x' }, Object.assign({}, h, { runden: 1 }), null]) { try { await backupEntschluesseln(schlecht, 'p'); f.push('unbekanntes Format angenommen'); } catch (e) {} }
+  const ohne = JSON.parse(JSON.stringify(backup)); backupOhneVersteck(ohne);
+  const nk2 = JSON.parse(ohne.localStorage['safari-notfallkarte']);
+  if (nk2.fahrzeug['Schlüssel-Versteck'] !== '' || nk2.fahrzeug.Kennzeichen !== 'X') f.push('ohne Passwort bleibt das Schlüssel-Versteck drin');
+  console.log(f.length ? 'FEHLER: ' + f.join(' | ') : 'OK');
+})().catch(e => console.log('FEHLER: ' + e.message));`;
+  const r = node72(skript);
+  if (r !== 'OK') return r || 'keine Ausgabe';
+  const ex = fn72(js72, 'exportBackup'), im = fn72(js72, 'importBackup');
+  if (!ex || !ex.includes("await passwortDialog({ modus: 'neu' })") || !ex.includes('backupVerschluesseln(backup, passwort)') || !ex.includes('backupOhneVersteck(backup)')) return 'exportBackup fragt nicht nach dem Passwort';
+  if (!im || !im.includes('backup.verschluesselt === true') || !im.includes("await passwortDialog({ modus: 'oeffnen' })") || !im.includes('backupEntschluesseln(backup, passwort)')) return 'importBackup öffnet keine verschlüsselten Backups';
+  const dlg = fn72(js72, 'passwortDialog');
+  return (dlg && (dlg.match(/type="password"/g) || []).length === 2 && dlg.includes('p1.length < 8')) || 'Passwort-Dialog ohne verdeckte Eingabe oder Mindestlänge';
+});
+
+test('U2 (ausgeführt): automatische Sicherung — gleiche Schlüssel wie der Backup-Export, ohne Claude-Key und Position; bei fremder/fehlender Kennung wird gefragt statt überschrieben; speichere() stößt die Sicherung an, der Import sperrt sie', () => {
+  const liste = js72.match(/const SICHERUNG_SCHLUESSEL = (\[[^\]]*\]);/), exp = js72.match(/\[('safari-settings'[^\]]*)\]\.forEach\(key =>/);
+  if (!liste || !exp) return 'Schlüssellisten nicht gefunden';
+  const a = new Function('return ' + liste[1])(), b = new Function('return [' + exp[1] + ']')();
+  if (JSON.stringify(a) !== JSON.stringify(b)) return 'Sicherung und Backup-Export sichern verschiedene Schlüssel';
+  const ent = fn72(js72, 'sicherungEntscheid'), dat = fn72(js72, 'sicherungDaten');
+  if (!ent || !dat) return 'Funktionen fehlen';
+  const entscheid = new Function(ent + '; return sicherungEntscheid;')();
+  const faelle = [[null, '', 'sichern'], [{ vorhanden: false }, '', 'sichern'], [{ vorhanden: true, kennung: 'abc' }, 'abc', 'sichern'],
+    [{ vorhanden: true, kennung: 'abc' }, '', 'fragen'], [{ vorhanden: true, kennung: 'abc' }, 'xyz', 'fragen'], [{ vorhanden: true, kennung: '' }, '', 'fragen'], [{ vorhanden: true }, 'abc', 'fragen']];
+  for (const [st, k, soll] of faelle) if (entscheid(st, k) !== soll) return `sicherungEntscheid(${JSON.stringify(st)}, ${JSON.stringify(k)}) ≠ ${soll}`;
+  const speicher = { 'safari-settings': JSON.stringify({ anthropicKey: 'sk-ant-x', userLat: 1, userLng: 2, userLocationTime: 3, ollamaUrl: 'http://localhost:11434' }), 'safari-logbuch': '[]', 'fremd': 'x', 'safari-sicherung-kennung': 'abc' };
+  const daten = new Function('localStorage', 'SICHERUNG_SCHLUESSEL', dat + '; return sicherungDaten();')({ getItem: k => (k in speicher ? speicher[k] : null) }, a);
+  if (JSON.stringify(Object.keys(daten).sort()) !== '["safari-logbuch","safari-settings"]') return 'sicherungDaten liefert: ' + Object.keys(daten).join(',');
+  if (/sk-ant|userLat|userLng|userLocationTime/.test(daten['safari-settings'])) return 'Claude-Key oder Position in den Daten';
+  const sp = fn72(js72, 'speichere');
+  if (!sp || !sp.includes('try { sicherungAnstossen(); } catch (_) {}')) return 'speichere() stößt die Sicherung nicht (abgesichert) an';
+  if (js72.indexOf('const sicherungStand = ') > js72.indexOf('function speichere(key, text)')) return 'sicherungStand wird nach speichere() definiert (Zugriff vor der Initialisierung)';
+  if (!/const sicherungStand = \{[^}]*gesperrt: true/.test(js72)) return 'die Sicherung ist vor der Prüfung beim Start nicht gesperrt';
+  const st = fn72(js72, 'sicherungStart'), im = fn72(js72, 'importBackup'), wh = fn72(js72, 'sicherungWiederherstellen');
+  if (!st || !st.includes("sicherungEntscheid(status, sicherungKennungLesen()) === 'fragen'") || !st.includes('sicherungFrage(status)')) return 'beim Start wird nicht gefragt';
+  if (!im.includes('sicherungStand.gesperrt = true') || !im.includes('if (backup.nurSpeicher !== true) await new Promise')) return 'Import sperrt die Sicherung nicht oder leert bei der automatischen Sicherung die Dokumente';
+  if (!im.includes('if (!backupOhneFrage && !confirm(')) return 'Import fragt bei der automatischen Sicherung doppelt';
+  if (!wh || !wh.includes('nurSpeicher: true') || !wh.includes('localStorage.setItem(SICHERUNG_KENNUNG, d.kennung)')) return 'Wiederherstellen übernimmt die Kennung nicht';
+  if (!js72.includes('sicherungStart();')) return 'sicherungStart() wird beim Start nicht aufgerufen';
+  for (const id of ['sicherung-status', 'nk-iphone']) if (!idx72.includes(`id="${id}"`)) return 'Einstellungen ohne #' + id;
+  return /navigator\.storage\.persist\(\)/.test(st) || 'kein Antrag auf dauerhaften Speicher';
+});
+
+test('U4 (ausgeführt): Sofort-Protokoll statt KI — Stichwörter treffen das richtige Protokoll (auch en/fr/es), kein Fehlalarm bei „bitten"/„Garage"/„testing"; der Text nennt alle Schritte; Block in index und mobile byteidentisch; beide Fehlerstellen hängen ihn an', () => {
+  const marke = /\/\/ ═══ SOFORT-PROTOKOLL STATT KI[\s\S]*?\n\}\n(?=\nfunction uiMulti)/;
+  const a = idx72.match(marke), b = mob72.match(marke);
+  if (!a || !b) return 'Block nicht gefunden';
+  if (a[0] !== b[0]) return 'Block weicht zwischen index und mobile ab';
+  const prot = idx72.match(/const NOTFALL_PROTOKOLLE = \[[\s\S]*?\n\];/);
+  if (!prot) return 'NOTFALL_PROTOKOLLE nicht gefunden';
+  const api = new Function('window', 'aktivesLand', 'NOTRUF_LAENDER', prot[0] + '\n' + a[0] + '\nreturn { sofortPassend, sofortOhneKi, letzteNutzerfrage, NOTFALL_PROTOKOLLE, SOFORT_STICHWORTE };')(
+    {}, () => ({ name: 'Namibia' }), [{ land: '🇳🇦 Namibia', polizei: '10111', medizin: '924' }]);
+  for (const p of api.NOTFALL_PROTOKOLLE) if (!(api.SOFORT_STICHWORTE[p.id] || []).length) return 'Protokoll ohne Stichwörter: ' + p.id;
+  const faelle = [['Was tun bei Schlangenbiss?', 'schlange'], ['Der Hund wurde von einer Schlange gebissen!', 'schlange,tierbiss'], ['Der Motor brennt', 'brand'],
+    ['Person reagiert nicht mehr und atmet nicht', 'bewusstlos'], ['Kind hat hohes Fieber seit gestern', 'fieber'], ['starke Blutung am Bein', 'blutung'],
+    ['Zunge schwillt nach Bienenstich', 'anaphylaxie'], ['Verdacht auf Hitzschlag', 'hitze'], ['snake bite on the ankle', 'schlange'], ['morsure de serpent', 'schlange,tierbiss'],
+    ['fiebre alta', 'fieber'], ['Ich möchte dich bitten, das Öl zu wechseln', ''], ['Wo ist die nächste Garage?', ''], ['testing the brakes', ''],
+    ['Wie wechsle ich den Luftfilter?', ''], ['Fahrt nach Brandenburg', ''], ['', '']];
+  for (const [frage, soll] of faelle) {
+    const ist = api.sofortPassend(frage).map(p => p.id).join(',');
+    if (ist !== soll) return `„${frage}" → ${ist || 'nichts'} statt ${soll || 'nichts'}`;
+  }
+  const text = api.sofortOhneKi('Was tun bei Schlangenbiss?', 'medizin');
+  const schlange = api.NOTFALL_PROTOKOLLE.find(p => p.id === 'schlange');
+  if (!schlange.schritte.every((st, i) => text.includes((i + 1) + '. ' + st))) return 'nicht alle Schritte im Text';
+  if (!text.includes('Sofort-Protokoll') || !text.includes('10111') || !text.includes('924')) return 'Kopf oder Notrufnummern fehlen';
+  if (api.sofortOhneKi('Wie wechsle ich den Luftfilter?', 'mechanik') !== '') return 'Hinweis in einem Modul ohne Notfallbezug';
+  if (!api.sofortOhneKi('Mir ist schlecht', 'medizin').includes('🚨')) return 'kein Verweis auf 🚨 Notfall im Modul Medizin';
+  if (api.letzteNutzerfrage([{ role: 'user', content: 'a' }, { role: 'assistant', content: 'b' }, { role: 'user', content: 'c' }, { role: 'assistant', content: 'd' }]) !== 'c') return 'letzteNutzerfrage falsch';
+  if (!idx72.includes("const ohneKi = sofortOhneKi(letzteNutzerfrage(msgs), thisCtx);\n      if (ohneKi) addMessage('assistant', ohneKi,")) return 'index.html hängt das Protokoll nicht an';
+  return mob72.includes("const ohneKi = sofortOhneKi(letzteNutzerfrage(msgs), thisCtx);\n      if (ohneKi) appendMsgEl('assistant', ohneKi,") || 'mobile.html hängt das Protokoll nicht an';
+});
+
+test('U1 (ausgeführt, Service Worker in der Sandbox): Die iPhone-Seite bleibt ohne Mac erreichbar — Hülle aus festen Dateien, erst der Mac, bei Ausfall/403 die Hülle; Weiterleitungen und alle /api-Anfragen bleiben unberührt; andere Seiten bekommen den Hinweis', () => {
+  const sw = srv72.match(/SW_JS = "{3}([\s\S]*?)"{3}/);
+  if (!sw) return 'SW_JS fehlt';
+  const skript = `
+const quell = ${JSON.stringify(sw[1].replace('__VERSION__', 'test'))};
+const ablage = {};                      // Name → Map(Pfad → Antwort)
+const kasten = name => ({ put: async (pfad, antwort) => { (ablage[name] = ablage[name] || new Map()).set(typeof pfad === 'string' ? pfad : pfad.url, antwort); }, match: async pfad => (ablage[name] || new Map()).get(pfad) });
+const horcher = {};
+let netz = 'an';                        // 'an' | 'aus' | '403' | 'umleitung'
+const geholt = [];
+const antwort = (pfad, ok, extra) => Object.assign({ ok, status: ok ? 200 : 403, url: 'https://macbook.local:8765' + pfad, type: 'basic', text: 'NETZ ' + pfad, clone() { return Object.assign({}, this, { text: this.text }); } }, extra || {});
+const ctx = {
+  self: { addEventListener: (n, f) => { horcher[n] = f; }, skipWaiting: async () => {}, clients: { claim: async () => {} } },
+  caches: { open: async name => kasten(name), keys: async () => Object.keys(ablage), delete: async n => { delete ablage[n]; } },
+  fetch: async (anfrage) => {
+    const pfad = typeof anfrage === 'string' ? anfrage : new URL(anfrage.url).pathname;
+    geholt.push(pfad);
+    if (netz === 'aus') throw new Error('kein Netz');
+    if (netz === 'umleitung') return antwort(pfad, false, { type: 'opaqueredirect', status: 0 });
+    if (netz === '403' && pfad !== '/api/netz/hinweis') return antwort(pfad, false);
+    return antwort(pfad, true);
+  },
+  URL, Promise, setTimeout, clearTimeout, Response: { error: () => ({ fehler: true }) }
+};
+require('vm').runInNewContext(quell, ctx);
+const warte = e => { let p; horcher.fetch(Object.assign(e, { respondWith: x => { p = x; } })); return p; };
+const req = (pfad, mode, method) => ({ request: { url: 'https://macbook.local:8765' + pfad, mode: mode || 'navigate', method: method || 'GET' } });
+(async () => {
+  const f = [];
+  let w; horcher.install({ waitUntil: p => { w = p; } }); await w;
+  const huelle = ablage['safari-assistant-huelle'] || new Map();
+  const soll = ['/mobile.html', '/i18n.js', '/i18n/en.js', '/i18n/fr.js', '/i18n/es.js', '/icon.png', '/dark-logo.jpg'];
+  if (JSON.stringify([...huelle.keys()].sort()) !== JSON.stringify(soll.slice().sort())) f.push('Hülle enthält: ' + [...huelle.keys()].join(','));
+  if ([...huelle.keys()].some(k => k.startsWith('/api/'))) f.push('API-Antwort in der Hülle');
+  // 1. Mac da: Antwort des Macs, unverändert
+  let r = await warte(req('/mobile.html?t=abc'));
+  if (!r || r.text !== 'NETZ /mobile.html') f.push('mit Mac kommt nicht die Antwort des Macs');
+  // 2. Mac aus → Hülle (auch mit ?t=…)
+  netz = 'aus';
+  r = await warte(req('/mobile.html?t=abc'));
+  if (!r || r.text !== 'NETZ /mobile.html') f.push('ohne Mac keine Hülle: ' + JSON.stringify(r));
+  // 3. Mac antwortet 403 (Freigabe aus) → Hülle
+  netz = '403';
+  r = await warte(req('/mobile.html'));
+  if (!r || !r.ok) f.push('bei 403 keine Hülle');
+  // 4. Weiterleitung bleibt eine Weiterleitung
+  netz = 'umleitung';
+  r = await warte(req('/mobile.html'));
+  if (!r || r.type !== 'opaqueredirect') f.push('Weiterleitung wird durch die Hülle ersetzt');
+  // 5. andere Seite ohne Mac → Hinweis; /go/ wird nie aus der Hülle bedient
+  netz = 'aus';
+  for (const pfad of ['/pois.html', '/go/abc', '/']) { r = await warte(req(pfad)); if (!r || r.text !== 'NETZ /api/netz/hinweis') f.push(pfad + ' ohne Mac: kein Hinweis'); }
+  // 6. Skript der Hülle ohne Mac aus dem Speicher; API nie abgefangen; POST nie
+  r = await warte(req('/i18n.js', 'no-cors'));
+  if (!r || r.text !== 'NETZ /i18n.js') f.push('/i18n.js kommt ohne Mac nicht aus dem Speicher');
+  for (const [pfad, mode, methode] of [['/api/vpn/status', 'cors', 'GET'], ['/api/ollama/api/tags', 'cors', 'GET'], ['/api/notfallkarte', 'cors', 'GET'], ['/mobile.html', 'navigate', 'POST'], ['/vendor/leaflet.js', 'no-cors', 'GET']])
+    if (warte(req(pfad, mode, methode)) !== undefined) f.push('abgefangen: ' + methode + ' ' + pfad);
+  // 7. Mac wieder da: Hülle wird aufgefrischt
+  netz = 'an';
+  const vorher = geholt.length; await warte(req('/mobile.html')); await new Promise(r2 => setTimeout(r2, 10));
+  if (geholt.length === vorher) f.push('mit Mac wird nicht beim Mac nachgefragt');
+  console.log(f.length ? 'FEHLER: ' + f.join(' | ') : 'OK');
+})().catch(e => console.log('FEHLER: ' + e.message));`;
+  const r = node72(skript);
+  return r === 'OK' || r || 'keine Ausgabe';
+});
+
+test('U1 (iPhone-Seite, ausgeführt): Band „Keine Verbindung zum Mac" mit dem Weg zum Notfall; die Notfallkarte vom Mac wird maskiert gezeigt, bei abgeschalteter Freigabe gelöscht und nie ohne Kopie gerendert', () => {
+  if (!mob72) return 'mobile.html fehlt';
+  for (const n of ['id="mac-aus"', '<button onclick="openNotruf()">🚨 Notfall</button>', "band.style.display = (!macAntwortet || zugangProblem) ? '' : 'none';",
+    'html += notfallkarteBlockMobil();', "fetch(SERVER_URL + '/api/notfallkarte', { headers: zugangHeader(), cache: 'no-store' })",
+    "else if (d.freigegeben === false && !d.grund) localStorage.removeItem(NK_MOBIL_KEY);"]) if (!mob72.includes(n)) return 'fehlt: ' + n;
+  const lesen = fn72(mob72, 'nkMobilLesen'), block = fn72(mob72, 'notfallkarteBlockMobil'), esc = fn72(mob72, 'nachrichtEsc');
+  if (!lesen || !block || !esc) return 'Funktionen fehlen';
+  const boese = '<img src=x onerror=alert(1)>" onclick="x';
+  const baue = wert => new Function('localStorage', "const NK_MOBIL_KEY = 'safari-mobile-notfallkarte';\n" + esc + '\n' + lesen + '\n' + block + '\nreturn notfallkarteBlockMobil();')({ getItem: () => wert });
+  if (baue(null) !== '' || baue('kaputt{') !== '' || baue(JSON.stringify({ karte: 'text' })) !== '') return 'ohne gültige Kopie wird etwas gerendert';
+  const html = baue(JSON.stringify({ zeit: 1794600000, karte: { personen: [{ label: boese, fields: { Name: boese, [boese]: boese, Blutgruppe: '0+' } }], hund: { [boese]: boese }, fahrzeug: { Kennzeichen: boese }, versicherung: 'kein Objekt', kontakte: null } }));
+  if (!html.includes('0+') || !html.includes('Blutgruppe')) return 'Felder fehlen in der Anzeige';
+  if (/<img|onerror=alert\(1\)>|" onclick="x"/.test(html)) return 'Markup aus der Karte kommt ungeschützt an';
+  return true;
+});
+
+test('U6: Servermeldungen folgen dem Ablauf vom 18.10. — kein „⚙️ Einstellungen → iPhone-Modus steht die vollständige Adresse (http://…)" mehr; die neuen Meldungen sind in en, fr und es übersetzt', () => {
+  if (/vollständige Adresse \(http:\/\/<Mac-IP>/.test(srv72)) return 'alte Meldung steht noch in server.py';
+  const texte = ['Zugangscode fehlt oder ist falsch. Am Mac: ⚙️ Einstellungen → Mobile App → „QR-Code zeigen“ — den Code mit der Kamera des iPhones scannen.',
+    'Dieser Zugangscode ist ungültig. Am Mac: ⚙️ Einstellungen → Mobile App → „QR-Code zeigen“.', 'Anfrage von fremder Webseite abgelehnt.'];
+  for (const t of texte) if (!srv72.replace(/'\s*\n\s*'/g, '').includes(t)) return 'server.py ohne: ' + t.slice(0, 50);
+  const fehler = [];
+  for (const l of SPR64) { const sb = i18nSandbox64(JSON.stringify(l)); sb.ladeWb(l); for (const t of texte) if (sb.ctx.DARK_I18N.t(t) === t) fehler.push(l + ': ' + t.slice(0, 40)); }
+  return !fehler.length || 'unübersetzt: ' + fehler.join(' | ');
+});
+
+test('I18N 2026-11-14-1 (ausgeführt): jeder neue Text — Sicherung, Passwort-Dialog, Band am iPhone, Sofort-Protokoll statt KI (ganzer Text über tMulti) — ist in en, fr UND es übersetzt, ohne deutsche Reste', () => {
+  const marke = /\/\/ ═══ SOFORT-PROTOKOLL STATT KI[\s\S]*?\n\}\n(?=\nfunction uiMulti)/;
+  const blockU4 = idx72.match(marke), prot = idx72.match(/const NOTFALL_PROTOKOLLE = \[[\s\S]*?\n\];/);
+  if (!blockU4 || !prot) return 'Block fehlt';
+  const texte = ['Automatische Sicherung auf diesem Mac', 'Jetzt sichern', 'Aus der automatischen Sicherung wiederherstellen', 'Wiederherstellen', 'Notfallkarte fürs iPhone bereitstellen',
+    'Wartet auf deine Entscheidung (Hinweis oben).', 'Nicht gesichert: Der Server kennt die Sicherung nicht (alt oder aus).', 'Zuletzt gesichert: 14.11.2026, 08:30 · 412 KB', 'Noch keine Sicherung.',
+    'Diese Ansicht ist leer — auf diesem Mac liegt eine Sicherung.', 'Auf diesem Mac liegt eine Sicherung aus einem anderen Browser-Speicher.', 'Stand der Sicherung:',
+    'Der Claude-Key gehört nicht zur Sicherung — nach dem Wiederherstellen einmal neu eintragen.', 'Leer weitermachen', 'Den Stand hier behalten', 'Gesichert.', 'Es gibt noch keine Sicherung.',
+    'Backup mit Passwort schützen?', 'Dieses Backup ist verschlüsselt', 'Bitte das Passwort eingeben, mit dem es erstellt wurde.', 'Passwort (mindestens 8 Zeichen)', 'Passwort wiederholen', 'Passwort eingeben',
+    'Mindestens 8 Zeichen.', 'Die beiden Eingaben sind verschieden.', 'Bitte ein Passwort eingeben.', 'Ohne Passwort', 'Verschlüsseln', 'Öffnen', 'Abgebrochen — kein Backup erstellt.',
+    'Abgebrochen — nichts wiederhergestellt.', '⚠️ Fehler: Falsches Passwort — oder die Datei ist beschädigt', 'Keine Verbindung zum Mac',
+    'Sofort-Protokolle, Notrufnummern und deine Position funktionieren trotzdem. KI-Antworten erst wieder mit dem Mac.', 'Neu verbinden',
+    'Kopie vom Mac, liegt auf diesem iPhone. Ändern am Mac: 🆘 Notfall-Karte.', '📋 ohne KI'];
+  const DEUTSCH = /(?:^|[^\p{L}])(?:Sicherung|sichern|gesichert|Wiederherstellen|Passwort|verschlüsselt|Verbindung|Schritt|ohne|oder|nicht|und|der|die|das|auf|diesem|liegt|unter|stehen|Notfall|Notrufnummern|Polizei|Rettung|Kopie|Ändern|eingeben|Zeichen|Abgebrochen|Zuletzt|trotzdem)(?![\p{L}])/u;
+  const fehler = [];
+  for (const l of SPR64) {
+    const sb = i18nSandbox64(JSON.stringify(l));
+    sb.ladeWb(l);
+    const t = sb.ctx.DARK_I18N.t, tm = sb.ctx.DARK_I18N.tMulti;
+    const falsch = texte.filter(s => { const r = t(s); return r === s || DEUTSCH.test(r); });
+    if (falsch.length) fehler.push(`${l}: ${JSON.stringify(falsch[0].slice(0, 60))} → ${JSON.stringify(t(falsch[0]).slice(0, 60))}`);
+    // der angehängte Protokoll-Text entsteht in der Oberflächensprache (DARK_I18N.t pro Zeile)
+    const api = new Function('window', 'DARK_I18N', 'aktivesLand', 'NOTRUF_LAENDER', prot[0] + '\n' + blockU4[0] + '\nreturn { sofortOhneKi };')({ DARK_I18N: sb.ctx.DARK_I18N }, sb.ctx.DARK_I18N, () => ({ name: 'Namibia' }), [{ land: '🇳🇦 Namibia', polizei: '10111', medizin: '924' }]);
+    for (const [frage, ctx] of [['Schlangenbiss', 'medizin'], ['Mir ist schlecht', 'notfall']]) {
+      const zeilen = api.sofortOhneKi(frage, ctx).split('\n').filter(z => z.trim());
+      const de = zeilen.filter(z => DEUTSCH.test(z.replace(/🇳🇦 Namibia/, '')));
+      if (de.length) fehler.push(`${l} (Protokoll-Text): ${JSON.stringify(de[0].slice(0, 70))}`);
+    }
+  }
+  return !fehler.length || fehler.join(' | ');
+});
+
+// =============================================
+console.log('\n=== 73. OBERFLÄCHE 2026-11-14-2 — Mac und iPhone neu geordnet ===');
+// =============================================
+// Anlass: „Die Mac-Oberfläche ist sehr heavy." Die Bausteine (IDs, Handler, data-module) bleiben, eine zweite Stilebene
+// und wenige Umstellungen ordnen sie neu. Mac: Notfall-Knopf oben, Einstellungen in fünf Bereichen, kurze Anleitung,
+// ruhiger Start-Hinweis. iPhone: Kopf mit Einstellungen · Bereich · Notfall, Bereiche als Blatt, Antwortsprache als Knopf.
+const idx73 = loadFile('index.html'), mob73 = loadFile('mobile.html'), srv73 = loadFile('server.py');
+const js73 = idx73 ? idx73.slice(idx73.indexOf('<script>', idx73.lastIndexOf('</style>'))) : '';
+const mjs73 = mob73 ? mob73.slice(mob73.indexOf('<script>', mob73.lastIndexOf('</style>'))) : '';
+function ebene73(html) {
+  const a = html.indexOf('<style id="oberflaeche-2">');
+  return a < 0 ? null : html.slice(a, html.indexOf('</style>', a));
+}
+function stubEl73() {
+  const e = { style: {}, attrs: {}, dataset: {}, textContent: '', scrollTop: 5, _kl: new Set(), setAttribute(k, v) { this.attrs[k] = v; } };
+  e.classList = { contains: k => e._kl.has(k), toggle: (k, an) => { if (an) e._kl.add(k); else e._kl.delete(k); } };
+  return e;
+}
+
+test('STILEBENE (index + mobile): <style id="oberflaeche-2"> steht HINTER der ersten Ebene und vor dem Skript; Systemschrift statt Festbreite (--mono → --sans, --code für Code); keine Schrift unter 12 px; Größen aus style-Attributen (9/10/11 px) werden angehoben', () => {
+  const fehler = [];
+  for (const [name, html] of [['index', idx73], ['mobile', mob73]]) {
+    if (!html) { fehler.push(name + ': Datei fehlt'); continue; }
+    const e = ebene73(html);
+    if (!e) { fehler.push(name + ': Ebene fehlt'); continue; }
+    if (html.indexOf('<style id="oberflaeche-2">') < html.indexOf('</style>')) fehler.push(name + ': Ebene steht vor dem Ende der ersten');
+    if (html.indexOf('<style id="oberflaeche-2">') > html.indexOf('<body')) fehler.push(name + ': Ebene steht nicht im <head>');
+    const ohneAttr = e.replace(/\[style\*=[^\]]*\]/g, '');
+    const klein = (ohneAttr.match(/font-size:\s*([0-9.]+)px/g) || []).map(x => parseFloat(x.replace(/[^0-9.]/g, ''))).filter(n => n < 12);
+    if (klein.length) fehler.push(name + ': Schriftgrößen unter 12 px: ' + klein.join(','));
+  }
+  const e = ebene73(idx73 || '') || '';
+  for (const n of ['--mono: var(--sans);', '--code:', '[style*="font-size:10px"]', '[style*="font-size:11px"]', '{ font-size: 12px !important; }', '{ font-size: 13px !important; }'])
+    if (!e.includes(n)) fehler.push('index: fehlt ' + n);
+  return !fehler.length || fehler.join(' | ');
+});
+
+test('MAC-NOTFALL: roter Knopf #notfall-knopf steht in der Seitenleiste über allen Gruppen, die Notfall-Gruppe vor Offline/Online/Werkzeugen; oeffneNotfall() öffnet die Notfall-Karte (ausgeführt), Ctrl+Umschalt+N ruft sie', () => {
+  if (!idx73) return 'index.html fehlt';
+  const k = idx73.indexOf('id="notfall-knopf" onclick="oeffneNotfall()"');
+  const g = ['group-notfall', 'group-offline', 'group-online', 'group-tools'].map(x => idx73.indexOf('id="' + x + '"'));
+  if (k < 0 || g.some(x => x < 0)) return 'Knopf oder Gruppe fehlt';
+  if (!(k < g[0] && g[0] < g[1] && g[1] < g[2] && g[2] < g[3])) return 'Reihenfolge: Knopf, Notfall, Offline, Online, Werkzeuge erwartet';
+  const fn = fn72(js73, 'oeffneNotfall');
+  if (!fn) return 'oeffneNotfall() fehlt';
+  const gerufen = [], karte = { id: 'karte' }, inhalt = { scrollTop: 400 };
+  const doc = { querySelector: sel => (gerufen.push(sel), karte), getElementById: id => id === 'notfallkarte-body' ? inhalt : null };
+  new Function('document', 'switchModule', fn + '\noeffneNotfall();')(doc, n => gerufen.push(n));
+  if (gerufen[0] !== '.nav-item[data-module="notfallkarte"]' || gerufen[1] !== karte) return 'öffnet nicht die Notfall-Karte';
+  if (inhalt.scrollTop !== 0) return 'Karte nicht an den Anfang gerollt';
+  if (!js73.includes("if (e.ctrlKey && e.shiftKey && !e.metaKey && !e.altKey && (e.key === 'N' || e.key === 'n')) { e.preventDefault(); oeffneNotfall(); }")) return 'Tastenkürzel fehlt';
+  return true;
+});
+
+test('MAC-SEITENLEISTE: Einstellungen und iPhone stehen im Fuß (.nav-fuss, weiter als nav-item mit data-module="settings"), „Beenden" klein in der Sprachzeile; die Anleitung bleibt als versteckter Eintrag erreichbar; der Fuß passt in die Leiste (min-width: 0, Name kürzbar)', () => {
+  if (!idx73) return 'index.html fehlt';
+  const fuss = idx73.indexOf('<div class="nav-fuss"'), zeile = idx73.indexOf('<div class="ui-lang-row">'), ende = idx73.indexOf('id="nav-hilfe"');
+  if (fuss < 0 || zeile < fuss || ende < zeile) return 'Fuß, Sprachzeile oder versteckter Eintrag fehlt/Reihenfolge';
+  const imFuss = idx73.slice(fuss, zeile), inZeile = idx73.slice(zeile, ende);
+  if (!imFuss.includes('class="nav-item nav-fuss-knopf" title="Einstellungen" aria-label="Einstellungen" data-module="settings" onclick="switchModule(this)"')) return 'Einstellungen nicht im Fuß';
+  if (!imFuss.includes('id="nav-iphone"') || !imFuss.includes('onclick="oeffneIphoneEinstellungen()"')) return 'iPhone nicht im Fuß';
+  if (imFuss.includes('id="shutdown"') || !inZeile.includes('class="nav-item fuss-aus"') || !inZeile.includes('id="shutdown" onclick="shutdownApp()"')) return 'Beenden steht nicht in der Sprachzeile';
+  if ((idx73.slice(0, idx73.indexOf('<script>', fuss)).match(/data-module="settings"/g) || []).length !== 1) return 'Einstellungen doppelt in der Seitenleiste';
+  if (!idx73.includes('<div class="nav-item" id="nav-hilfe" hidden data-module="hilfe" onclick="switchModule(this)">')) return 'versteckter Eintrag für die Anleitung fehlt';
+  const e = ebene73(idx73) || '';
+  for (const n of ['.nav-fuss .nav-fuss-knopf { flex: 1 1 auto; min-width: 0;', '.nav-fuss .nav-fuss-knopf .nav-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }', '#shutdown.fuss-aus { flex: 0 0 26px;'])
+    if (!e.includes(n)) return 'Stil fehlt: ' + n;
+  return true;
+});
+
+test('MAC-EINSTELLUNGEN (ausgeführt): fünf Bereiche als Reiter; JEDE Gruppe der Einstellungen trägt einen der fünf Bereiche, jeder Bereich hat mindestens eine Gruppe und eine Anzeige-Regel; einstellungenBereich() schaltet Panel + Reiter um, Unbekanntes → Allgemein; VPN-Kachel und iPhone-Zeile springen in ihren Bereich', () => {
+  if (!idx73) return 'index.html fehlt';
+  const a = idx73.indexOf('<div class="panel" id="panel-settings" data-bereich="allgemein">');
+  if (a < 0) return 'Panel ohne Startbereich';
+  const panel = idx73.slice(a, idx73.indexOf('<script>', a));
+  const soll = ['allgemein', 'ki', 'iphone', 'netz', 'daten'];
+  const reiter = [...panel.matchAll(/<button type="button" role="tab" data-bereich="([a-z]+)"[^>]*onclick="einstellungenBereich\('([a-z]+)'\)">/g)].map(m => m[1] === m[2] ? m[1] : '?');
+  if (JSON.stringify(reiter) !== JSON.stringify(soll)) return 'Reiter: ' + reiter.join(',');
+  const gruppen = [...panel.matchAll(/<div class="settings-group"([^>]*)>/g)].map(m => (m[1].match(/data-bereich="([a-z]+)"/) || [])[1] || '(ohne)');
+  if (gruppen.length < 9) return 'nur ' + gruppen.length + ' Gruppen gefunden';
+  const fremd = gruppen.filter(g => !soll.includes(g));
+  if (fremd.length) return 'Gruppe ohne gültigen Bereich: ' + fremd.join(',') + ' — sie wäre unsichtbar';
+  const leer = soll.filter(b => !gruppen.includes(b));
+  if (leer.length) return 'Bereich ohne Gruppe: ' + leer.join(',');
+  const e = ebene73(idx73) || '';
+  if (!e.includes('#panel-settings .settings-group[data-bereich] { display: none;')) return 'Grundregel fehlt';
+  for (const b of soll) if (!e.includes(`#panel-settings[data-bereich="${b}"] .settings-group[data-bereich="${b}"]`)) return 'Anzeige-Regel fehlt: ' + b;
+  const fn = fn72(js73, 'einstellungenBereich'), liste = js73.match(/const EINST_BEREICHE = \[[^\]]*\];/);
+  if (!fn || !liste) return 'einstellungenBereich() oder EINST_BEREICHE fehlt';
+  const knoepfe = soll.map(b => { const k = stubEl73(); k.dataset.bereich = b; return k; }), inhalt = { scrollTop: 300 };
+  const p = { dataset: {}, querySelectorAll: () => knoepfe, querySelector: () => inhalt };
+  const api = new Function('document', liste[0] + '\n' + fn + '\nreturn { einstellungenBereich, EINST_BEREICHE };')({ getElementById: id => id === 'panel-settings' ? p : null });
+  if (JSON.stringify(api.EINST_BEREICHE) !== JSON.stringify(soll)) return 'EINST_BEREICHE weicht von den Reitern ab';
+  api.einstellungenBereich('netz');
+  if (p.dataset.bereich !== 'netz' || !knoepfe[3]._kl.has('active') || knoepfe[0]._kl.has('active') || knoepfe[3].attrs['aria-selected'] !== 'true' || knoepfe[0].attrs['aria-selected'] !== 'false') return 'Umschalten auf „netz" falsch';
+  if (inhalt.scrollTop !== 0) return 'Bereich nicht an den Anfang gerollt';
+  api.einstellungenBereich('gibtsnicht');
+  if (p.dataset.bereich !== 'allgemein' || !knoepfe[0]._kl.has('active')) return 'unbekannter Bereich landet nicht bei „allgemein"';
+  const offen = einzeiler72(js73, 'oeffneEinstellungen');
+  if (!offen || !offen.includes('if (bereich) einstellungenBereich(bereich);')) return 'oeffneEinstellungen(bereich) fehlt';
+  if (!js73.includes("function oeffneIphoneEinstellungen() { oeffneEinstellungen('iphone'); }")) return 'oeffneIphoneEinstellungen() fehlt';
+  const vpn = fn72(js73, 'oeffneVpnEinstellungen') || einzeiler72(js73, 'oeffneVpnEinstellungen') || '';
+  if (!vpn.includes("oeffneEinstellungen('netz')")) return 'VPN-Kachel öffnet nicht den Bereich Netz';
+  return true;
+});
+
+test('MAC-ANLEITUNG: „iPhone verbinden" zeigt sieben kurze Karten; die ausführliche Fassung (Netz-Varianten, Terminal-Befehle, Fehlersuche) steht WÖRTLICH darunter — zugeklappt in <details class="anleitung-mehr">', () => {
+  if (!idx73) return 'index.html fehlt';
+  const a = idx73.indexOf('<div class="panel" id="panel-hilfe">'), b = idx73.indexOf('<div class="panel" id="panel-dokumente">');
+  if (a < 0 || b < a) return 'Panel fehlt';
+  const panel = idx73.slice(a, b), d = panel.indexOf('<details class="anleitung-mehr">');
+  if (d < 0 || panel.includes('<details class="anleitung-mehr" open')) return 'ausführlicher Teil fehlt oder ist aufgeklappt';
+  const kurz = panel.slice(0, d), lang = panel.slice(d);
+  const karten = (kurz.match(/<div class="anleitung-karte/g) || []).length;
+  if (karten !== 7) return karten + ' Karten statt 7';
+  for (const n of ['<div class="anleitung-titel">Einmal einrichten</div>', '<div class="anleitung-titel">Wenn der Mac nicht antwortet</div>', 'onclick="oeffneIphoneEinstellungen()">Zur Einrichtung</button>', '<div class="anleitung-karte anleitung-warnung">'])
+    if (!kurz.includes(n)) return 'kurze Fassung: fehlt ' + n;
+  for (const n of ['Starlink als Router', 'ipconfig getifaddr en0', 'networksetup', 'Einmalig: Zertifikat aufs iPhone', '🔒 Sicherheit'])
+    if (!lang.includes(n)) return 'ausführliche Fassung: fehlt ' + n;
+  if (kurz.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').length > 2600) return 'kurze Fassung ist nicht mehr kurz';
+  return true;
+});
+
+test('MAC-START-HINWEIS + BÄNDER: „Die lokale KI läuft nicht" ist eine zugeklappte Zeile (<details>, „Erneut prüfen" in der Zeile, Befehle und Adresse im aufklappbaren Teil); das Band der Sicherung steht im Seitenfluss über dem Inhalt (.main, nicht schwebend); pruefeServer() zeigt die kiwix-Warnung, die /api/ping liefert', () => {
+  if (!idx73 || !srv73) return 'Datei fehlt';
+  const fn = fn72(js73, 'renderStartBanner');
+  if (!fn) return 'renderStartBanner() fehlt';
+  const a = fn.indexOf('<details class="start-banner-klapp"><summary>'), z = fn.indexOf('</summary>', a), ende = fn.indexOf('</details>', a);
+  if (a < 0 || z < a || ende < z) return 'kein zugeklappter Hinweis';
+  const zeile = fn.slice(a, z), rest = fn.slice(z, ende);
+  if (fn.includes('<details class="start-banner-klapp" open')) return 'Hinweis ist aufgeklappt';
+  for (const n of ['<span class="start-banner-title">Die lokale KI läuft nicht</span>', 'Sofort-Protokolle, Karte, Logbuch und Notizen gehen trotzdem.', 'onclick="event.preventDefault();checkOllama(true)">Erneut prüfen</button>'])
+    if (!zeile.includes(n)) return 'Zeile: fehlt ' + n;
+  for (const n of ['<code>ollama serve</code>', '<code>brew install ollama</code>', '<span class="start-banner-adresse" data-i18n-skip>${escHtml(url)}</span>', "oeffneEinstellungen('ki')"])
+    if (!rest.includes(n)) return 'aufklappbarer Teil: fehlt ' + n;
+  const frage = fn72(js73, 'sicherungFrage');
+  if (!frage || !frage.includes("const main = document.querySelector('.main');") || !frage.includes('if (main) main.insertBefore(el, main.firstChild); else document.body.appendChild(el);')) return 'Band der Sicherung hängt nicht im Seitenfluss';
+  if (!(ebene73(idx73) || '').includes('.main > .hinweis-band { position: static; transform: none;')) return 'Band schwebt weiter (Stil fehlt)';
+  const ps = fn72(js73, 'pruefeServer');
+  if (!ps || !ps.includes('const kiwixWarnung = p.kiwix_offen') || !ps.includes('+ iphone + portWarnung + kiwixWarnung;')) return 'kiwix-Warnung fehlt in pruefeServer()';
+  if (!srv73.includes('kiwix_offen=bool(KIWIX_PROC is not None and not KIWIX_NUR_LOKAL)')) return 'server.py liefert kiwix_offen nicht';
+  return true;
+});
+
+test('MAC-FELDER + KONTRAST (gerechnet): Eingabefelder ohne eigene Klasse (Logbuch, Checklisten) bekommen das dunkle Aussehen — über :where(), damit jede Regel mit Klasse weiter vorgeht; die geöffnete Sofort-Karte zeigt nicht mehr „… Schritte · antippen"; Textfarben der Ebene gegen ihre Flächen ≥ 4,5 : 1', () => {
+  const e = ebene73(idx73 || '') || '';
+  if (!e.includes(':where(.main) :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]), textarea) {')) return 'Feld-Regel fehlt';
+  if (!e.includes('color-scheme: dark;')) return 'color-scheme fehlt (Kalendersymbol im Datumsfeld bliebe schwarz)';
+  if (!e.includes('.sofort-card.open .sofort-card-sub { display: none; }')) return 'Untertitel der offenen Karte bleibt';
+  if (!e.includes('.welcome-title, .welcome-title[style] {') || !e.includes('font-style: normal !important;')) return 'Titel bleibt kursiv';
+  // Kontrast: nur die Textfarbe wird angehoben (style beginnt damit oder „;color:") — nicht border-color/background-color
+  for (const n of ['.w-faellig, [style^="color:#e24b4a"], [style*=";color:#e24b4a"] { color: #f0706a !important; }', '[style^="color:#3a9d6b"], [style*=";color:#3a9d6b"] { color: #4fbf88 !important; }', '[style*="background:#6b6b6b"] { background: #8a8a8a !important; }'])
+    if (!e.includes(n)) return 'Kontrast-Regel fehlt: ' + n;
+  if (/\[style\*="color:#(e24b4a|3a9d6b)"\]/.test(e)) return 'Kontrast-Regel trifft auch border-color/background-color';
+  // gerechnet statt behauptet: Textfarben der Ebene gegen ihre drei Flächen, jeweils mindestens 4,5 : 1
+  const lum = h => { const [r, g, b] = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(c => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const kontrast = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  const farbe = n => (e.match(new RegExp('--' + n + ': (#[0-9a-f]{6})')) || [])[1];
+  const flaechen = ['bg', 'surface', 'surface2'].map(farbe), texte = ['text', 'text2', 'text3'].map(farbe).concat(['#f0706a', '#4fbf88']);
+  if (flaechen.concat(texte).some(x => !x)) return 'Farbwerte der Ebene nicht gefunden';
+  for (const t of texte) for (const f of flaechen) if (kontrast(t, f) < 4.5) return `Kontrast ${t} auf ${f}: ${kontrast(t, f).toFixed(2)}`;
+  if (kontrast('#111111', '#8a8a8a') < 4.5 || kontrast('#ffffff', farbe('notfall') || '#000000') < 4.5) return 'Kontrast Abzeichen/Notfall-Knopf';
+  return true;
+});
+
+test('IPHONE-KOPF: Kopf mit genau drei Knöpfen — Einstellungen · Bereich · Notfall (je 44 pt); #mod-bar liegt im Blatt #modul-overlay (zu beim Start), vor der VPN-Leiste; jedes Werkzeug im Blatt hat einen Namen (aria-label → ::after), ⚙️/🚨 erscheinen dort nicht doppelt; die Zahl neuer wichtiger Meldungen steht auch am Kopf', () => {
+  if (!mob73) return 'mobile.html fehlt';
+  const a = mob73.indexOf('<header class="kopf" id="kopf">'), z = mob73.indexOf('</header>', a);
+  if (a < 0 || z < a) return 'Kopf fehlt';
+  const kopf = mob73.slice(a, z);
+  const knoepfe = [...kopf.matchAll(/<button class="([^"]+)"[^>]*onclick="([^"]+)"/g)].map(m => m[2]);
+  if (JSON.stringify(knoepfe) !== JSON.stringify(['openSetup()', 'modulBlatt(true)', 'openNotruf()'])) return 'Knöpfe im Kopf: ' + knoepfe.join(', ');
+  if (!kopf.includes('<button class="kopf-knopf kopf-notfall" onclick="openNotruf()" aria-label="Notfall">🚨</button>')) return 'Notfall-Knopf';
+  if (!kopf.includes('id="kopf-titel" onclick="modulBlatt(true)" aria-haspopup="dialog" aria-expanded="false" aria-controls="modul-overlay"') || /id="kopf-titel"[^>]*aria-label=/.test(kopf)) return 'Titel-Knopf (ein aria-label würde den Namen des Bereichs überdecken)';
+  const o = mob73.indexOf('<div id="modul-overlay" class="modul-overlay" style="display:none"'), bar = mob73.indexOf('<div class="mod-bar" id="mod-bar"></div>'), vpn = mob73.indexOf('id="vpn-leiste"');
+  if (o < 0 || bar < o || vpn < bar) return 'Blatt, #mod-bar, VPN-Leiste: Reihenfolge';
+  if (!mob73.slice(o, bar).includes('role="dialog" aria-modal="true" aria-label="Bereich wählen"')) return 'Blatt ohne Dialog-Rolle';
+  const leiste = fn72(mjs73, 'renderModBar');
+  if (!leiste || !leiste.includes('kopfTitelZeigen();')) return 'renderModBar() aktualisiert den Kopf nicht';
+  const werkzeuge = [...leiste.matchAll(/`<button class="mod-btn" onclick="(\w+)\(\)"([^>]*)>/g)];
+  if (werkzeuge.length !== 5) return werkzeuge.length + ' feste Knöpfe statt 5';
+  const ohneName = werkzeuge.filter(m => !/aria-label="[^"]+"/.test(m[2])).map(m => m[1]);
+  if (ohneName.length) return 'ohne Namen im Blatt: ' + ohneName.join(',');
+  const e = ebene73(mob73) || '';
+  for (const n of ['.kopf-knopf { flex: 0 0 44px; width: 44px; height: 44px;', '.modul-blatt .mod-btn:not([data-ctx])::after { content: attr(aria-label);', '.modul-blatt .mod-btn[onclick="openSetup()"], .modul-blatt .mod-btn[onclick="openNotruf()"] { display: none; }',
+    '.modul-blatt .mod-btn[data-ctx] { grid-column: span 3;', '.modul-blatt { width: 100%; max-height: 86dvh; overflow-y: auto;'])
+    if (!e.includes(n)) return 'Stil fehlt: ' + n;
+  if (!/\.kopf-titel \{[^}]*min-height: 44px;/.test(e)) return 'Titel-Knopf unter 44 pt';
+  const badge = fn72(mjs73, 'zeigeNachrichtenBadgeMobil');
+  if (!badge || !badge.includes("const k = document.getElementById('kopf-badge');")) return 'Zahl der Meldungen fehlt am Kopf';
+  if (mjs73.indexOf('modulBlattEinrichten();\nrenderModBar();') < 0) return 'modulBlattEinrichten() läuft nicht vor dem ersten renderModBar()';
+  return true;
+});
+
+test('IPHONE-KOPF (ausgeführt): kopfTitelZeigen() zeigt Symbol + Kurzname des Bereichs; modulBlatt(true/false) öffnet/schließt und meldet aria-expanded; ein Tipp auf einen Knopf im Blatt schließt es (Bereichswechsel UND Werkzeug), ein Tipp daneben nicht; Escape schließt', () => {
+  const namen = ['kopfTitelZeigen', 'modulBlatt', 'modulBlattEinrichten', 'sprachLeiste'];
+  const quelle = namen.map(n => fn72(mjs73, n));
+  if (quelle.some(q => !q)) return 'fehlt: ' + namen.filter((n, i) => !quelle[i]).join(',');
+  const els = { 'kopf-titel-text': stubEl73(), 'modul-overlay': stubEl73(), 'kopf-titel': stubEl73(), 'lang-bar': stubEl73(), 'lang-knopf': stubEl73() };
+  const horcher = {};
+  els['mod-bar'] = { addEventListener: (t, f) => { horcher.klick = f; } };
+  const doc = { getElementById: id => els[id] || null, addEventListener: (t, f) => { horcher[t] = f; } };
+  const api = new Function('document', 'MODULES', 'currentCtx', quelle.join('\n') + '\nreturn { kopfTitelZeigen, modulBlatt, modulBlattEinrichten, sprachLeiste };')(doc, { medizin: { icon: '🏥', label: 'Medizin & Erste Hilfe — Notfall' } }, 'medizin');
+  api.kopfTitelZeigen();
+  if (els['kopf-titel-text'].textContent !== '🏥 Medizin & Erste Hilfe') return 'Titel: ' + els['kopf-titel-text'].textContent;
+  api.sprachLeiste(true);
+  api.modulBlatt(true);
+  if (els['modul-overlay'].style.display !== 'flex' || els['kopf-titel'].attrs['aria-expanded'] !== 'true') return 'öffnet nicht';
+  if (els['lang-bar']._kl.has('offen')) return 'Sprachauswahl bleibt unter dem Blatt offen';
+  api.modulBlattEinrichten();
+  if (typeof horcher.klick !== 'function' || typeof horcher.keydown !== 'function') return 'Horcher fehlen';
+  horcher.klick({ target: { closest: s => null } });
+  if (els['modul-overlay'].style.display !== 'flex') return 'Tipp neben die Knöpfe schließt das Blatt';
+  horcher.klick({ target: { closest: s => s === '.mod-btn' ? {} : null } });
+  if (els['modul-overlay'].style.display !== 'none' || els['kopf-titel'].attrs['aria-expanded'] !== 'false') return 'Tipp auf einen Knopf schließt nicht';
+  api.modulBlatt(true); horcher.keydown({ key: 'Escape' });
+  if (els['modul-overlay'].style.display !== 'none') return 'Escape schließt nicht';
+  return true;
+});
+
+test('IPHONE-ANTWORTSPRACHE (ausgeführt): die sieben Sprachknöpfe bleiben, die Leiste ist zu (.lang-bar:not(.offen)); der 🌐-Knopf in der Statuszeile klappt sie auf und zu und zeigt das Kürzel der Wahl; setLang() schließt und aktualisiert, ladeAntwortsprache() aktualisiert; Tippfläche 44 pt', () => {
+  if (!mob73) return 'mobile.html fehlt';
+  const st = mob73.indexOf('<div id="status-hint">'), lb = mob73.indexOf('<div class="lang-bar" id="lang-bar">');
+  if (st < 0 || lb < st) return 'Statuszeile oder Sprachleiste fehlt';
+  if (!mob73.slice(st, lb).includes('<button class="lang-knopf" id="lang-knopf" onclick="sprachLeiste()" aria-expanded="false" aria-controls="lang-bar" title="Antwortsprache">')) return '🌐-Knopf fehlt in der Statuszeile';
+  if ((mob73.match(/<button class="lang-btn( active)?" data-lang="[^"]+" onclick="setLang\(this\)">/g) || []).length !== 7) return 'nicht mehr sieben Sprachknöpfe';
+  const e = ebene73(mob73) || '';
+  for (const n of ['.lang-bar:not(.offen) { display: none; }', ".lang-knopf::before { content: ''; position: absolute; inset: -8px -6px; }", '.lang-btn { min-height: 44px;'])
+    if (!e.includes(n)) return 'Stil fehlt: ' + n;
+  const quelle = ['sprachLeiste', 'sprachKnopfZeigen'].map(n => fn72(mjs73, n));
+  if (quelle.some(q => !q)) return 'Funktion fehlt';
+  const els = { 'lang-bar': stubEl73(), 'lang-knopf': stubEl73(), 'lang-knopf-text': stubEl73() }, aktiv = { textContent: '🇩🇪 DE' };
+  const doc = { getElementById: id => els[id] || null, querySelector: s => s === '.lang-btn.active' ? aktiv : null };
+  const api = new Function('document', quelle.join('\n') + '\nreturn { sprachLeiste, sprachKnopfZeigen };')(doc);
+  api.sprachLeiste();
+  if (!els['lang-bar']._kl.has('offen') || els['lang-knopf'].attrs['aria-expanded'] !== 'true') return 'klappt nicht auf';
+  api.sprachLeiste();
+  if (els['lang-bar']._kl.has('offen') || els['lang-knopf'].attrs['aria-expanded'] !== 'false') return 'klappt nicht zu';
+  api.sprachLeiste(true); api.sprachLeiste(true);
+  if (!els['lang-bar']._kl.has('offen')) return 'sprachLeiste(true) ist kein fester Zustand';
+  api.sprachKnopfZeigen();
+  if (els['lang-knopf-text'].textContent !== 'DE') return 'Kürzel: ' + els['lang-knopf-text'].textContent;
+  aktiv.textContent = '🇹🇿 SW'; api.sprachKnopfZeigen();
+  if (els['lang-knopf-text'].textContent !== 'SW') return 'Kürzel nach Wechsel: ' + els['lang-knopf-text'].textContent;
+  const setzen = fn72(mjs73, 'setLang'), laden = fn72(mjs73, 'ladeAntwortsprache');
+  if (!setzen || !setzen.includes('sprachKnopfZeigen(); sprachLeiste(false);')) return 'setLang() schließt/aktualisiert nicht';
+  if (!laden || !laden.includes('sprachKnopfZeigen();')) return 'ladeAntwortsprache() aktualisiert den Knopf nicht';
+  return true;
+});
+
+test('IPHONE-BLÄTTER: das Einstellungs-Blatt ist höchstens 92 % des Bildschirms hoch und rollt (vorher 994 px Inhalt auf 844 px — Kopf, Version und Darstellung lagen unerreichbar über dem Bildschirm); Botschaftsnummern im Notruf-Blatt 14 px mit 44-pt-Tippfläche; keine Schrift unter 12 px aus style-Attributen', () => {
+  const e = ebene73(mob73 || '') || '';
+  if (!e.includes('#setup-overlay > div { max-height: 92dvh; overflow-y: auto;')) return 'Regel fehlt';
+  // Review U5: die Botschaftsnummern im Notruf-Blatt waren 11 px groß und 15 px hoch zum Tippen
+  if (!e.includes('#notruf-gps-box [style*="font-size:11px"] { font-size: 14px !important;')) return 'Botschaftszeile bleibt klein';
+  if (!e.includes('#notruf-gps-box strong > a[href^="tel:"] { display: inline-block; padding: 12px 2px;')) return 'Botschaftsnummern ohne Tippfläche';
+  if (!mob73.includes('<div style="font-size:11px;color:var(--text2);margin-bottom:8px">DE-Botschaft: <strong>${telHtml(eintrag.botschaft)}</strong>')) return 'die Regel greift nicht mehr: Aufbau der Botschaftszeile hat sich geändert';
+  if (!/\[style\*="font-size:10px"\][^{]*\{ font-size: 12px !important; \}/.test(e.replace(/\n\s*/g, ' '))) return 'kleine Schrift aus style-Attributen wird nicht angehoben';
+  return true;
+});
+
+test('I18N 2026-11-14-2 (ausgeführt): jeder neue Text der Oberfläche — Reiter, Notfall-Knopf, Start-Hinweis, kiwix-Warnung, die sieben Karten der Anleitung, Blatt am iPhone — ist in en, fr UND es übersetzt, ohne deutsche Reste; die Texte stehen so in den Seiten', () => {
+  if (!idx73 || !mob73) return 'Datei fehlt';
+  const mac = ['Allgemein', 'KI & Modelle', 'Netz & VPN', 'Daten & Sicherung', 'Bereiche der Einstellungen', 'Zeigt die iPhone-Ansicht hier am Mac — zum Ausprobieren.',
+    'Notrufnummern, Position und Sofort-Protokolle — ohne KI (Ctrl+Umschalt+N)', 'Safari Assistant beenden', 'iPhone verbinden', 'iPhone verbinden — QR-Code und Einrichtung',
+    'Die lokale KI läuft nicht', 'Sofort-Protokolle, Karte, Logbuch und Notizen gehen trotzdem.',
+    '⚠️ Die Offline-Wikipedia ist im WLAN ohne Zugangscode lesbar — diese kiwix-Version lässt sich nicht auf diesen Mac beschränken. Abhilfe: kiwix-tools aktualisieren.',
+    'Die App am iPhone — im selben WLAN wie der Mac', 'Einmal einrichten',
+    '⚙️ Einstellungen → iPhone führt in fünf Schritten durch: Zertifikat erzeugen, Profil per AirDrop aufs iPhone, installieren, Vertrauen einschalten, QR-Code scannen.',
+    'Der Schritt, der am häufigsten fehlt — am iPhone: Einstellungen → Allgemein → Info → Zertifikatsvertrauenseinstellungen → das Zertifikat des Safari Assistant einschalten.',
+    'Zur Einrichtung', 'Im Alltag', 'Am Mac: ⚙️ Einstellungen → iPhone → „QR-Code zeigen“. Am iPhone: das Symbol auf dem Home-Bildschirm antippen.',
+    'Die Freigabe ist nach jedem Start des Safari Assistant aus und endet nach 12 Stunden ohne Anfrage von selbst.', 'Symbol auf dem Home-Bildschirm',
+    'Nach dem ersten Scannen in Safari: Teilen-Menü → „Zum Home-Bildschirm“. Der Zugangscode steckt in der gespeicherten Adresse.',
+    '— der letzte Teil ist der Code. Nach „Zugangscode erneuern“ das Symbol löschen und neu anlegen.', 'Wenn der Mac nicht antwortet',
+    'Die App startet am iPhone trotzdem: Sofort-Protokolle, Notrufnummern, die eigene Position und — wenn unter „Daten & Sicherung“ freigegeben — die Notfallkarte.',
+    'KI-Antworten, Karte, Dokumente und Wikipedia brauchen den Mac. Das gilt für den Weg mit Zertifikat (https).', 'Welches Netz?',
+    'Starlink als Router, der Reiserouter oder der Hotspot eines iPhones — Mac und iPhone müssen im selben WLAN sein. Internet braucht es dafür nicht.',
+    'Die Adresse nutzt den Namen des Macs (', ') und bleibt beim Wechsel des Netzes gleich. Ein iPhone-Hotspot lässt sich nur mit Mobilfunkempfang einschalten.',
+    '⚙️ Einstellungen → iPhone → „Klappt nicht?“ nennt die häufigsten Ursachen und zeigt, was vom iPhone ankommt.', 'Zur Fehlersuche im Terminal:', 'zeigt die Adresse des Macs im WLAN,',
+    ', wer auf dem Port lauscht.', 'In fremden WLANs',
+    'In WLANs von Lodges, Campingplätzen oder an der Grenze die Freigabe aus lassen. Ist sie an, antwortet der Mac nur Geräten mit dem Zugangscode — sichtbar ist er im Netz trotzdem.',
+    'Ausführlich: Hintergrund, Netz-Varianten und Fehlersuche'];
+  const handy = ['Bereich wählen', 'Antwortsprache', 'Einstellungen', 'Notfall', 'Karte', 'Schließen'];
+  const fehler = [];
+  // die Texte müssen so in den Seiten stehen — sonst prüft der Test etwas, das niemand sieht
+  const flach = h => h.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\s+/g, ' ');
+  const idxFlach = flach(idx73), mobFlach = flach(mob73);
+  mac.forEach(s => { if (!idxFlach.includes(s)) fehler.push('index.html enthält nicht: ' + JSON.stringify(s.slice(0, 50))); });
+  handy.forEach(s => { if (!mobFlach.includes(s)) fehler.push('mobile.html enthält nicht: ' + JSON.stringify(s)); });
+  const DEUTSCH = /(?:^|[^\p{L}])(?:der|die|das|und|nicht|für|mit|ist|dem|eine|zum|zur|auf|wird|oder|nur|auch|über|sich|beim|nach|vom|wenn|dann|Einstellungen|Freigabe|Zugangscode|Schritt|Netz|Sicherung|Karte|Notfall|läuft|zeigt|lauscht|wählen|beenden|verbinden|einrichten)(?:[^\p{L}]|$)/u;
+  for (const l of SPR64) {
+    const sb = i18nSandbox64(JSON.stringify(l));
+    sb.ladeWb(l);
+    const t = sb.ctx.DARK_I18N.t;
+    const falsch = mac.concat(handy).filter(s => { const r = t(s); return r === s || DEUTSCH.test(r); });
+    if (falsch.length) fehler.push(`${l}: ${JSON.stringify(falsch[0].slice(0, 60))} → ${JSON.stringify(t(falsch[0]).slice(0, 60))}`);
+  }
+  return !fehler.length || fehler.slice(0, 4).join(' | ');
+});
+
+// =============================================
+console.log('\n=== 74. SOS AM IPHONE 2026-11-14-3 — Position + eigene Nachricht mit zwei Tipps ===');
+// =============================================
+// Testnummern aus dem britischen Bereich für Film/Fernsehen (Ofcom: 020 7946 0xxx, 07700 900xxx) — keine echten Anschlüsse.
+// Wunsch 14.11.: „schnell zugänglicher Notfallknopf, über den ich direkt meine GPS-Position und eine vorgefertigte
+// Nachricht schicken kann". 🚨 im Kopf → „🆘 Position senden" → Nachrichten (iMessage/SMS) oder WhatsApp.
+const mob74 = loadFile('mobile.html');
+const js74 = mob74 ? mob74.slice(mob74.indexOf('<script>', mob74.lastIndexOf('</style>'))) : '';
+function sos74() {
+  const namen = ['formatDD', 'toDMS', 'plusCode', 'positionFormate', 'escHtml', 'nachrichtEsc', 'sosLesen', 'sosNummer', 'sosZeit', 'sosNachricht', 'sosSmsUrl', 'sosWaUrl', 'sosInhalt', 'sosEditor', 'sosSpeichern'];
+  const q = namen.map(n => fn72(js74, n) || einzeiler72(js74, n));
+  const fehlt = namen.filter((n, i) => !q[i]);
+  if (fehlt.length) return { fehler: 'fehlt: ' + fehlt.join(',') };
+  const konst = ["const SOS_KEY = 'safari-mobile-sos';", "const SOS_TEXT_VORGABE = '🆘 Notfall — ich brauche Hilfe. Hier ist meine Position:';", 'const SOS_MAX = 8;', "const sosStand = { modus: 'start', text: '', quelle: '' };"];
+  for (const k of konst) if (!js74.includes(k)) return { fehler: 'Konstante fehlt: ' + k };
+  const speicher = {};
+  const ls = { getItem: k => (k in speicher ? speicher[k] : null), setItem: (k, v) => { speicher[k] = String(v); } };
+  const els = {};
+  const doc = { getElementById: id => els[id] || null };
+  const api = new Function('localStorage', 'document', 'uiMulti', 'showToast', 'sosZeigen',
+    konst.join('\n') + '\n' + q.join('\n') + '\nreturn { sosLesen, sosNummer, sosNachricht, sosSmsUrl, sosWaUrl, sosInhalt, sosSpeichern, sosStand, SOS_KEY };')(ls, doc, t => t, () => {}, () => {});
+  return { api, speicher, els };
+}
+
+test('SOS (ausgeführt): Nummern nur mit Ländervorwahl — „0049 …" → „+49…", Leerzeichen/Klammern/Bindestriche weg; „0170 …" (ohne Vorwahl), Buchstaben und zu kurze Nummern werden abgelehnt', () => {
+  const r = sos74(); if (r.fehler) return r.fehler;
+  const n = r.api.sosNummer;
+  const gut = [['+44 20 7946 0000', '+442079460000'], ['0044 (20) 7946-0000', '+442079460000'], ['+27 82 000 0000', '+27820000000'], ['+264.81.000.000', '+26481000000']];
+  for (const [ein, aus] of gut) if (n(ein) !== aus) return `${ein} → ${n(ein)} statt ${aus}`;
+  for (const schlecht of ['020 7946 0000', '+0 123 4567', '+49 30 SOS', '+49 12', '', null, '+4420794600001234567', 'javascript:alert(1)'])
+    if (n(schlecht) !== '') return `angenommen: ${schlecht} → ${n(schlecht)}`;
+  return true;
+});
+
+test('SOS (ausgeführt): Nachricht = eigener Text + Koordinaten (5 Stellen, Genauigkeit, Uhrzeit) + Google-Maps-Link + Plus Code; letzte bekannte Position ist als solche gekennzeichnet; ohne Position steht „Position unbekannt" drin', () => {
+  const r = sos74(); if (r.fehler) return r.fehler;
+  const zeit = new Date(2026, 10, 14, 15, 38).getTime();
+  const t = r.api.sosNachricht('Hilfe!', -22.5609, 17.0658, 12.4, zeit, true).split('\n');
+  const soll = ['Hilfe!', '📍 -22.56090, 17.06580 (±12 m, 14.11. 15:38)', 'https://www.google.com/maps/search/?api=1&query=-22.56090,17.06580'];
+  for (let i = 0; i < 3; i++) if (t[i] !== soll[i]) return `Zeile ${i + 1}: ${JSON.stringify(t[i])}`;
+  if (!/^Plus Code [23456789CFGHJMPQRVWX]{8}\+[23456789CFGHJMPQRVWX]{2}$/.test(t[3] || '')) return 'Plus Code: ' + t[3];
+  const alt = r.api.sosNachricht('Hilfe!', -22.5609, 17.0658, null, zeit, false);
+  if (!alt.includes('(letzte bekannte Position, 14.11. 15:38)')) return 'alte Position nicht gekennzeichnet: ' + alt.split('\n')[1];
+  const ohne = r.api.sosNachricht('Hilfe!', null, null, null, null, false);
+  if (ohne !== 'Hilfe!\n📍 Position unbekannt (kein GPS)') return 'ohne Position: ' + JSON.stringify(ohne);
+  if (!r.api.sosNachricht('', 1, 2, null, null, true).startsWith('🆘 Notfall — ich brauche Hilfe.')) return 'leerer Text ohne Vorgabe';
+  return true;
+});
+
+test('SOS (ausgeführt): Links — Nachrichten-App mit allen Empfängern (sms:/open?addresses=…, einer: sms:<Nr>&body=), WhatsApp je Kontakt (wa.me/<Nr ohne +>?text=); der Text ist vollständig kodiert (& ? # Zeilenumbruch); ungültige Nummern fallen weg', () => {
+  const r = sos74(); if (r.fehler) return r.fehler;
+  const text = 'A & B?\n#1 https://x.y/?a=1&b=2';
+  const k = encodeURIComponent(text);
+  const zwei = r.api.sosSmsUrl(['+44 20 7946 0000', 'Quatsch', '0044 7700 900000'], text);
+  if (zwei !== 'sms:/open?addresses=+442079460000,+447700900000&body=' + k) return 'mehrere: ' + zwei;
+  const eins = r.api.sosSmsUrl(['+27 82 000 0000'], text);
+  if (eins !== 'sms:+27820000000&body=' + k) return 'einer: ' + eins;
+  if (r.api.sosSmsUrl([], text) !== 'sms:&body=' + k) return 'ohne Empfänger';
+  if (r.api.sosWaUrl('+44 20 7946 0000', text) !== 'https://wa.me/442079460000?text=' + k) return 'WhatsApp: ' + r.api.sosWaUrl('+44 20 7946 0000', text);
+  if (r.api.sosWaUrl('030 5000', text) !== '') return 'WhatsApp ohne Vorwahl erzeugt einen Link';
+  if (/[\n&#?]/.test(decodeURIComponent('') + zwei.split('&body=')[1])) return 'Text nicht vollständig kodiert';
+  return true;
+});
+
+test('SOS (ausgeführt): Speichern prüft die Nummern (ohne Vorwahl → Hinweis, nichts gespeichert), leere Zeilen fallen weg; kaputter Speicher führt nicht zum Absturz; Namen mit HTML werden in Knopf und Editor maskiert, die Links bleiben in Anführungszeichen', () => {
+  const r = sos74(); if (r.fehler) return r.fehler;
+  const feld = (v, an) => ({ value: v, checked: !!an, textContent: '' });
+  Object.assign(r.els, { 'sos-text': feld('Hilfe'), 'sos-name-0': feld('A'), 'sos-nr-0': feld('030 5000'), 'sos-sms-0': feld('', true), 'sos-wa-0': feld(''), 'sos-name-1': feld(''), 'sos-nr-1': feld(''), 'sos-sms-1': feld('', true), 'sos-wa-1': feld(''), 'sos-fehler': feld('') });
+  r.api.sosSpeichern();
+  if (r.speicher[r.api.SOS_KEY] !== undefined) return 'Nummer ohne Vorwahl wurde gespeichert';
+  if (!r.els['sos-fehler'].textContent.includes('Ländervorwahl')) return 'kein Hinweis zur Vorwahl';
+  r.els['sos-name-0'].value = '<img src=x onerror=alert(1)>"x'; r.els['sos-nr-0'].value = '+44 20 7946 0000'; r.els['sos-wa-0'].checked = true;
+  r.api.sosSpeichern();
+  const d = JSON.parse(r.speicher[r.api.SOS_KEY] || '{}');
+  if (!d.kontakte || d.kontakte.length !== 1 || d.kontakte[0].nummer !== '+442079460000' || d.kontakte[0].wa !== true || d.text !== 'Hilfe') return 'gespeichert: ' + r.speicher[r.api.SOS_KEY];
+  for (const kaputt of ['{', '"x"', 'null', '{"kontakte":"nein","text":5}', '{"kontakte":[null,1,{"nummer":7}]}']) {
+    r.speicher[r.api.SOS_KEY] = kaputt;
+    try { const x = r.api.sosLesen(); if (!Array.isArray(x.kontakte) || typeof x.text !== 'string') return 'sosLesen bei ' + kaputt; } catch (e) { return 'Absturz bei ' + kaputt + ': ' + e.message; }
+  }
+  r.speicher[r.api.SOS_KEY] = JSON.stringify(d);
+  r.api.sosStand.modus = 'bereit'; r.api.sosStand.text = 'Hilfe\n📍 1, 2';
+  const h = r.api.sosInhalt();
+  if (h.includes('<img') || h.includes('onerror=alert(1)>')) return 'Name nicht maskiert (Knopf)';
+  if (!/<a class="sos-knopf" href="sms:\+442079460000&amp;body=Hilfe%0A%F0%9F%93%8D%201%2C%202"/.test(h)) return 'Nachrichten-Link: ' + (h.match(/<a class="sos-knopf" href="[^"]*"/) || [''])[0];
+  if (!h.includes('<a class="sos-knopf sos-wa" href="https://wa.me/442079460000?text=Hilfe%0A') || !h.includes('target="_blank" rel="noopener"')) return 'WhatsApp-Link';
+  r.api.sosStand.modus = 'bearbeiten';
+  const e = r.api.sosInhalt();
+  if (e.includes('<img') || !e.includes('value="&lt;img src=x onerror=alert(1)&gt;&quot;x"')) return 'Name nicht maskiert (Editor)';
+  return true;
+});
+
+test('SOS: steht als ERSTES im Notfall-Blatt (vor Land/Notrufnummern); GPS höchstens 12 s, danach die letzte bekannte Position; „Nicht warten" geht sofort; frische Position wird gespeichert; Eingabefelder 16 px (sonst zoomt iOS beim Tippen); Knopf ≥ 56 px hoch', () => {
+  if (!mob74) return 'mobile.html fehlt';
+  const rn = fn72(js74, 'renderNotruf');
+  if (!rn || !rn.includes('html = sosBlockMobil() + html;')) return 'SOS nicht oben im Notfall-Blatt';
+  if (rn.indexOf('html = sosBlockMobil() + html;') > rn.indexOf('html += reisewarnBlockMobil(land);')) return 'SOS steht nicht vor den übrigen Blöcken';
+  const st = fn72(js74, 'sosStart');
+  if (!st || !st.includes('sosWarten = setTimeout(sosLetzte, 12000);') || !st.includes('{ enableHighAccuracy: true, timeout: 11000, maximumAge: 30000 }') || !st.includes("localStorage.setItem('safari-mobile-settings', JSON.stringify(mSettings))")) return 'sosStart()';
+  const f = fn72(js74, 'sosFertig');
+  if (!f || !f.includes("if (sosStand.modus !== 'ortet') return;") || !f.includes('clearTimeout(sosWarten)')) return 'sosFertig() schützt nicht vor doppeltem Abschluss';
+  if (!js74.includes('function sosOhneWarten() { sosLetzte(); }')) return '„Nicht warten" fehlt';
+  const e = (mob74.match(/<style id="oberflaeche-2">[\s\S]*?<\/style>/) || [''])[0];
+  if (!/\.sos-box textarea, \.sos-kontakt input:not\(\[type="checkbox"\]\) \{[^}]*font-size: 16px;/.test(e)) return 'Eingabefelder nicht 16 px';
+  if (!/\.sos-knopf \{[^}]*min-height: 56px;/.test(e)) return 'SOS-Knopf zu klein';
+  return true;
+});
+
+test('I18N 2026-11-14-3 (ausgeführt): alle Texte des SOS-Blocks sind in en, fr, es übersetzt — ohne deutsche Reste; der Kanal-Knopf heißt sprachneutral „iMessage/SMS" (fr „Nachrichten" = Actualités)', () => {
+  if (!mob74) return 'mobile.html fehlt';
+  const texte = ['🆘 Notfall — ich brauche Hilfe. Hier ist meine Position:', 'Position unbekannt (kein GPS)', 'letzte bekannte Position', 'Position wird bestimmt …', 'Nicht warten — letzte bekannte Position nehmen',
+    'Nachricht ist fertig — App wählen, dort „Senden“ tippen', 'Nachrichten (Empfänger wählen)', 'Andere App …', 'Ohne Mobilfunk geht keine SMS raus; WhatsApp und iMessage brauchen Internet.', 'Position senden',
+    'Empfänger:', 'Noch keine Empfänger — einmal einrichten.', 'Empfänger & Text', 'Nummer mit Ländervorwahl, z. B. +49 …', 'SOS-Nachricht einrichten', 'Text — die Position wird automatisch angehängt:',
+    'Empfänger (bis zu 8). Leere Zeilen werden ignoriert.', 'Bleibt nur auf diesem iPhone gespeichert. Tipp: einmal an die eigene Nummer testen.', 'Nummer bitte mit Ländervorwahl (+49 …, +27 …):',
+    'Speichern nicht möglich (Speicher des Browsers voll oder gesperrt).', 'SOS-Nachricht gespeichert', 'Nachricht kopiert'];
+  const fehler = [];
+  for (const t of texte) if (!mob74.includes("'" + t + "'")) fehler.push('nicht in mobile.html: ' + t.slice(0, 40));
+  if (!mob74.includes('💬 iMessage/SMS · <span data-i18n-skip>')) fehler.push('Kanal-Knopf nicht sprachneutral');
+  const DEUTSCH = /(?:^|[^\p{L}])(?:der|die|das|und|nicht|ist|ich|brauche|Hilfe|Position wird|Empfänger|Nachricht|Nummer|einrichten|gespeichert|Speichern|letzte|bekannte|unbekannt|wählen|tippen)(?:[^\p{L}]|$)/u;
+  for (const l of SPR64) {
+    const sb = i18nSandbox64(JSON.stringify(l)); sb.ladeWb(l);
+    const t = sb.ctx.DARK_I18N.t;
+    const falsch = texte.filter(s => { const r = t(s); return r === s || DEUTSCH.test(r); });
+    if (falsch.length) fehler.push(`${l}: ${falsch[0].slice(0, 40)} → ${t(falsch[0]).slice(0, 50)}`);
+  }
+  return !fehler.length || fehler.slice(0, 4).join(' | ');
+});
+
+// =============================================
+console.log('\n=== 75. CLAUDE-KEY VOM MAC AUFS iPHONE 2026-11-14-4 ===');
+// =============================================
+// Wunsch 14.11.: den Key nicht am iPhone abtippen, und „sehen, für wen ich die Übergabe bestätige". Serverseite:
+// test-sicherheit.py Abschnitt 11 (ausgeführt). Hier: die beiden Seiten.
+const idx75 = loadFile('index.html'), mob75 = loadFile('mobile.html');
+const js75 = idx75 ? idx75.slice(idx75.indexOf('<script>', idx75.lastIndexOf('</style>'))) : '';
+const mjs75 = mob75 ? mob75.slice(mob75.indexOf('<script>', mob75.lastIndexOf('</style>'))) : '';
+
+function node75(fn, q) {
+  // test() wartet nicht auf Promises — das Szenario läuft deshalb in einem eigenen Node-Prozess (wie Abschnitt 72)
+  const aus = node72('(' + fn.toString() + ')(' + JSON.stringify(q) + ').then(r => console.log(r === true ? "OK" : "FEHLER " + r), e => console.log("AUSNAHME " + e.message));');
+  return aus === 'OK' || aus;
+}
+
+test('KEY-ÜBERGABE MAC (ausgeführt): das Band zeigt Gerät, Adresse, Restzeit und den Code der Anfrage — alles maskiert —, sagt, WELCHER Key geht (Key fürs iPhone vor Mac-Key, nur die letzten 4 Zeichen); ohne Key ein Hinweis; dieselbe Anfrage wird nur aufgefrischt, eine neue ersetzt das Band; „Erlauben" schickt id + Key, „Ablehnen" keinen Key', () => {
+  const q = ['schluesselFuersIphone', 'schluesselEnde', 'schluesselBand', 'schluesselAntworten', 'escHtml'].map(n => fn72(js75, n) || einzeiler72(js75, n));
+  if (q.some(x => !x) || !js75.includes('const schluesselStand = { id: null, timer: null };')) return 'Funktion fehlt';
+  return node75(szenario75mac, q);
+});
+async function szenario75mac(q) {
+  const eingefuegt = [], gesendet = [];
+  const neuesEl = () => { const e = { id: '', className: '', innerHTML: '', attrs: {}, entfernt: false, setAttribute(k, v) { this.attrs[k] = v; }, remove() { this.entfernt = true; aktuell = null; },
+    querySelector(sel) { const m = sel === '.schluessel-geraet' ? 'g' : 'w'; return this['_' + m] || (this['_' + m] = { innerHTML: '' }); } }; return e; };
+  let aktuell = null;
+  const doc = { getElementById: id => id === 'schluessel-frage' ? aktuell : null, createElement: () => { aktuell = neuesEl(); return aktuell; },
+    querySelector: () => ({ insertBefore: el => eingefuegt.push(el), firstChild: null }), body: { appendChild: el => eingefuegt.push(el) } };
+  const settings = { anthropicKey: 'sk-ant-api03-' + 'MAC'.repeat(7) + '1111', iphoneAnthropicKey: '' };
+  const api = new Function('document', 'settings', 'fetch', 'getServerUrl', 'showToast', 'oeffneEinstellungen',
+    'const schluesselStand = { id: null, timer: null };\n' + q.join('\n') + '\nreturn { schluesselBand, schluesselAntworten, schluesselStand };')(
+    doc, settings, async (u, o) => { gesendet.push([u, JSON.parse(o.body)]); return { ok: true, json: async () => ({ ok: true }) }; }, () => '', () => {}, () => {});
+  const a = { id: 'ID1', code: '4821', ip: '192.168.178.23', geraet: 'iPhone · iOS 18.1 <img src=x onerror=alert(1)>', rest_s: 97 };
+  api.schluesselBand(a);
+  const el = eingefuegt[0];
+  if (!el || el.id !== 'schluessel-frage' || el.attrs.role !== 'alertdialog') return 'Band nicht eingefügt';
+  const h = el.innerHTML;
+  if (h.includes('<img')) return 'Gerätename nicht maskiert';
+  for (const n of ['<b class="schluessel-code" data-i18n-skip>4821</b>', '192.168.178.23', 'iPhone · iOS 18.1 &lt;img', '97 s</span>', 'Übergeben wird der Key dieses Macs <span data-i18n-skip>••••1111</span>', 'onclick="schluesselAntworten(true)">Erlauben</button>', 'onclick="schluesselAntworten(false)">Ablehnen</button>'])
+    if (!h.includes(n)) return 'Band ohne ' + n;
+  if (h.includes('MACMACMAC')) return 'Band zeigt mehr als die letzten 4 Zeichen';
+  settings.iphoneAnthropicKey = 'sk-ant-api03-' + 'IPHONE'.repeat(3) + '2222';
+  api.schluesselBand(Object.assign({}, a, { rest_s: 90 }));
+  if (eingefuegt.length !== 1) return 'dieselbe Anfrage erzeugt ein zweites Band (Knöpfe würden springen)';
+  if (!el._w.innerHTML.includes('Übergeben wird der Key fürs iPhone <span data-i18n-skip>••••2222</span>') || !el._g.innerHTML.includes('90 s')) return 'Auffrischen: ' + el._w.innerHTML;
+  await api.schluesselAntworten(true);
+  const [url, body] = gesendet[0] || [];
+  if (url !== '/api/schluessel/antwort' || body.id !== 'ID1' || body.erlauben !== true || body.key !== settings.iphoneAnthropicKey) return 'Erlauben sendet: ' + JSON.stringify(gesendet[0]);
+  api.schluesselBand(Object.assign({}, a, { id: 'ID2' }));
+  await api.schluesselAntworten(false);
+  if (gesendet[1][1].erlauben !== false || 'key' in gesendet[1][1]) return 'Ablehnen schickt einen Key mit';
+  settings.iphoneAnthropicKey = ''; settings.anthropicKey = '';
+  api.schluesselBand(Object.assign({}, a, { id: 'ID3' }));
+  if (!aktuell || !aktuell.innerHTML.includes('Am Mac ist noch kein Claude-Key eingetragen')) return 'kein Hinweis ohne Key';
+  const n = gesendet.length; await api.schluesselAntworten(true);
+  if (gesendet.length !== n) return 'ohne Key wird trotzdem „erlaubt" gesendet';
+  api.schluesselBand(null);
+  if (aktuell !== null || api.schluesselStand.id !== null) return 'Band bleibt nach Ende der Anfrage';
+  return true;
+}
+
+test('KEY-ÜBERGABE MAC: Feld „Key fürs iPhone" in den Einstellungen; der Key geht weder in die automatische Sicherung noch ins Backup; die Abfrage startet mit der App (alle 3 s, nur Loopback)', () => {
+  if (!idx75) return 'index.html fehlt';
+  if (!idx75.includes('<input class="settings-input" id="iphone-anthropic-key" type="password" placeholder="sk-ant-..." autocomplete="off" onchange="saveSettings()"')) return 'Feld fehlt';
+  const sd = fn72(js75, 'sicherungDaten');
+  if (!sd || !sd.includes('delete st.iphoneAnthropicKey;')) return 'Sicherung enthält den Key fürs iPhone';
+  if (!js75.includes('delete st.anthropicKey; delete st.userLat; delete st.userLng; delete st.userLocationTime; delete st.iphoneAnthropicKey; val = JSON.stringify(st); } catch(_) {}')) return 'Backup enthält den Key fürs iPhone';
+  if (!js75.includes("for (const k of ['anthropicKey', 'iphoneAnthropicKey', 'manualModel',")) return 'Prüfer beim Import kennt das Feld nicht';
+  if (!js75.includes("const ik = document.getElementById('iphone-anthropic-key'); if (ik) settings.iphoneAnthropicKey = ik.value.trim();")) return 'Speichern fehlt';
+  if (!js75.includes("schluesselStart();           // Claude-Key ans iPhone") || !js75.includes('schluesselStand.timer = setInterval(schluesselPruefen, 3000);')) return 'Abfrage startet nicht';
+  if (!(fn72(js75, 'schluesselPruefen') || '').includes("'/api/schluessel/offen', { cache: 'no-store' }")) return 'falscher Abfrageweg';
+  return true;
+});
+
+test('KEY-ÜBERGABE iPHONE (ausgeführt): „Vom Mac holen" fragt an und zeigt den Code GROSS; übernimmt nur einen Key im richtigen Format; abgelehnt, abgelaufen und ersetzt enden mit eigener Meldung; ein Netzaussetzer bricht nicht ab', () => {
+  const q = ['keyHolenHinweis', 'keyHolenEnde', 'keyVomMacHolen', 'keyHolenPruefen'].map(n => fn72(mjs75, n) || einzeiler72(mjs75, n));
+  if (q.some(x => !x) || !mjs75.includes('const keyHolen = { id: null, timer: null };')) return 'Funktion fehlt';
+  if (!mob75.includes('<button id="m-key-holen" onclick="keyVomMacHolen()"') || !mob75.includes('<div id="m-key-code-wert" data-i18n-skip style="font-size:34px;')) return 'Knopf oder große Code-Anzeige fehlt';
+  return node75(szenario75iphone, q);
+});
+async function szenario75iphone(q) {
+  const els = {}; ['m-api-key-hint', 'm-key-holen', 'm-key-code', 'm-key-code-wert'].forEach(id => { els[id] = { textContent: '', style: {}, disabled: false }; });
+  let antworten = [], gespeichert = null, intervalle = 0;
+  const fetchStub = async (url, o) => { const a = antworten.shift(); if (a === 'netz') throw new Error('offline'); return { ok: a.st === 200, status: a.st, json: async () => a.d }; };
+  const mSettings = {};
+  const api = new Function('document', 'fetch', 'SERVER_URL', 'zugangHeader', 'uiMulti', 'showToast', 'zeigeApiKeyStatus', 'mSettings', 'localStorage', 'setInterval', 'clearInterval',
+    'const keyHolen = { id: null, timer: null };\n' + q.join('\n') + '\nreturn { keyVomMacHolen, keyHolenPruefen, keyHolen };')(
+    { getElementById: id => els[id] || null }, fetchStub, '', h => h || {}, t => t, () => {}, () => {}, mSettings,
+    { setItem: (k, v) => { gespeichert = [k, v]; } }, () => (++intervalle), () => {});
+  antworten = [{ st: 200, d: { id: 'X', code: '0042', frist_s: 120 } }];
+  await api.keyVomMacHolen();
+  if (els['m-key-code-wert'].textContent !== '0042' || els['m-key-code'].style.display !== 'block' || !els['m-key-holen'].disabled || intervalle !== 1) return 'Code nicht groß angezeigt';
+  antworten = ['netz']; await api.keyHolenPruefen();
+  if (api.keyHolen.id !== 'X') return 'Netzaussetzer bricht ab';
+  antworten = [{ st: 200, d: { status: 'erlaubt', key: 'kein-key' } }]; await api.keyHolenPruefen();
+  if (mSettings.anthropicKey || gespeichert) return 'ungültiger Key übernommen';
+  const KEY = 'sk-ant-api03-' + 'A'.repeat(30);
+  antworten = [{ st: 200, d: { id: 'Y', code: '1234' } }]; await api.keyVomMacHolen();
+  antworten = [{ st: 200, d: { status: 'erlaubt', key: KEY } }]; await api.keyHolenPruefen();
+  if (mSettings.anthropicKey !== KEY || !gespeichert || gespeichert[0] !== 'safari-mobile-settings' || api.keyHolen.id !== null || els['m-key-code'].style.display !== 'none') return 'Übernehmen';
+  for (const [st, text] of [['abgelehnt', 'Am Mac abgelehnt.'], ['abgelaufen', 'Abgelaufen — nicht rechtzeitig am Mac bestätigt.'], ['unbekannt', 'Anfrage ersetzt oder abgelaufen — bitte neu holen.']]) {
+    antworten = [{ st: 200, d: { id: 'Z', code: '1' } }]; await api.keyVomMacHolen();
+    antworten = [{ st: 200, d: { status: st } }]; await api.keyHolenPruefen();
+    if (els['m-api-key-hint'].textContent !== text || api.keyHolen.id !== null) return st + ': ' + els['m-api-key-hint'].textContent;
+  }
+  antworten = [{ st: 403, d: { error: 'Den Claude-Key gibt es nur über die verschlüsselte Verbindung (https).' } }]; await api.keyVomMacHolen();
+  if (!els['m-api-key-hint'].textContent.includes('https') || api.keyHolen.id !== null) return 'http-Fehler nicht gemeldet';
+  return true;
+}
+
+test('I18N 2026-11-14-4 (ausgeführt): die Texte der Key-Übergabe sind in en, fr, es übersetzt', () => {
+  const texte = ['Key fürs iPhone (optional)', 'Leer: das iPhone bekommt den Key dieses Macs. Übergabe: am iPhone ⚙️ → „Vom Mac holen“.', '📲 Claude-Key an ein Gerät übergeben?', 'Code auf dem Gerät:',
+    '— nur erlauben, wenn dort genau dieser Code steht.', 'Übergeben wird der Key fürs iPhone', 'Übergeben wird der Key dieses Macs', 'Am Mac ist noch kein Claude-Key eingetragen — erst unter ⚙️ Einstellungen → KI & Modelle eintragen.',
+    'Erlauben', 'Ablehnen', '📲 Vom Mac holen', 'Am Mac „Erlauben“ tippen, wenn dort derselbe Code steht:', 'Am Mac bestätigen. Code auf diesem iPhone:', 'Claude-Key vom Mac übernommen', 'Am Mac abgelehnt.',
+    'Abgelaufen — nicht rechtzeitig am Mac bestätigt.', 'Anfrage ersetzt oder abgelaufen — bitte neu holen.'];
+  const fehler = [];
+  const DEUTSCH = /(?:^|[^\p{L}])(?:der|die|das|und|nicht|ist|Gerät|erlauben|übergeben|Übergeben|Code auf|dieses|holen|bestätigen|abgelehnt|eintragen|bitte)(?:[^\p{L}]|$)/u;
+  for (const l of SPR64) {
+    const sb = i18nSandbox64(JSON.stringify(l)); sb.ladeWb(l);
+    const t = sb.ctx.DARK_I18N.t;
+    const falsch = texte.filter(s => { const r = t(s); return r === s || DEUTSCH.test(r); });
+    if (falsch.length) fehler.push(`${l}: ${falsch[0].slice(0, 40)} → ${t(falsch[0]).slice(0, 50)}`);
+  }
+  return !fehler.length || fehler.join(' | ');
+});
+
+// =============================================
+console.log('\n=== 76. MODELL-CHECK 14.11.2026 — Standard Sonnet 5.5 ===');
+// =============================================
+test('CLAUDE-STANDARD (index + mobile): CLAUDE_STANDARD_MODELL und die Online-Module (Claude, Sicherheitslage) nennen claude-sonnet-5-5 — 4.6 ist laut Anthropic frühestens ab 17.02.2027 abschaltbar, also während der Reise; kein Modul nennt mehr 4.6', () => {
+  const fehler = [];
+  for (const d of ['index.html', 'mobile.html']) {
+    const h = loadFile(d);
+    if (!h) { fehler.push(d + ' fehlt'); continue; }
+    if (!h.includes("const CLAUDE_STANDARD_MODELL = 'claude-sonnet-5-5';")) fehler.push(d + ': Standard');
+    if ((h.match(/model: 'claude-sonnet-5-5',/g) || []).length !== 2) fehler.push(d + ': Module');
+    if (!h.includes("modelLabel: 'Claude Sonnet 5.5',")) fehler.push(d + ': Anzeige');
+    if (/claude-sonnet-4-6|Claude Sonnet 4\.6/.test(h)) fehler.push(d + ': nennt noch 4.6');
+  }
   return !fehler.length || fehler.join(' | ');
 });
 

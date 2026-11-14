@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Safari Assistant — lokaler Server (Stand 2026-10-06-1)
+Safari Assistant — lokaler Server (Stand 2026-11-14-5)
 (Creator: DARK; Name seit 2026-10-05 in englischer Schreibweise, kurz davor „DARK", in der Entwicklung „Safari Assistent")
 Port 8765
 - Statische Dateien (HTML/JS)
@@ -25,9 +25,19 @@ Port 8765
 - Re-Audit 2026-09-12: Host-Header-Prüfung (DNS-Rebinding), Mutationen nur same-origin, statische
   Auslieferung nur für die App-Dateien (kein .git/rag-store/Verzeichnislisting), Verbindungs-Timeout
   und Thread-Obergrenze (Slowloris), Seitenlimit im PDF-Extraktor, keine internen Fehlertexte nach außen.
+- VPN-Prüfung (2026-10-30-1): Geht der Mac übers eigene VPN ins Internet — IPv4 und IPv6 getrennt? Stand unter
+  /api/vpn/status (auch vom iPhone, dann ohne Adressen); prüfen, merken, vergessen, einstellen nur vom Mac.
+- 2026-11-02-1: VPN-Prüfung mit Anbieter-Erkennung (Mullvad): Mullvad bestätigt selbst, ob der Ausgang einer seiner
+  Server ist (https, je Weg) — dann muss nicht jedes Netz einzeln gemerkt werden. Schalter: /api/vpn/anbieter (nur Mac).
 """
 
+import email.utils
 import errno
+import hashlib
+import ipaddress
+import xml.etree.ElementTree as ET
+import plistlib
+import uuid
 import os
 import sys
 import time
@@ -37,6 +47,7 @@ import json
 import shutil
 import signal
 import socket
+import socketserver
 import sqlite3
 import ssl
 import struct
@@ -44,7 +55,9 @@ import subprocess
 import zlib
 from pathlib import Path
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs, unquote
+import http.client
+from urllib.parse import urlparse, parse_qs, unquote, urlencode
+from datetime import datetime as _dt, timezone as _tz, timedelta as _td
 import threading
 
 import platform
@@ -68,7 +81,7 @@ DOCS_DIR.mkdir(exist_ok=True)
 #      niemals versehentlich abgeschossen wird.
 #   3. Eltern-Wache (nur aus der .app): stirbt der Launcher, beendet sich der Server mit.
 APP_SIGNATUR = 'safari-assistent'
-SERVER_VERSION = '2026-10-06-1'
+SERVER_VERSION = '2026-11-14-5'
 # Kennung gegenüber fremden Diensten (Reisewarnungen, Overpass, …) — mit Projektadresse, wie es deren
 # Nutzungsregeln verlangen; viele Installationen teilen sie sich (2026-09-27).
 PROJEKT_UA = 'SafariAssistant/2026.10 (+https://github.com/DarkPirateGo/safari-assistant)'
@@ -124,8 +137,10 @@ def runtime_entfernen():
         except OSError:
             pass
 
-def lan_ip():
-    """Beste Vermutung für die IP dieses Macs im lokalen Netz — für die iPhone-Adresse.
+def lan_ip_route():
+    """Adresse, die der Kernel für die Route ins Internet wählt. Läuft am Mac ein VPN-Programm, ist das die Adresse
+    des TUNNELS, nicht die des WLANs — für den iPhone-Zugang darum lan_ip() nehmen. Hier bleibt sie für die VPN-Wache:
+    ein Wechsel dieser Adresse (VPN an/aus, anderes Netz) heißt „die alte Messung gilt nicht mehr".
     Der UDP-„connect" SENDET nichts, er lässt nur den Kernel die Route wählen; das funktioniert
     darum auch am Travel-Router ohne Internet. Ohne Default-Route bleibt es leer."""
     try:
@@ -145,6 +160,94 @@ def lan_ip():
         return '' if ip.startswith('127.') else ip
     except OSError:
         return ''
+
+
+# ── Adresse für den iPhone-Zugang bei laufendem VPN am Mac (2026-11-02-2) ──
+# Mit einem VPN-Programm am Mac (Mullvad, WireGuard …) schickt der Kernel die Route nach 8.8.8.8 durch den Tunnel;
+# lan_ip_route() liefert dann die Tunnel-Adresse (z. B. 10.x). An die würde der iPhone-Zugang gebunden — das iPhone im
+# WLAN käme nicht mehr durch („sobald ich das VPN am Mac einschalte, bricht die Verbindung ab"). Darum: liegt die Adresse
+# der Route auf einem Tunnel, nimmt lan_ip() die Adresse der ursprünglichen Standardroute (netstat), ersatzweise die einer
+# aktiven en*-Schnittstelle. Unklar oder nichts gefunden = die Adresse der Route, wie bisher.
+TUNNEL_SCHNITTSTELLEN = _re.compile(r'^(utun|tun|tap|ppp|ipsec|wg|gif|stf|nordlynx|tailscale|zt|proton)', _re.I)
+_LAN_IP_CACHE = {'route': None, 'ip': '', 'zeit': 0.0}
+LAN_IP_CACHE_S = 5.0
+
+
+def _befehl_text(befehl, timeout=4):
+    """Ausgabe eines Systembefehls als Text; leer bei Fehler."""
+    try:
+        p = subprocess.run(befehl, capture_output=True, text=True, timeout=timeout)
+    except (OSError, subprocess.SubprocessError):
+        return ''
+    return p.stdout if p.returncode == 0 else ''
+
+
+def _schnittstellen_aus_text(text):
+    """ifconfig (macOS) oder `ip -4 -o addr` (Linux) → {Name: {'ips': [IPv4], 'aktiv': True/False/None}}."""
+    ifs, name = {}, None
+    for zeile in text.splitlines():
+        m = _re.match(r'^([A-Za-z][\w.\-]*):\s+flags=', zeile)
+        if m:
+            name = m.group(1)
+            ifs.setdefault(name, {'ips': [], 'aktiv': None})
+            continue
+        m = _re.match(r'^\d+:\s+([\w.\-]+)(?:@\S+)?\s+inet\s+(\d+\.\d+\.\d+\.\d+)', zeile)
+        if m:
+            ifs.setdefault(m.group(1), {'ips': [], 'aktiv': None})['ips'].append(m.group(2))
+            continue
+        if name:
+            m = _re.match(r'^\s+inet\s+(\d+\.\d+\.\d+\.\d+)', zeile)
+            if m:
+                ifs[name]['ips'].append(m.group(1))
+            m = _re.match(r'^\s+status:\s*(\S+)', zeile)
+            if m:
+                ifs[name]['aktiv'] = (m.group(1) == 'active')
+    return ifs
+
+
+def _standardroute_schnittstellen(text):
+    """Netif-Spalte der „default"-Zeilen aus `netstat -rn -f inet` (macOS), in der Reihenfolge der Tabelle."""
+    namen = []
+    for zeile in text.splitlines():
+        t = zeile.split()
+        if len(t) >= 4 and t[0] == 'default' and t[3] not in namen:
+            namen.append(t[3])
+    return namen
+
+
+def _lan_ip_ohne_tunnel(route_ip):
+    try:
+        ifs = _schnittstellen_aus_text(_befehl_text(['ifconfig']) or _befehl_text(['ip', '-4', '-o', 'addr']))
+        eigene = next((n for n, d in ifs.items() if route_ip in d['ips']), None)
+        if eigene is None or not TUNNEL_SCHNITTSTELLEN.match(eigene):
+            return route_ip                       # die Route läuft über ein echtes Netz (oder unklar) → wie bisher
+        kandidaten = [n for n in _standardroute_schnittstellen(_befehl_text(['netstat', '-rn', '-f', 'inet']))
+                      if n in ifs and not TUNNEL_SCHNITTSTELLEN.match(n)]
+        kandidaten += sorted(n for n, d in ifs.items() if _re.match(r'^en\d+$', n) and n not in kandidaten and d['aktiv'] is True)
+        for n in kandidaten:
+            if ifs[n]['aktiv'] is False:
+                continue
+            for a in ifs[n]['ips']:
+                if tls_ip_erlaubt(a) and not a.startswith('127.'):
+                    return a
+    except Exception:
+        pass
+    return route_ip
+
+
+def lan_ip():
+    """IP dieses Macs im lokalen Netz — für die iPhone-Adresse. Wie lan_ip_route(), außer ein VPN-Tunnel am Mac
+    liegt auf der Route: dann die Adresse des WLANs bzw. Kabels (siehe oben). Kurz zwischengespeichert."""
+    route = lan_ip_route()
+    if not route:
+        return route
+    jetzt = time.monotonic()
+    c = _LAN_IP_CACHE
+    if c['route'] == route and jetzt - c['zeit'] < LAN_IP_CACHE_S:
+        return c['ip']
+    ip = _lan_ip_ohne_tunnel(route)
+    c.update({'route': route, 'ip': ip, 'zeit': jetzt})
+    return ip
 
 
 def port_belegt_von(port, timeout=1.5):
@@ -715,7 +818,7 @@ def tls_status():
 # Zugang aus dem WLAN nur mit Zugangscode (Cookie, gesetzt über http://<Mac-IP>:8765/go/<code>);
 # der Code liegt mit 0600 im Home und überlebt Neustarts, damit das iPhone ihn nur einmal braucht.
 # Ollama bleibt dabei auf 127.0.0.1 — das iPhone spricht es über /api/ollama/* durch den Server.
-LAN_STATE = {'an': False, 'ip': '', 'server': None, 'seit': 0.0, 'anfragen': 0, 'letzte': 0.0,
+LAN_STATE = {'an': False, 'ip': '', 'server': None, 'seit': 0.0, 'anfragen': 0, 'letzte': 0.0, 'weg': '',
              'hinweis': '', 'tls': False, 'tls_grund': ''}
 # 2026-09-13-1: Vergessen-Schutz. Bleibt der Modus an, obwohl das iPhone längst nicht mehr anfragt
 # (Lodge-WLAN, Grenze), schließt der Server ihn nach LAN_INAKTIV_H Stunden ohne Anfrage von selbst.
@@ -757,6 +860,321 @@ def token_gueltig(wert):
         return False
     return secrets.compare_digest(wert, zugangs_token())
 
+
+# ── HANDYZUGANG WIE BEI WINGFOILSCOUT (2026-10-18-1) ─────────
+# Wunsch vom 18.10.2026: „die gleiche Logik für den Handyzugang wie bei der Wingfoilscout-App".
+# Übernommen aus Wingfoilscout 2.5.0–2.6.0 (dort SECURITY.md, Nachträge vom 10./11.10.2026):
+# - Beim Freigeben wird der Weg gewählt: 'sicher' (https mit dem Profil der lokalen CA, empfohlen)
+#   oder 'schnell' (http — nur als Ausweg unter „Klappt nicht?", wenn sich kein Profil installieren lässt).
+# - Ein Port, zwei Protokolle: das erste Byte entscheidet (0x16 = TLS-Handshake), siehe SafariServer.
+# - Läuft die Freigabe für den sicheren Weg, wird http vom ersten Augenblick an abgelehnt — bevor Code
+#   oder Cookie gelesen werden, ohne Cookie zu setzen (Wingfoilscout F-01).
+# - Über https liegt der Code in einem eigenen Cookie mit Secure, das Safari nie über http schickt.
+# - Was vom iPhone ankommt (verbunden / Handshake abgebrochen / ohne gültigen Code), meldet
+#   GET /api/netz/stand — nur im Speicher, nur an den Mac, nie der Code.
+# - Welcher Weg schon geklappt hat, merkt ~/.safari-assistant-iphone.json (0600): dann zeigen die
+#   Einstellungen gleich den QR-Code statt der Schritte.
+# - Das Profil (.mobileconfig) kommt per AirDrop aufs iPhone.
+# - Ein Service Worker legt am iPhone einen Hinweis ab, der erscheint, wenn der Mac nicht antwortet.
+# Bewusst NICHT übernommen (Entscheidung vom 18.10.2026): das Zertifikatsmodell. Die lokale CA mit
+# Namensbeschränkung bleibt, wie sie ist — am iPhone muss nichts neu installiert werden.
+# Bleibt außerdem wie bisher: nie automatisch an, aus beim Beenden, aus nach LAN_INAKTIV_H Stunden ohne
+# Anfrage, Neubinden beim Netzwechsel, „Beenden" und alle Schalter nur vom Mac (mutation_erlaubt).
+WEGE = ('sicher', 'schnell')
+COOKIE_HTTP = 'safari_zugang'            # ohne Secure — nur für den Weg ohne Zertifikat
+COOKIE_HTTPS = 'safari_zugang_https'     # mit Secure — eigener Name, weil http ein Secure-Cookie gleichen Namens nicht überschreiben darf
+COOKIE_MAX_ALTER = 400 * 86400           # 400 Tage — länger lassen Safari und Chrome ein Cookie ohnehin nicht gelten
+ZUSTAND_DATEI = Path.home() / '.safari-assistant-iphone.json'
+PROFIL_DATEINAME = 'Safari Assistant iPhone.mobileconfig'
+HANDY_MELDUNG = {'seit': 0.0, 'verbunden': 0.0, 'verschluesselt': False, 'abgebrochen': 0.0, 'ohne_schluessel': 0.0}
+HANDY_LOCK = threading.Lock()
+_ZUSTAND_CACHE = {'wert': None}
+_CA_INFO = {'mtime': None, 'wert': {}}
+
+def handy_melden(art, verschluesselt=False):
+    """Ein Ereignis vom iPhone festhalten: 'verbunden' (gültiger Code), 'abgebrochen' (TLS-Handshake
+    abgebrochen — meist vertraut das iPhone dem Zertifikat noch nicht), 'ohne_schluessel' (kein oder ein
+    falscher Code). Nur die Uhrzeit — keine Adresse, kein Gerätename, nie der Code."""
+    with HANDY_LOCK:
+        HANDY_MELDUNG[art] = time.time()
+        if art == 'verbunden':
+            HANDY_MELDUNG['verschluesselt'] = bool(verschluesselt)
+
+def handy_meldung_zuruecksetzen():
+    with HANDY_LOCK:
+        HANDY_MELDUNG.update({'seit': time.time(), 'verbunden': 0.0, 'verschluesselt': False,
+                              'abgebrochen': 0.0, 'ohne_schluessel': 0.0})
+
+def handy_meldung():
+    """GET /api/netz/stand (nur vom Mac): Freigabe, Weg und die letzten Ereignisse mit Uhrzeit."""
+    with HANDY_LOCK:
+        mm = dict(HANDY_MELDUNG)
+
+    def uhr(t):
+        return time.strftime('%H:%M', time.localtime(t)) if t else ''
+    return {'an': bool(LAN_STATE['an']), 'weg': LAN_STATE.get('weg') or '', 'jetzt': time.time(), 'seit': mm['seit'],
+            'verbunden': mm['verbunden'], 'verbunden_um': uhr(mm['verbunden']), 'verschluesselt': mm['verschluesselt'],
+            'abgebrochen': mm['abgebrochen'], 'abgebrochen_um': uhr(mm['abgebrochen']),
+            'ohne_schluessel': mm['ohne_schluessel'], 'ohne_schluessel_um': uhr(mm['ohne_schluessel'])}
+
+def zustand_lesen():
+    """~/.safari-assistant-iphone.json — nur bekannte Felder werden übernommen (die Datei könnte von Hand
+    verändert sein): bewaehrt ('https'|'http'), kennung (CA, mit der https geklappt hat), profil (CA,
+    für die das Profil geladen wurde), zeit, profil_zeit."""
+    if _ZUSTAND_CACHE['wert'] is not None:
+        return dict(_ZUSTAND_CACHE['wert'])
+    try:
+        d = json.loads(ZUSTAND_DATEI.read_text(encoding='utf-8'))
+        d = d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        d = {}
+    gut = {}
+    if d.get('bewaehrt') in ('https', 'http'):
+        gut['bewaehrt'] = d['bewaehrt']
+    for k in ('kennung', 'profil'):
+        if isinstance(d.get(k), str) and _re.match(r'^[0-9a-f]{16}$', d[k]):
+            gut[k] = d[k]
+    for k in ('zeit', 'profil_zeit'):
+        if isinstance(d.get(k), (int, float)) and not isinstance(d.get(k), bool):
+            gut[k] = float(d[k])
+    _ZUSTAND_CACHE['wert'] = gut
+    return dict(gut)
+
+def zustand_merken(**werte):
+    d = zustand_lesen()
+    neu = dict(d, **werte)
+    try:
+        schreibe_privat(ZUSTAND_DATEI, json.dumps(neu))
+    except OSError:
+        pass   # nicht gemerkt: die Einstellungen zeigen dann weiter die Schritte statt gleich den QR-Code
+    _ZUSTAND_CACHE['wert'] = neu
+    return dict(neu)
+
+def handy_bewaehrt(verschluesselt):
+    """Nach einer Anfrage mit gültigem Code: Hat der Weg geklappt, für den gerade freigegeben ist? Nur dann
+    merken — eine verirrte Anfrage auf dem anderen Protokoll stellt den gemerkten Weg nicht um."""
+    weg, g = LAN_STATE.get('weg'), zustand_lesen()
+    if weg == 'sicher' and verschluesselt:
+        k = ca_kennung()
+        if k and (g.get('bewaehrt') != 'https' or g.get('kennung') != k):
+            zustand_merken(bewaehrt='https', kennung=k, zeit=time.time())
+    elif weg == 'schnell' and not verschluesselt and g.get('bewaehrt') != 'http':
+        zustand_merken(bewaehrt='http', zeit=time.time())
+
+def ca_info():
+    """Merkmale der vorhandenen CA — auch wenn der iPhone-Modus in diesem Lauf noch nicht an war: Kennung
+    (erste 16 Hex-Stellen des SHA-256 über das Zertifikat, wie bei Wingfoilscout), Name, Stufe der
+    Namensbeschränkung, gültig bis, Fingerabdruck. Zwischengespeichert, solange die Datei gleich bleibt."""
+    try:
+        mt = TLS_CA_CRT.stat().st_mtime
+    except OSError:
+        return {}
+    if _CA_INFO['mtime'] == mt:
+        return dict(_CA_INFO['wert'])
+    try:
+        der = ssl.PEM_cert_to_DER_cert(TLS_CA_CRT.read_text(encoding='ascii'))
+    except (OSError, ValueError):
+        return {}
+    w = {'kennung': hashlib.sha256(der).hexdigest()[:16]}
+    if openssl_pfad():
+        stufe, name = tls_ca_merkmale()
+        w.update({'stufe': stufe, 'name': name, 'gueltig_bis': tls_gueltig_bis(TLS_CA_CRT),
+                  'fingerabdruck': tls_fingerabdruck()})
+    _CA_INFO.update({'mtime': mt, 'wert': w})
+    return dict(w)
+
+def ca_kennung():
+    return ca_info().get('kennung', '')
+
+def iphone_profil():
+    """Das Profil fürs iPhone (wie bei Wingfoilscout): das Zertifikat der lokalen CA als Root-Nutzlast
+    (com.apple.security.root). Unsigniert — das iPhone zeigt beim Installieren „Nicht überprüft"; bei
+    einem selbst erzeugten Profil ist das richtig so. Es enthält nur das öffentliche Zertifikat, nie einen
+    Schlüssel. Die UUIDs folgen aus dem Zertifikat: dasselbe Zertifikat ergibt dasselbe Profil, ein
+    zweites Laden ersetzt am iPhone das erste, statt es zu verdoppeln."""
+    der = ssl.PEM_cert_to_DER_cert(TLS_CA_CRT.read_text(encoding='ascii'))
+    h = hashlib.sha256(der).hexdigest()
+    name = ca_info().get('name') or 'Safari Assistant lokale CA'
+    nutzlast = {
+        'PayloadCertificateFileName': 'safari-assistant-ca.cer',
+        'PayloadContent': der,
+        'PayloadDescription': 'Das Zertifikat deines Macs für den Safari Assistant im eigenen WLAN.',
+        'PayloadDisplayName': name,
+        'PayloadIdentifier': 'local.safari-assistant.zertifikat.' + h[:16],
+        'PayloadType': 'com.apple.security.root',
+        'PayloadUUID': str(uuid.UUID(h[:32])).upper(),
+        'PayloadVersion': 1,
+    }
+    return plistlib.dumps({
+        'PayloadContent': [nutzlast],
+        'PayloadDescription': ('Damit dein iPhone den Safari Assistant auf deinem Mac verschlüsselt öffnet. Danach: '
+                               'Einstellungen → Allgemein → Info → Zertifikatsvertrauenseinstellungen → „'
+                               + name + '" einschalten.'),
+        'PayloadDisplayName': 'Safari Assistant im eigenen WLAN',
+        'PayloadIdentifier': 'local.safari-assistant.profil.' + h[:16],
+        'PayloadOrganization': 'Safari Assistant',
+        'PayloadRemovalDisallowed': False,
+        'PayloadType': 'Configuration',
+        'PayloadUUID': str(uuid.UUID(h[32:64])).upper(),
+        'PayloadVersion': 1,
+    }, fmt=plistlib.FMT_XML)
+
+# Service Worker fürs iPhone (wie Wingfoilscout 2.5.3): Ist das iPhone eingerichtet, der iPhone-Modus am Mac
+# aber aus (nach jedem Start, nach 12 h ohne Anfrage), kommt vom Mac nichts an — das Symbol auf dem
+# Home-Bildschirm öffnete dann eine leere Seite. Der Hinweis muss deshalb schon auf dem iPhone liegen.
+# Der Worker tut absichtlich wenig: Seitenaufrufe gehen unverändert an den Mac; nur wenn keine Antwort
+# kommt (Verbindung scheitert oder nach FRIST_MS nichts da), zeigt er den abgelegten Hinweis. Jede Antwort
+# des Macs — auch „Zugangscode fehlt" oder „Nur verschlüsselt" — kommt an, wie sie ist. Abgelegt wird nur
+# der Hinweis, keine Seite mit Daten; Chat, Karte, Daten und Formulare berührt er nicht. Angemeldet wird er
+# nur von mobile.html, nur über https und nie am Mac selbst. Ob iOS ihn in einer Web-App vom
+# Home-Bildschirm mit selbst installierter CA ausführt, ist noch nicht am Gerät geprüft (wie bei
+# Wingfoilscout) — scheitert die Anmeldung, ändert sich nichts zum Schlechteren.
+SW_JS = """/* Safari Assistant — Service Worker fürs iPhone (server.py SW_JS, seit 2026-10-18-1). */
+'use strict';
+var VERSION = '__VERSION__';
+var HINWEIS = '/api/netz/hinweis';
+var KASTEN = 'safari-assistant-hinweis-' + VERSION;
+var FRIST_MS = 12000;
+// 2026-11-14-1 (Review U1): die App-Hülle bleibt am iPhone liegen. Ist der Mac aus, schläft er oder ist die Freigabe
+// aus, startet die iPhone-Seite trotzdem — Sofort-Protokolle, Notrufnummern und die eigene Position brauchen den Mac
+// nicht. Nur feste Dateien ohne persönliche Daten; jede Antwort des Macs geht weiter unverändert durch.
+var HUELLE = 'safari-assistant-huelle';
+var SEITE = '/mobile.html';
+var HUELLE_DATEIEN = [SEITE, '/i18n.js', '/i18n/en.js', '/i18n/fr.js', '/i18n/es.js', '/icon.png', '/dark-logo.jpg'];
+var FRIST_HUELLE_MS = 4000;      // mit Hülle wartet niemand 12 s auf einen Mac, der nicht antwortet
+
+function huelleHolen() {
+  return caches.open(HUELLE).then(function (kasten) {
+    return Promise.all(HUELLE_DATEIEN.map(function (pfad) {
+      return fetch(pfad, {credentials: 'same-origin', cache: 'no-store'}).then(function (antwort) {
+        if (antwort.ok) return kasten.put(pfad, antwort);
+      }).catch(function () {});
+    }));
+  });
+}
+
+function ausHuelle(pfad) {
+  return caches.open(HUELLE).then(function (kasten) { return kasten.match(pfad); });
+}
+
+function inHuelle(pfad, antwort) {
+  var kopie = antwort.clone();
+  caches.open(HUELLE).then(function (kasten) { return kasten.put(pfad, kopie); }).catch(function () {});
+}
+
+function hinweisHolen() {
+  return fetch(HINWEIS, {credentials: 'same-origin', cache: 'no-store'}).then(function (antwort) {
+    if (!antwort.ok) throw new Error('Hinweis: ' + antwort.status);
+    return caches.open(KASTEN).then(function (kasten) { return kasten.put(HINWEIS, antwort); });
+  });
+}
+
+function mitFrist(versprechen, ms) {
+  return new Promise(function (ja, nein) {
+    var uhr = setTimeout(function () { nein(new Error('Frist')); }, ms || FRIST_MS);
+    versprechen.then(function (a) { clearTimeout(uhr); ja(a); }, function (f) { clearTimeout(uhr); nein(f); });
+  });
+}
+
+self.addEventListener('install', function (e) {
+  e.waitUntil(hinweisHolen().then(huelleHolen).then(function () { return self.skipWaiting(); }));
+});
+
+self.addEventListener('activate', function (e) {
+  e.waitUntil(caches.keys().then(function (namen) {
+    return Promise.all(namen.filter(function (n) {
+      return n.indexOf('safari-assistant-hinweis-') === 0 && n !== KASTEN;
+    }).map(function (n) { return caches.delete(n); }));
+  }).then(function () { return self.clients.claim(); }));
+});
+
+function hinweisSeite() {
+  return caches.open(KASTEN).then(function (kasten) { return kasten.match(HINWEIS); })
+    .then(function (hinweis) { return hinweis || Response.error(); });
+}
+
+self.addEventListener('fetch', function (e) {
+  var anfrage = e.request;
+  if (anfrage.method !== 'GET') return;
+  var pfad = new URL(anfrage.url).pathname;
+  if (anfrage.mode === 'navigate') {
+    // Die iPhone-Seite: erst der Mac, sonst die Hülle, sonst der Hinweis. Alle anderen Seiten wie bisher.
+    if (pfad !== SEITE) { e.respondWith(mitFrist(fetch(anfrage)).catch(hinweisSeite)); return; }
+    e.respondWith(ausHuelle(SEITE).then(function (huelle) {
+      return mitFrist(fetch(anfrage), huelle ? FRIST_HUELLE_MS : FRIST_MS).then(function (antwort) {
+        if (antwort.type === 'opaqueredirect') return antwort;      // Weiterleitungen folgt der Browser selbst
+        if (antwort.ok) { inHuelle(SEITE, antwort); return antwort; }
+        // Der Mac antwortet, gibt die Seite aber nicht her (Freigabe aus, Code fehlt): die Hülle, falls es eine gibt
+        return (!antwort.ok && huelle) ? huelle : antwort;
+      }).catch(function () { return huelle || hinweisSeite(); });
+    }));
+    return;
+  }
+  // Skripte und Bilder der Hülle: vom Mac, wenn er antwortet (und dabei auffrischen), sonst aus dem Speicher
+  if (HUELLE_DATEIEN.indexOf(pfad) > 0) {
+    e.respondWith(fetch(anfrage).then(function (antwort) {
+      if (antwort.ok) inHuelle(pfad, antwort);
+      return antwort.ok ? antwort : ausHuelle(pfad).then(function (alt) { return alt || antwort; });
+    }).catch(function () {
+      return ausHuelle(pfad).then(function (alt) { return alt || Response.error(); });
+    }));
+  }
+});
+"""
+
+# Der Hinweis selbst: in den vier Sprachen der Oberfläche, gewählt wie in i18n.js (gespeicherte Wahl,
+# sonst die Sprache des iPhones). Keine Daten, nichts von außen.
+HINWEIS_HTML = """<!DOCTYPE html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Safari Assistant</title>
+<style>
+body{margin:0;background:#0f0e0c;color:#e8e4dc;font:16px/1.6 -apple-system,system-ui,sans-serif;padding:28px 20px}
+h1{font-size:20px;font-weight:600;margin:0 0 10px}ol{padding-left:22px}li{margin:8px 0}
+.klein{color:#9a9589;font-size:13px}button{font:inherit;font-size:16px;margin-top:14px;padding:12px 20px;border-radius:10px;border:0;background:#c8a95a;color:#0f0e0c;min-height:44px}
+[data-l]{display:none}
+</style></head><body>
+<div data-l="de"><h1>Der Safari Assistant antwortet nicht</h1><p>Dein iPhone erreicht den Mac gerade nicht. Meist hilft eins davon:</p><ol>
+<li>Ist der Mac wach und der Safari Assistant geöffnet?</li>
+<li>Am Mac: ⚙️ Einstellungen → Mobile App → „QR-Code zeigen“. Nach jedem Start des Safari Assistant und nach 12 Stunden ohne Anfrage ist die Freigabe aus.</li>
+<li>Ist das iPhone im selben WLAN wie der Mac (Starlink oder Hotspot)?</li></ol>
+<button type="button" onclick="location.reload()">Neu laden</button>
+<p class="klein">Diese Seite liegt auf deinem iPhone, sie kommt nicht vom Mac.</p></div>
+<div data-l="en"><h1>Safari Assistant isn't responding</h1><p>Your iPhone can't reach the Mac right now. One of these usually helps:</p><ol>
+<li>Is the Mac awake and Safari Assistant open?</li>
+<li>On the Mac: ⚙️ Settings → Mobile app → “Show QR code”. Sharing is off after every start of Safari Assistant and after 12 hours without a request.</li>
+<li>Is the iPhone on the same Wi-Fi as the Mac (Starlink or hotspot)?</li></ol>
+<button type="button" onclick="location.reload()">Reload</button>
+<p class="klein">This page is stored on your iPhone; it doesn't come from the Mac.</p></div>
+<div data-l="fr"><h1>Safari Assistant ne répond pas</h1><p>Votre iPhone n’atteint pas le Mac pour le moment. En général, l’un de ces points aide :</p><ol>
+<li>Le Mac est-il réveillé et Safari Assistant ouvert ?</li>
+<li>Sur le Mac : ⚙️ Réglages → Application mobile → « Afficher le code QR ». Le partage est coupé après chaque démarrage de Safari Assistant et après 12 heures sans requête.</li>
+<li>L’iPhone est-il sur le même Wi-Fi que le Mac (Starlink ou partage de connexion) ?</li></ol>
+<button type="button" onclick="location.reload()">Recharger</button>
+<p class="klein">Cette page est enregistrée sur votre iPhone ; elle ne vient pas du Mac.</p></div>
+<div data-l="es"><h1>Safari Assistant no responde</h1><p>Tu iPhone no llega al Mac en este momento. Normalmente ayuda una de estas cosas:</p><ol>
+<li>¿Está el Mac despierto y Safari Assistant abierto?</li>
+<li>En el Mac: ⚙️ Ajustes → App móvil → «Mostrar código QR». El acceso compartido se apaga tras cada inicio de Safari Assistant y tras 12 horas sin solicitudes.</li>
+<li>¿Está el iPhone en la misma wifi que el Mac (Starlink o punto de acceso)?</li></ol>
+<button type="button" onclick="location.reload()">Volver a cargar</button>
+<p class="klein">Esta página está guardada en tu iPhone; no viene del Mac.</p></div>
+<script>
+(function () {
+  var l = 'de', s = ['de', 'en', 'fr', 'es'];
+  try {
+    var v = JSON.parse(localStorage.getItem('safari-ui-sprache') || 'null');
+    if (s.indexOf(v) >= 0) l = v;
+    else { var n = String(navigator.language || 'de').toLowerCase().slice(0, 2); l = s.indexOf(n) >= 0 ? n : 'en'; }
+  } catch (e) {}
+  var b = document.querySelector('[data-l="' + l + '"]');
+  if (b) b.style.display = 'block';
+  document.documentElement.lang = l;
+})();
+</script>
+<noscript><style>[data-l]{display:block}</style></noscript>
+</body></html>
+"""
+
 def url_fuers_log(url):
     """Zugangscode nur im Terminal voll zeigen. Startet die App den Server, landet stdout in einer
     Logdatei — dort steht der Code nicht (2026-09-27, Audit M1). Die volle Adresse steht in der App
@@ -772,7 +1190,8 @@ def lan_status():
     st = LAN_STATE
     port = SERVER_INFO.get('port') or 8765
     ip = st['ip'] if st['an'] else lan_ip()
-    schema = 'https' if st['tls'] else 'http'
+    # 2026-10-18-1: Der Weg bestimmt das Schema — „schnell" ist http, auch wenn ein Zertifikat da wäre.
+    schema = 'https' if (st['tls'] and st.get('weg') != 'schnell') else 'http'
     # Hauptadresse ist der Bonjour-Name: der bleibt beim Wechsel Starlink ↔ iPhone-Hotspot gleich,
     # die IP nicht. Damit überlebt auch das Home-Bildschirm-Icon am iPhone den Netzwechsel.
     name = bonjour_name()
@@ -780,7 +1199,7 @@ def lan_status():
     url_name = f'{schema}://{name}:{port}/go/{token}' if name else ''
     # Die IP-Adresse nur anbieten, wenn das Zertifikat sie auch abdeckt — sonst schickt man das
     # iPhone auf eine Adresse, die vorhersehbar an der Zertifikatsprüfung scheitert.
-    ip_gedeckt = (not st['tls']) or (ip and ip in (TLS_STATE.get('ips') or []))
+    ip_gedeckt = (schema == 'http') or (ip and ip in (TLS_STATE.get('ips') or []))
     url_ip = f'{schema}://{ip}:{port}/go/{token}' if (ip and ip_gedeckt) else ''
     return {'an': st['an'], 'ip': ip, 'port': port,
             'url': url_name or url_ip,
@@ -789,7 +1208,10 @@ def lan_status():
             'code': token,
             'seit_s': int(time.time() - st['seit']) if st['an'] else 0,
             'inaktiv_s': lan_inaktiv_s(), 'auto_aus_h': LAN_INAKTIV_H,
-            'anfragen': st['anfragen'], 'hinweis': st['hinweis']}
+            'anfragen': st['anfragen'], 'hinweis': st['hinweis'],
+            # 2026-10-18-1: für die Einstellungen (Schritte oder gleich der QR-Code)
+            'weg': (st.get('weg') or '') if st['an'] else '', 'gemerkt': zustand_lesen(), 'ca': ca_info(),
+            'openssl': bool(openssl_pfad()), 'offen': bool(SERVER_INFO.get('offen'))}
 
 def lan_inaktiv_s():
     """Sekunden seit der letzten Anfrage mit gültigem Zugangscode — vor der ersten Anfrage seit dem Einschalten."""
@@ -797,7 +1219,59 @@ def lan_inaktiv_s():
         return 0
     return int(time.time() - max(LAN_STATE['letzte'], LAN_STATE['seit']))
 
+# ── WIKIPEDIA AUF EIGENER HERKUNFT (2026-11-14-1, Review S3) ──
+# Bisher reichte der Assistent die Offline-Wikipedia unter seiner eigenen Adresse durch (/wiki auf dem App-Port,
+# ohne Sicherheits-Richtlinie). Damit lief jedes Skript aus einer ZIM-Datei — oder ein XSS-Fehler in kiwix-serve —
+# in der Herkunft der App und kam an deren Browser-Speicher (Claude-Key, Notfallkarte, Chats). Jetzt hat die
+# Wikipedia einen eigenen Port: gleiche Maschine, gleicher Schutz (Host-Prüfung, iPhone-Modus, Zugangscode, Weg),
+# aber eine andere Herkunft — der Browser trennt localStorage/IndexedDB nach Schema, Name UND Port. Das Cookie mit
+# dem Zugangscode gilt portübergreifend, am iPhone ist nichts neu einzurichten. Anfragen von dort an die App scheitern
+# an der Port-Prüfung von origin_passt (kein CORS, keine Mutation). Der App-Port leitet /wiki nur noch um.
+WIKI_STATE = {'server': None, 'port': 0, 'lan': None}
+WIKI_PORT_ABSTAND = 100      # App 8765 → Wikipedia 8865 (bis +9, falls belegt); außerhalb der Ports, die der Launcher abfragt
+
+def wiki_server_oeffnen(hauptport, adresse='127.0.0.1'):
+    """Zweiter Listener nur für /wiki (SafariHandler mit nur_wiki). Liefert den Port oder 0 — dann bleibt es beim
+    Durchreichen auf dem App-Port (mit Hinweis im Log), damit die Wikipedia im Busch nicht ausfällt."""
+    for kandidat in range(hauptport + WIKI_PORT_ABSTAND, hauptport + WIKI_PORT_ABSTAND + 10):
+        try:
+            srv = SafariServer((adresse, kandidat), SafariHandler)
+        except OSError:
+            continue
+        srv.nur_wiki = True
+        threading.Thread(target=srv.serve_forever, kwargs={'poll_interval': 0.5}, daemon=True).start()
+        WIKI_STATE.update({'server': srv, 'port': kandidat})
+        return kandidat
+    return 0
+
+def _wiki_lan_schliessen():
+    srv = WIKI_STATE.get('lan')
+    WIKI_STATE['lan'] = None
+    if srv is not None:
+        try:
+            srv.shutdown()
+            srv.server_close()
+        except Exception:
+            pass
+
+def _wiki_lan_oeffnen(ip, ctx):
+    """Die Wikipedia fürs iPhone: derselbe Port wie am Mac, auf der WLAN-Adresse, mit demselben Zertifikat.
+    Scheitert das Binden, bleibt der iPhone-Zugang selbst unberührt — nur die Wikipedia ist dort dann zu."""
+    _wiki_lan_schliessen()
+    wport = WIKI_STATE.get('port')
+    if not wport:
+        return
+    try:
+        srv = SafariServer((ip, wport), SafariHandler, ssl_kontext=ctx, lan=True)
+    except OSError as e:
+        print(f'📚 Wikipedia fürs iPhone: {ip}:{wport} lässt sich nicht öffnen ({e.strerror or e}).')
+        return
+    srv.nur_wiki = True
+    threading.Thread(target=srv.serve_forever, kwargs={'poll_interval': 0.5}, daemon=True).start()
+    WIKI_STATE['lan'] = srv
+
 def _lan_listener_schliessen():
+    _wiki_lan_schliessen()
     srv = LAN_STATE['server']
     LAN_STATE['server'] = None
     if srv is not None:
@@ -807,38 +1281,70 @@ def _lan_listener_schliessen():
         except Exception:
             pass
 
-def lan_an():
-    """Öffnet den WLAN-Zugang. Liefert (ok, status)."""
+def lan_an(weg=None):
+    """Öffnet den WLAN-Zugang für einen Weg (2026-10-18-1, wie Wingfoilscout): 'sicher' — https mit dem
+    Profil der lokalen CA, Standard — oder 'schnell' — http, nur als Ausweg. Ohne Angabe bleibt der Weg,
+    der gerade läuft (Netzwechsel), sonst 'sicher'. Liefert (ok, status)."""
     with LAN_LOCK:
+        if weg not in WEGE:
+            weg = LAN_STATE.get('weg') if LAN_STATE.get('weg') in WEGE else 'sicher'
         ip = lan_ip()
         if not ip:
             LAN_STATE['hinweis'] = 'Keine Netzwerk-IP gefunden — ist der Mac im WLAN (Starlink/Hotspot)?'
             return False, lan_status()
         port = SERVER_INFO.get('port') or 8765
         if LAN_STATE['an'] and LAN_STATE['ip'] == ip and (LAN_STATE['server'] is not None or SERVER_INFO.get('offen')):
-            return True, lan_status()
+            if LAN_STATE.get('weg') == weg:
+                return True, lan_status()
+            # Weg wechseln, ohne neu zu binden: der Listener spricht beide Protokolle (das erste Byte
+            # entscheidet). Für „sicher" muss er dafür mit Zertifikat geöffnet worden sein.
+            if weg == 'schnell' or LAN_STATE['tls']:
+                LAN_STATE.update({'weg': weg, 'seit': time.time(), 'anfragen': 0, 'hinweis': ''})
+                handy_meldung_zuruecksetzen()
+                print(f'📱 iPhone-Modus: Weg gewechselt → {"verschlüsselt (https)" if weg == "sicher" else "ohne Zertifikat (http)"}')
+                return True, lan_status()
         _lan_listener_schliessen()
         if SERVER_INFO.get('offen'):
             # Ausweichlösung nach defektem lo0: der Hauptserver lauscht bereits auf 0.0.0.0,
             # ein zweiter Listener wäre EADDRINUSE. Dann öffnet nur das Tor (Anfragen-Gate) —
             # und zwar unverschlüsselt, weil der bestehende Listener kein TLS spricht.
-            LAN_STATE.update({'an': True, 'ip': ip, 'seit': time.time(), 'anfragen': 0, 'hinweis': '',
+            if weg == 'sicher':
+                LAN_STATE.update({'an': False, 'ip': '', 'weg': '', 'tls': False,
+                                  'hinweis': 'Der Server läuft in der Ausweichbindung 0.0.0.0 (defektes lo0) und spricht dort '
+                                             'kein https. Verschlüsselt geht es erst, wenn lo0 repariert ist — oder unter '
+                                             '„Klappt nicht?" ohne Zertifikat.'})
+                return False, lan_status()
+            LAN_STATE.update({'an': True, 'ip': ip, 'seit': time.time(), 'anfragen': 0, 'hinweis': '', 'weg': 'schnell',
                               'tls': False, 'tls_grund': 'Ausweichbindung 0.0.0.0 (defektes lo0) — ohne Verschlüsselung.'})
+            handy_meldung_zuruecksetzen()
             print(f'📱 iPhone-Modus: AN (ohne TLS) — ' + url_fuers_log(f'http://{ip}:{port}/go/{zugangs_token()}'))
             return True, lan_status()
+        t0 = time.monotonic()
         ctx, tls_grund = tls_vorbereiten()
+        t_tls = time.monotonic() - t0
+        if weg == 'sicher' and ctx is None:
+            # Nie still auf http ausweichen: der sichere Weg ohne Zertifikat wäre keiner.
+            LAN_STATE.update({'an': False, 'ip': '', 'weg': '', 'tls': False, 'tls_grund': tls_grund,
+                              'hinweis': f'Verschlüsselt geht es gerade nicht: {tls_grund} Unter „Klappt nicht?" steht der Weg ohne Zertifikat.'})
+            return False, lan_status()
         try:
-            srv = SafariServer((ip, port), SafariHandler, ssl_kontext=ctx)
+            srv = SafariServer((ip, port), SafariHandler, ssl_kontext=ctx, lan=True)
         except OSError as e:
             LAN_STATE['hinweis'] = f'WLAN-Adresse {ip}:{port} lässt sich nicht öffnen ({e.strerror or e}).'
             LAN_STATE['an'] = False
+            LAN_STATE['weg'] = ''
             return False, lan_status()
         threading.Thread(target=srv.serve_forever, kwargs={'poll_interval': 0.5}, daemon=True).start()
+        _wiki_lan_oeffnen(ip, ctx)      # 2026-11-14-1 (Review S3): Wikipedia auf eigenem Port, siehe WIKI_STATE
         LAN_STATE.update({'an': True, 'ip': ip, 'server': srv, 'seit': time.time(), 'anfragen': 0,
-                          'hinweis': '', 'tls': bool(ctx), 'tls_grund': tls_grund})
+                          'hinweis': '', 'tls': bool(ctx), 'tls_grund': tls_grund, 'weg': weg})
+        handy_meldung_zuruecksetzen()
         st = lan_status()
-        print(f'📱 iPhone-Modus: AN — {url_fuers_log(st["url"])}' + ('' if ctx else f'  ⚠️  ohne Verschlüsselung: {tls_grund}'))
-        if ctx:
+        print(f'📱 iPhone-Modus: AN ({"verschlüsselt" if weg == "sicher" else "ohne Zertifikat"}) — {url_fuers_log(st["url"])}')
+        dauer = time.monotonic() - t0
+        if dauer > 2:   # 2026-10-11-1: wer bremst, steht im Log (Zertifikat oder Listener)
+            print(f'⏱️  iPhone-Modus einschalten dauerte {dauer:.1f} s (Zertifikat {t_tls:.1f} s, Listener {dauer - t_tls:.1f} s)')
+        if ctx and weg == 'sicher':
             print(f'🔐 Zertifikat der lokalen CA fürs iPhone: {TLS_CA_CRT}')
         return True, lan_status()
 
@@ -846,7 +1352,7 @@ def lan_aus(grund=''):
     with LAN_LOCK:
         war_an = LAN_STATE['an']
         _lan_listener_schliessen()
-        LAN_STATE.update({'an': False, 'ip': '', 'hinweis': grund, 'tls': False})
+        LAN_STATE.update({'an': False, 'ip': '', 'hinweis': grund, 'tls': False, 'weg': ''})
         if war_an:
             print('📱 iPhone-Modus: AUS' + (f' ({grund})' if grund else ''))
         return lan_status()
@@ -1616,6 +2122,1017 @@ def starte_reisewarn_wache():
     threading.Thread(target=wache, daemon=True).start()
 
 
+# ── NACHRICHTEN AUS RSS-FEEDS, NACH THEMEN (2026-10-18-2) ─────
+# Wunsch vom 18.10.2026: „RSS-Feeds, die uns innerhalb der App regelmäßig zu wichtigen Themen auf dem Laufenden
+# halten — vor allem länderspezifische Infos", dazu eigene Feedquellen und eine Sortierung nach Themen.
+# Aufbau wie bei den Reisewarnungen: Der Mac holt die Feeds im Hintergrund, sobald Netz da ist, speichert das
+# Ergebnis (offline lesbar, auch fürs iPhone) und versucht es sonst später wieder. Nichts blockiert eine Anfrage.
+# Grundsätze:
+# - Gespeichert werden nur Titel, ein kurzer Anriss (NACHRICHT_TEXT_MAX Zeichen), Datum, Quelle und Link — nie der
+#   ganze Artikel. Lesen heißt: Original öffnen.
+# - Themen und Länder ordnet eine feste Stichwortliste zu (THEMEN, LAND_WOERTER) — keine KI, nichts geraten.
+#   Bei Nachrichtenquellen (filter=True) bleibt nur, was zu einem Thema passt; amtliche Quellen bleiben ganz.
+# - Feeds sind fremder Inhalt: als Text gespeichert und angezeigt, Links nur http(s), XML ohne Entity-
+#   Deklarationen, Größe (FEED_MAX_BYTES, auch entpackt) und Zeit (FEED_TIMEOUT) begrenzt.
+# - Eigene Quellen legt nur der Mac an (Mutations-Gate für alles unter /api/nachrichten/). Adressen im eigenen
+#   Netz holt der Server nie — weder als Adresse noch über einen DNS-Namen oder eine Weiterleitung: sonst ließen
+#   sich über eine Feed-Adresse Ollama, kiwix oder der Router ansprechen.
+NACHRICHTEN_DATEI = Path.home() / '.safari-assistant-nachrichten.json'   # Meldungen + Stand je Quelle
+FEEDS_DATEI = Path.home() / '.safari-assistant-feeds.json'               # eigene Quellen + abgeschaltete eingebaute
+try:
+    NACHRICHTEN_ALLE_H = max(1, int(os.environ.get('SAFARI_NACHRICHTEN_H', '6')))
+except ValueError:
+    NACHRICHTEN_ALLE_H = 6
+NACHRICHTEN_WIEDERHOLUNG_MIN = 30
+NACHRICHTEN_TAGE = 30              # ältere Meldungen fallen heraus
+NACHRICHTEN_MAX = 1500             # im Speicher
+NACHRICHTEN_ANTWORT_MAX = 800      # an die Seiten (das iPhone legt sie in localStorage ab)
+NACHRICHTEN_JE_QUELLE = 80
+NACHRICHT_TITEL_MAX = 300
+NACHRICHT_TEXT_MAX = 320
+FEED_MAX_BYTES = 3 * 1024 * 1024
+FEED_TIMEOUT = 25
+EIGENE_QUELLEN_MAX = 40
+NACHRICHTEN_STATE = {'laeuft': False, 'letzter_versuch': 0.0, 'meldung': ''}
+NACHRICHTEN_LOCK = threading.Lock()
+FEEDS_LOCK = threading.Lock()
+NACHRICHTEN_NACHHOLEN = set()      # Quellen, die während eines laufenden Abrufs dazukamen — danach holen
+
+LAND_NAME = {l['aa']: l['name'] for l in REISEWARN_LAENDER}          # Code → Name in der App (deutsch)
+LAND_ISO3 = {'NA': 'NAM', 'BW': 'BWA', 'ZA': 'ZAF', 'ZM': 'ZMB', 'ZW': 'ZWE', 'MZ': 'MOZ', 'MW': 'MWI', 'TZ': 'TZA',
+             'KE': 'KEN', 'UG': 'UGA', 'RW': 'RWA', 'BI': 'BDI', 'ET': 'ETH', 'AO': 'AGO', 'LS': 'LSO', 'SZ': 'SWZ'}
+LAND_EN = {'NA': 'Namibia', 'BW': 'Botswana', 'ZA': 'South Africa', 'ZM': 'Zambia', 'ZW': 'Zimbabwe', 'MZ': 'Mozambique',
+           'MW': 'Malawi', 'TZ': 'Tanzania', 'KE': 'Kenya', 'UG': 'Uganda', 'RW': 'Rwanda', 'BI': 'Burundi',
+           'ET': 'Ethiopia', 'AO': 'Angola', 'LS': 'Lesotho', 'SZ': 'Eswatini'}
+# Woran ein Land im Text erkannt wird: Name, Bewohner, Hauptstadt und bekannte Orte — englisch, deutsch,
+# portugiesisch, französisch. Ganze Wörter, ohne Groß-/Kleinschreibung.
+LAND_WOERTER = {
+    'NA': ['namibia', 'namibian', 'namíbia', 'namibie', 'windhoek', 'swakopmund', 'walvis bay', 'etosha'],
+    'BW': ['botswana', 'botsuana', 'motswana', 'batswana', 'gaborone', 'maun', 'kasane', 'okavango'],
+    'ZA': ['south africa', 'south african', 'südafrika', 'áfrica do sul', 'afrique du sud', 'johannesburg', 'cape town',
+           'kapstadt', 'pretoria', 'durban', 'kruger'],
+    'ZM': ['zambia', 'zambian', 'sambia', 'zâmbia', 'zambie', 'lusaka', 'livingstone'],
+    'ZW': ['zimbabwe', 'zimbabwean', 'simbabwe', 'harare', 'bulawayo', 'victoria falls'],
+    'MZ': ['mozambique', 'mozambican', 'mosambik', 'moçambique', 'mocambique', 'maputo', 'beira', 'cabo delgado',
+           'nampula', 'inhambane'],
+    'MW': ['malawi', 'malawian', 'lilongwe', 'blantyre', 'mzuzu'],
+    'TZ': ['tanzania', 'tanzanian', 'tansania', 'tanzânia', 'tanzanie', 'dar es salaam', 'dodoma', 'arusha', 'zanzibar',
+           'serengeti', 'ngorongoro'],
+    'KE': ['kenya', 'kenyan', 'kenia', 'quénia', 'nairobi', 'mombasa', 'kisumu', 'masai mara', 'maasai mara'],
+    'UG': ['uganda', 'ugandan', 'ouganda', 'kampala', 'entebbe', 'jinja'],
+    'RW': ['rwanda', 'rwandan', 'ruanda', 'kigali'],
+    'BI': ['burundi', 'burundian', 'burundais', 'bujumbura', 'gitega'],
+    'ET': ['ethiopia', 'ethiopian', 'äthiopien', 'etiópia', 'éthiopie', 'addis ababa', 'addis abeba', 'tigray', 'amhara',
+           'oromia'],
+    'AO': ['angola', 'angolan', 'angolano', 'angolana', 'luanda', 'lubango', 'benguela'],
+    'LS': ['lesotho', 'maseru', 'basotho', 'mosotho'],
+    'SZ': ['eswatini', 'swaziland', 'swazi', 'mbabane', 'manzini'],
+}
+
+
+def _wortmuster(teile, ganz=False):
+    """Regex aus Wortanfängen (ganz=True: ganzen Wörtern), ohne Groß-/Kleinschreibung. Treffer nur am Wortanfang,
+    damit „trail" nicht als „rail" und „Tete" nicht in „Tête" zählt."""
+    return _re.compile(r'(?<!\w)(?:' + '|'.join(teile) + r')' + (r'(?!\w)' if ganz else ''), _re.I)
+
+
+# ganze Wörter, Mehrzahl mit „s" eingeschlossen („Malawians", „Kenyans")
+LAND_RE = {code: _re.compile(r'(?<!\w)(?:' + '|'.join(_re.escape(w) for w in woerter) + r')s?(?!\w)', _re.I)
+           for code, woerter in LAND_WOERTER.items()}
+
+# Die Themen — in dieser Reihenfolge erscheinen sie in der App. Die Wörter sind Wortanfänge (Regex): „protest"
+# trifft auch „protesters". Englisch, deutsch, portugiesisch (Mosambik, Angola), französisch (Burundi, Ruanda).
+# Ein Text kann mehrere Themen treffen; das mit den meisten Treffern steht vorn.
+THEMEN = [
+    {'id': 'sicherheit', 'name': 'Sicherheit', 'icon': '🛡️', 'woerter': [
+        r'protest', r'demonstrat', r'riot', r'unrest', r'violen', r'clash', r'attack', r'terror', r'insurgen', r'militant',
+        r'jihad', r'al.?shabaab', r'kidnap', r'abduct', r'carjack', r'hijack', r'robber', r'gunm[ae]n', r'shooting',
+        r'curfew', r'state of emergency', r'martial law', r'coup(?!\w)', r'xenophob', r'looting', r'landmine', r'bandit',
+        r'crime', r'post.?election', r'election violence', r'security (?:alert|situation|threat)',
+        r'unruhen', r'ausschreitung', r'anschlag', r'entführ', r'überfall', r'ausgangssperre', r'notstand', r'putsch',
+        r'plünder', r'kriminal',
+        r'protesto', r'manifesta[çc]', r'violência', r'ataque', r'insurgent', r'rapto', r'sequestr', r'assalto',
+        r'recolher obrigatório', r'estado de emergência',
+        r'émeute', r'attaque', r'enlèvement', r'couvre-feu', r"état d'urgence", r"coup d'état", r'insécurité']},
+    {'id': 'einreise', 'name': 'Grenzen & Einreise', 'icon': '🛂', 'woerter': [
+        r'border', r'frontier', r'visas?(?!\w)', r'e-?visa', r'electronic travel authori[sz]', r'immigration',
+        r'entry requirement', r'customs', r'carnet', r'temporary import', r'cross.?border', r'passport',
+        r'yellow fever certificate', r'travel advi[cs]', r'entry ban', r'port of entry', r'pet import',
+        r'grenze', r'grenzüber', r'visum', r'einreise', r'zoll(?!\w)', r'zollbeh',
+        r'fronteira', r'visto(?!\w)', r'imigração', r'alfândega', r'passaporte',
+        r'frontière', r'douane']},
+    {'id': 'treibstoff', 'name': 'Treibstoff & Versorgung', 'icon': '⛽', 'woerter': [
+        r'fuel', r'diesel', r'petrol', r'gasoline', r'paraffin', r'filling station', r'service station', r'forecourt',
+        r'rationing', r'load.?shedding', r'power (?:cut|outage|rationing)', r'blackout', r'electricity',
+        r'water (?:shortage|cut|rationing)', r'shortage', r'scarcity',
+        r'treibstoff', r'kraftstoff', r'benzin', r'tankstelle', r'stromausfall', r'engpass', r'knappheit',
+        r'combustível', r'combustivel', r'gasóleo', r'gasolina', r'escassez', r'corte de energia', r'apagão',
+        r'carburant', r'gazole', r'pénurie', r'coupure', r'délestage']},
+    {'id': 'geld', 'name': 'Geld & Bargeld', 'icon': '💵', 'woerter': [
+        r'currency', r'exchange rate', r'devaluat', r'depreciat', r'inflation', r'cash (?:shortage|crisis|crunch)',
+        r'shortage of cash', r'banknote', r'atms?(?!\w)', r'forex', r'foreign currency', r'kwacha', r'metical',
+        r'meticais', r'shilling', r'birr(?!\w)', r'kwanza', r'zig(?!\w)', r'zimbabwe gold', r'mobile money',
+        r'währung', r'wechselkurs', r'bargeld', r'geldautomat', r'abwertung',
+        r'câmbio', r'moeda', r'inflação', r'desvaloriza', r'multicaixa',
+        r'taux de change', r'monnaie', r'franc burundais', r'dévaluation']},
+    {'id': 'gesundheit', 'name': 'Gesundheit', 'icon': '🩺', 'woerter': [
+        r'outbreak', r'epidemic', r'pandemic', r'cholera', r'malaria', r'mpox', r'monkeypox', r'ebola', r'marburg',
+        r'anthrax', r'rabies', r'measles', r'dengue', r'typhoid', r'polio', r'plague', r'meningitis', r'yellow fever',
+        r'rift valley fever', r'sleeping sickness', r'trypanosom', r'hepatitis', r'diarrh', r'health alert',
+        r'disease', r'vaccin', r'hospital(?!ity)', r'snake.?bite', r'antivenom',
+        r'ausbruch', r'epidemie', r'tollwut', r'masern', r'krankenhaus', r'impf', r'seuche',
+        r'surto', r'epidemia', r'cólera', r'malária', r'sarampo', r'vacina',
+        r'épidémie', r'choléra', r'paludisme', r'rougeole', r'hôpital']},
+    {'id': 'natur', 'name': 'Naturereignisse & Wetter', 'icon': '🌀', 'woerter': [
+        r'cyclone', r'tropical (?:storm|depression)', r'storm', r'flood', r'heavy rain', r'torrential',
+        r'(?:rainfall|weather) warning', r'severe weather', r'drought', r'wildfire', r'bush ?fire', r'veld ?fire',
+        r'earthquake', r'tremor', r'landslide', r'mudslide', r'heat ?wave', r'hailstorm', r'lightning', r'el niño',
+        r'la niña', r'locust', r'tsunami', r'volcan',
+        r'zyklon', r'sturm', r'überschwemm', r'hochwasser', r'dürre', r'waldbrand', r'buschfeuer', r'erdbeben',
+        r'erdrutsch', r'unwetter', r'hitzewelle',
+        r'ciclone', r'tempestade', r'cheias?(?!\w)', r'inunda', r'seca(?!\w)', r'incêndio', r'sismo',
+        r'chuvas? (?:fortes|intensas)',
+        r'tempête', r'inondation', r'sécheresse', r'incendie', r'séisme']},
+    {'id': 'strassen', 'name': 'Straßen & Fähren', 'icon': '🛣️', 'woerter': [
+        r'road (?:closure|closed|block|works|repair|construction|condition|safety|toll)',
+        r'roads? (?:are |is |were |was )?(?:closed|impassable|flooded|blocked)', r'impassable', r'washed away',
+        r'bridge', r'detour', r'roadblock', r'checkpoint', r'toll ?(?:gate|road|plaza|fee)', r'ferry', r'pontoon',
+        r'highway', r'traffic (?:fine|police|jam|disruption)', r'speed (?:trap|camera|limit)',
+        r'(?:bus|truck|road) accident', r'motorist',
+        r'straße', r'strasse', r'gesperrt', r'brücke', r'fähre', r'maut', r'umleitung', r'kontrollpunkt',
+        r'estrada', r'ponte(?!\w)', r'portagem', r'desvio', r'intransitável', r'batelão', r'travessia',
+        r'route (?:coupée|barrée|nationale)', r'pont(?!\w)', r'péage', r'bac(?!\w)', r'barrage routier']},
+    {'id': 'parks', 'name': 'Parks & Camps', 'icon': '🐘', 'woerter': [
+        r'national park', r'game (?:reserve|park|drive)', r'nature reserve', r'conservanc', r'wildlife', r'park fee',
+        r'conservation fee', r'entry fee', r'campsite', r'camping', r'poach', r'human.?wildlife', r'elephant',
+        r'lions?(?!\w)', r'rhino', r'safari', r'kws(?!\w)', r'sanparks', r'zimparks', r'tanapa', r'uwa(?!\w)',
+        r'dnpw', r'ngorongoro', r'serengeti', r'etosha', r'chobe', r'kruger', r'mara(?!\w)',
+        r'nationalpark', r'wildreservat', r'parkgebühr', r'campingplatz', r'wilderei',
+        r'parque nacional', r'caça furtiva', r'acampamento',
+        r'parc national', r'braconnage']},
+    {'id': 'sonstiges', 'name': 'Weitere Meldungen', 'icon': '📰', 'woerter': []},
+]
+THEMEN_IDS = [t['id'] for t in THEMEN]
+_THEMEN_RE = {t['id']: _wortmuster(t['woerter']) for t in THEMEN if t['woerter']}
+# „Wichtig": was unterwegs sofort zählt. Bei GDACS entscheidet allein die Warnstufe (Orange/Rot).
+KRITISCH_RE = _wortmuster([
+    r'borders? (?:is |are |has been |have been |was |were )?(?:closed|shut)', r'clos(?:es|ed|ing|ure of)(?: the)? borders?',
+    r'border closure', r'curfew', r'state of emergency', r'martial law', r'evacuat', r'cholera outbreak',
+    r'outbreak (?:of|declared)', r'ebola', r'marburg', r'cyclone', r'tropical storm', r'flood warning',
+    r'severe weather warning', r'fuel crisis', r'no fuel', r'terror(?:ist)? attack', r'coup(?!\w)', r'travel ban',
+    r'grenze (?:ist |wurde )?geschlossen', r'grenzschließung', r'ausgangssperre', r'notstand', r'evakuier',
+    r'fronteira (?:encerrada|fechada)', r'encerramento da fronteira', r'recolher obrigatório', r'estado de emergência',
+    r'evacua', r'frontière fermée', r'fermeture de la frontière', r'couvre-feu', r"état d'urgence", r'évacu'])
+
+
+def themen_zuordnen(text):
+    """Themen eines Textes, das mit den meisten Treffern zuerst (bei Gleichstand: Reihenfolge in THEMEN)."""
+    treffer = []
+    for i, t in enumerate(THEMEN):
+        r = _THEMEN_RE.get(t['id'])
+        if r is None:
+            continue
+        n = len(r.findall(text or ''))
+        if n:
+            treffer.append((-n, i, t['id']))
+    return [t for _, _, t in sorted(treffer)]
+
+
+def laender_erkennen(text):
+    return [code for code, r in LAND_RE.items() if r.search(text or '')]
+
+
+def _google_news(code):
+    """Stichwortsuche bei Google News für ein Land, letzte 7 Tage. Inoffizielles Format (von Google nicht beworben); die
+    Links sind Weiterleitungen über news.google.com. Nur für den privaten, nicht kommerziellen Gebrauch gedacht."""
+    q = (f'"{LAND_EN[code]}" (fuel OR diesel OR border OR visa OR curfew OR protest OR unrest OR cholera OR outbreak '
+         f'OR flood OR cyclone OR "national park" OR "road closed") when:7d')
+    return 'https://news.google.com/rss/search?' + urlencode({'q': q, 'hl': 'en-ZA', 'gl': 'ZA', 'ceid': 'ZA:en'})
+
+
+# Je Land eine Zeitung — jede Adresse am 18.10.2026 abgerufen und als aktueller Feed bestätigt. Wo die Zeitungen
+# keinen erreichbaren Feed hatten (Äthiopien, Angola, Lesotho), der Länder-Feed von AllAfrica (Bedingung von
+# AllAfrica: Quelle nennen und verlinken — die App zeigt Namen und Link jeder Meldung). Lesotho und Eswatini
+# liefern selten etwas Neues.
+ZEITUNGEN = {
+    'NA': ('The Namibian', 'https://www.namibian.com.na/feed/', 'en'),
+    'BW': ('Sunday Standard (Botswana)', 'https://www.sundaystandard.info/feed/', 'en'),
+    'ZA': ('Daily Maverick', 'https://www.dailymaverick.co.za/dmrss/', 'en'),
+    'ZM': ('Lusaka Times', 'https://www.lusakatimes.com/feed/', 'en'),
+    'ZW': ('NewZimbabwe', 'https://www.newzimbabwe.com/feed/', 'en'),
+    'MZ': ('Club of Mozambique', 'https://clubofmozambique.com/feed/', 'en'),
+    'MW': ('Nyasa Times', 'https://www.nyasatimes.com/feed/', 'en'),
+    'TZ': ('Daily News (Tanzania)', 'https://dailynews.co.tz/feed/', 'en'),
+    'KE': ('Capital FM (Kenya)', 'https://capitalfm.africa/news/feed/', 'en'),
+    'UG': ('Nile Post', 'https://nilepost.co.ug/feed/', 'en'),
+    'RW': ('KT Press', 'https://www.ktpress.rw/feed/', 'en'),
+    'BI': ('Iwacu', 'https://www.iwacu-burundi.org/feed/', 'fr'),
+    'ET': ('AllAfrica: Ethiopia', 'https://allafrica.com/tools/headlines/rdf/ethiopia/headlines.rdf', 'en'),
+    'AO': ('AllAfrica: Angola', 'https://allafrica.com/tools/headlines/rdf/angola/headlines.rdf', 'en'),
+    'LS': ('AllAfrica: Lesotho', 'https://allafrica.com/tools/headlines/rdf/lesotho/headlines.rdf', 'en'),
+    'SZ': ('Times of Eswatini', 'https://www.times.co.sz/feed/', 'en'),
+}
+
+
+def _standardquellen():
+    """Die eingebauten Quellen. art: amtlich / zeitung / suche. thema = festes Thema für alle Meldungen der Quelle,
+    ersatz = Thema, wenn kein Stichwort passt. filter=True: nur Meldungen, die zu einem Thema passen.
+    nur_route=True: nur Meldungen, die eines der 16 Länder betreffen (für weltweite Quellen).
+    geprueft = Adresse am 18.10.2026 abgerufen und als Feed bestätigt."""
+    q = [
+        {'id': 'gdacs', 'name': 'GDACS — Katastrophenwarnungen (UN/EU)', 'url': 'https://www.gdacs.org/xml/rss_24h.xml',
+         'land': '', 'thema': 'natur', 'filter': False, 'nur_route': True, 'art': 'amtlich', 'geprueft': True},
+        {'id': 'cdc', 'name': 'CDC — Gesundheitshinweise für Reisende (USA)', 'url': 'https://wwwnc.cdc.gov/travel/rss/notices.xml',
+         'land': '', 'thema': 'gesundheit', 'filter': False, 'nur_route': True, 'art': 'amtlich', 'geprueft': True},
+    ]
+    for l in REISEWARN_LAENDER:
+        c = l['aa']
+        q.append({'id': 'fcdo-' + c.lower(), 'name': 'UK FCDO — ' + LAND_EN[c],
+                  'url': f'https://www.gov.uk/foreign-travel-advice/{l["fcdo"]}.atom', 'land': c, 'thema': '',
+                  'ersatz': 'einreise', 'filter': False, 'nur_route': False, 'art': 'amtlich', 'geprueft': c in ('MW', 'ET')})
+    for l in REISEWARN_LAENDER:
+        c = l['aa']
+        name, url, sprache = ZEITUNGEN[c]
+        q.append({'id': 'zeitung-' + c.lower(), 'name': name, 'url': url, 'land': c, 'thema': '', 'filter': True,
+                  'nur_route': False, 'art': 'zeitung', 'sprache': sprache, 'geprueft': True})
+    for l in REISEWARN_LAENDER:
+        c = l['aa']
+        q.append({'id': 'gnews-' + c.lower(), 'name': 'Google News — ' + LAND_EN[c], 'url': _google_news(c), 'land': c,
+                  'thema': '', 'filter': True, 'nur_route': False, 'art': 'suche', 'geprueft': False})
+    return q
+
+
+NACHRICHTEN_QUELLEN = _standardquellen()
+_QUELLEN_IDS = {q['id'] for q in NACHRICHTEN_QUELLEN}
+_ART_RANG = {'amtlich': 0, 'zeitung': 1, 'eigen': 2, 'suche': 3}
+
+
+# ── Abruf: nur öffentliche Adressen ──
+_FEED_HOSTS_GESPERRT = ('localhost', 'localhost.localdomain', 'ip6-localhost', 'ip6-loopback', 'broadcasthost')
+_FEED_ENDUNGEN_GESPERRT = ('.local', '.localhost', '.localdomain', '.lan', '.home', '.internal', '.intranet', '.corp',
+                           '.arpa', '.test', '.invalid')
+
+
+def feed_url_pruefen(url):
+    """Erste Prüfung einer Feed-Adresse, ohne Netz: nur http(s), ohne Benutzer/Passwort, höchstens 600 Zeichen, kein
+    Name und keine IP-Adresse aus dem eigenen oder einem reservierten Netz. Liefert '' oder den Grund."""
+    url = str(url or '').strip()
+    if not url:
+        return 'Keine Adresse angegeben.'
+    if len(url) > 600:
+        return 'Die Adresse ist zu lang (höchstens 600 Zeichen).'
+    if any(ord(ch) < 33 or ord(ch) == 127 for ch in url):
+        return 'Die Adresse enthält Leer- oder Steuerzeichen.'
+    try:
+        u = urlparse(url)
+        host = (u.hostname or '').lower().rstrip('.')
+        u.port   # löst bei einem kaputten Port ValueError aus
+    except ValueError:
+        return 'Die Adresse ist nicht lesbar.'
+    if u.scheme not in ('http', 'https'):
+        return 'Nur http- und https-Adressen.'
+    if not host:
+        return 'In der Adresse fehlt der Servername.'
+    if u.username or u.password:
+        return 'Adressen mit Benutzername oder Passwort werden nicht unterstützt.'
+    try:
+        ip = ipaddress.ip_address(host.strip('[]'))
+    except ValueError:
+        ip = None
+    if ip is not None:
+        return '' if ip.is_global else 'Private oder reservierte IP-Adressen holt der Assistent nicht.'
+    if host in _FEED_HOSTS_GESPERRT or host.endswith(_FEED_ENDUNGEN_GESPERRT) or '.' not in host:
+        return 'Adressen im eigenen Netz (localhost, .local, Rechnernamen ohne Domain) holt der Assistent nicht.'
+    return ''
+
+
+def feed_host_oeffentlich(host):
+    """Beim Abruf: Alle Adressen, die der Name im DNS hat, müssen öffentlich sein — sonst könnte ein Name, der auf
+    127.0.0.1 oder ins WLAN zeigt, Ollama, kiwix oder den Router erreichen. Nicht auflösbar → socket.gaierror
+    (zählt als Netzfehler: vermutlich offline)."""
+    infos = socket.getaddrinfo(host, None)
+    if not infos:
+        return False
+    return all(feed_adresse_erlaubt(info[4][0]) for info in infos)
+
+
+def feed_adresse_erlaubt(adresse):
+    """Eine einzelne aufgelöste Adresse: nur öffentliche (global routbare) gelten."""
+    try:
+        return ipaddress.ip_address(str(adresse).split('%')[0]).is_global
+    except ValueError:
+        return False
+
+
+def _feed_socket(host, port, timeout):
+    """2026-11-14-1 (Review S6): Verbindet NUR mit Adressen, die diese eine Auflösung geliefert hat und die alle
+    öffentlich sind. Vorher prüfte feed_host_oeffentlich() eine Auflösung, urllib verband mit einer zweiten — ein
+    Feed-Server, der beim zweiten Mal 127.0.0.1 oder eine WLAN-Adresse antwortet (DNS-Rebinding), erreichte damit
+    Ollama, kiwix oder den Router."""
+    infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    for info in infos:
+        if not feed_adresse_erlaubt(info[4][0]):
+            raise ValueError('Die Adresse zeigt ins eigene Netz — der Assistent holt sie nicht.')
+    letzter = None
+    for fam, typ, proto, _name, adresse in infos[:4]:
+        s = socket.socket(fam, typ, proto)
+        try:
+            if isinstance(timeout, (int, float)):
+                s.settimeout(timeout)
+            s.connect(adresse)
+            return s
+        except OSError as e:
+            s.close()
+            letzter = e
+    raise letzter or OSError(errno.EADDRNOTAVAIL, 'keine Adresse')
+
+
+class _FeedHTTPVerbindung(http.client.HTTPConnection):
+    def connect(self):
+        self.sock = _feed_socket(self.host, self.port, self.timeout)
+
+
+class _FeedHTTPSVerbindung(http.client.HTTPSConnection):
+    def __init__(self, host, **kw):
+        self._feed_kontext = kw.get('context') or ssl.create_default_context()
+        kw['context'] = self._feed_kontext
+        http.client.HTTPSConnection.__init__(self, host, **kw)
+
+    def connect(self):
+        s = _feed_socket(self.host, self.port, self.timeout)
+        try:
+            self.sock = self._feed_kontext.wrap_socket(s, server_hostname=self.host)   # Zertifikat und Name wie üblich
+        except Exception:
+            s.close()
+            raise
+
+
+class _FeedHTTP(urllib.request.HTTPHandler):
+    def http_open(self, req):
+        # Über einen System-Proxy geht die Verbindung zum Proxy, nicht zum Feed — dort gibt es nichts festzunageln.
+        return self.do_open(http.client.HTTPConnection if req.has_proxy() else _FeedHTTPVerbindung, req)
+
+
+class _FeedHTTPS(urllib.request.HTTPSHandler):
+    def https_open(self, req):
+        if getattr(req, '_tunnel_host', None):
+            return self.do_open(http.client.HTTPSConnection, req, context=ssl.create_default_context())
+        return self.do_open(_FeedHTTPSVerbindung, req, context=ssl.create_default_context())
+
+
+class _FeedWeiterleitung(urllib.request.HTTPRedirectHandler):
+    """Weiterleitungen nur auf öffentliche http(s)-Adressen, höchstens fünf."""
+    max_redirections = 5
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        grund = feed_url_pruefen(newurl)
+        if not grund and not feed_host_oeffentlich(urlparse(newurl).hostname or ''):
+            grund = 'Das Ziel liegt im eigenen Netz.'
+        if grund:
+            # Grund als ganzer Satz hinter dem Doppelpunkt — so übersetzt i18n.js beide Teile
+            raise ValueError(f'Weiterleitung abgelehnt: {grund}')
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_FEED_OPENER = urllib.request.build_opener(_FeedWeiterleitung, _FeedHTTP, _FeedHTTPS)
+
+
+def _nur_ascii(s, n):
+    return ''.join(ch for ch in str(s or '') if 32 <= ord(ch) < 127)[:n]
+
+
+def _feed_entpacken(daten, kodierung):
+    """gzip/deflate entpacken — mit Deckel auch für die entpackte Größe (sonst reichte eine kleine „Zip-Bombe")."""
+    kodierung = (kodierung or '').lower().strip()
+    if kodierung not in ('gzip', 'x-gzip', 'deflate'):
+        return daten
+    try:
+        z = zlib.decompressobj(32 + zlib.MAX_WBITS)        # gzip oder zlib, Kopf wird erkannt
+        roh = z.decompress(daten, FEED_MAX_BYTES + 1)
+    except zlib.error:
+        z = zlib.decompressobj(-zlib.MAX_WBITS)            # „deflate" ohne Kopf
+        roh = z.decompress(daten, FEED_MAX_BYTES + 1)
+    if len(roh) > FEED_MAX_BYTES or z.unconsumed_tail:
+        raise ValueError(f'Feed größer als {FEED_MAX_BYTES // (1024 * 1024)} MB (entpackt).')
+    return roh
+
+
+def feed_holen(url, etag='', geaendert='', timeout=FEED_TIMEOUT):
+    """GET mit Zeitlimit, Größendeckel, gzip und bedingter Anfrage (ETag/Last-Modified spart Datenvolumen — wichtig mit
+    Starlink Standby). Liefert (bytes | None, etag, last_modified); None heißt „unverändert seit dem letzten Abruf"."""
+    grund = feed_url_pruefen(url)
+    if grund:
+        raise ValueError(grund)
+    if not feed_host_oeffentlich(urlparse(url).hostname):
+        raise ValueError('Die Adresse zeigt ins eigene Netz — der Assistent holt sie nicht.')
+    kopf = {'User-Agent': PROJEKT_UA, 'Accept-Encoding': 'gzip',
+            'Accept': 'application/rss+xml, application/atom+xml, application/rdf+xml, application/xml;q=0.9, '
+                      'text/xml;q=0.8, */*;q=0.1'}
+    if etag:
+        kopf['If-None-Match'] = _nur_ascii(etag, 200)
+    if geaendert:
+        kopf['If-Modified-Since'] = _nur_ascii(geaendert, 100)
+    try:
+        with _FEED_OPENER.open(urllib.request.Request(url, headers=kopf), timeout=timeout) as r:
+            daten = r.read(FEED_MAX_BYTES + 1)
+            kodierung = r.headers.get('Content-Encoding', '')
+            neu_etag = _nur_ascii(r.headers.get('ETag'), 200)
+            neu_geaendert = _nur_ascii(r.headers.get('Last-Modified'), 100)
+    except urllib.error.HTTPError as e:
+        if e.code == 304:
+            return None, etag, geaendert
+        raise
+    if len(daten) > FEED_MAX_BYTES:
+        raise ValueError(f'Feed größer als {FEED_MAX_BYTES // (1024 * 1024)} MB.')
+    return _feed_entpacken(daten, kodierung), neu_etag, neu_geaendert
+
+
+# ── Feeds lesen: RSS 2.0, RSS 1.0 (RDF), Atom ──
+def _lokal(tag):
+    return tag.rsplit('}', 1)[-1].lower() if isinstance(tag, str) else ''
+
+
+def _kind(el, *namen):
+    for k in el:
+        if _lokal(k.tag) in namen:
+            return k
+    return None
+
+
+def _kindtext(el, *namen):
+    """Text des ersten nicht leeren Kindes — in der Reihenfolge der Namen (Vorrang)."""
+    for name in namen:
+        for k in el:
+            if _lokal(k.tag) == name:
+                t = ''.join(k.itertext()).strip()
+                if t:
+                    return t
+    return ''
+
+
+def feed_parsen(daten):
+    """→ (Feed-Titel, [Rohmeldungen]). Entity-Deklarationen werden abgelehnt (Schutz gegen „Billion Laughs");
+    externe Entities und DTDs lädt ElementTree nicht nach."""
+    if not daten:
+        raise ValueError('Leere Antwort.')
+    if _re.search(rb'<!ENTITY', daten, _re.I):
+        raise ValueError('Feed mit Entity-Deklarationen abgelehnt.')
+    try:
+        wurzel = ET.fromstring(daten)
+    except ET.ParseError as e:
+        anfang = daten[:400].lstrip().lower()
+        if anfang.startswith(b'<!doctype html') or anfang.startswith(b'<html'):
+            raise ValueError('Keine Feed-Adresse — der Server liefert eine Webseite (HTML).')
+        raise ValueError(f'Kein gültiges XML ({e}).')
+    art = _lokal(wurzel.tag)
+    if art == 'html':
+        raise ValueError('Keine Feed-Adresse — der Server liefert eine Webseite (HTML).')
+    if art not in ('rss', 'rdf', 'feed', 'channel'):
+        raise ValueError('Kein RSS- oder Atom-Feed.')
+    kanal = _kind(wurzel, 'channel') if art in ('rss', 'rdf') else wurzel
+    titel = _kindtext(kanal, 'title') if kanal is not None else ''
+    eintraege = []
+    for el in wurzel.iter():
+        if _lokal(el.tag) not in ('item', 'entry'):
+            continue
+        link = ''
+        for k in el:
+            if _lokal(k.tag) != 'link':
+                continue
+            href = k.get('href')
+            if href is not None:
+                if (k.get('rel') or 'alternate') == 'alternate' and not link:
+                    link = href.strip()
+            elif (k.text or '').strip() and not link:
+                link = k.text.strip()
+        if not link:
+            about = el.get('{http://www.w3.org/1999/02/22-rdf-syntax-ns#}about') or ''
+            g = _kind(el, 'guid')
+            if about.lower().startswith('http'):
+                link = about.strip()
+            elif g is not None and (g.get('isPermaLink') or 'true') != 'false' and (g.text or '').strip().lower().startswith('http'):
+                link = g.text.strip()
+        extra = {}
+        for k in el:
+            n = _lokal(k.tag)
+            if n in ('iso3', 'alertlevel', 'eventtype', 'country') and (k.text or '').strip():
+                extra[n] = k.text.strip()[:200]
+        eintraege.append({
+            'titel': _kindtext(el, 'title'),
+            'link': link,
+            'text': _kindtext(el, 'description', 'summary') or _kindtext(el, 'encoded', 'content'),
+            'datum': _kindtext(el, 'pubdate', 'published', 'updated', 'date', 'issued'),
+            'guid': _kindtext(el, 'guid', 'id'),
+            'kategorien': [((k.text or '').strip() or (k.get('term') or '').strip())[:80]
+                           for k in el if _lokal(k.tag) == 'category'][:10],
+            'extra': extra,
+        })
+        if len(eintraege) >= 500:
+            break
+    return _einzeilig(titel)[:200], eintraege
+
+
+_ISO_RE = _re.compile(r'^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?)?\s*(Z|[+-]\d{2}:?\d{2})?$', _re.I)
+
+
+def feed_zeit(s):
+    """RFC 822 (RSS) oder ISO 8601 (Atom, dc:date) → Epoch-Sekunden; 0, wenn nicht lesbar. Ohne Zeitzone: UTC."""
+    s = (s or '').strip()
+    if not s:
+        return 0
+    try:
+        dt = email.utils.parsedate_to_datetime(s)
+        if dt is not None:
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=_tz.utc)
+            return int(dt.timestamp())
+    except (TypeError, ValueError, IndexError, OverflowError):
+        pass
+    m = _ISO_RE.match(s)
+    if not m:
+        return 0
+    j, mo, t, h, mi, se, zone = m.groups()
+    try:
+        dt = _dt(int(j), int(mo), int(t), int(h or 0), int(mi or 0), int(se or 0), tzinfo=_tz.utc)
+    except ValueError:
+        return 0
+    if zone and zone.upper() != 'Z':
+        z = zone.replace(':', '')
+        dt -= (1 if z[0] == '+' else -1) * _td(hours=int(z[1:3]), minutes=int(z[3:5]))
+    return int(dt.timestamp())
+
+
+_NR_LEER = _re.compile(r'\s+')
+_WP_FUSS_RE = _re.compile(r'\s*(?:The post .{0,300}? appeared first on .{0,150}?|(?:Read|Continue reading) (?:more|the full)'
+                          r'.{0,100}?|\[(?:…|\.\.\.)\])\s*\.?\s*$', _re.I | _re.S)
+
+
+def _einzeilig(s):
+    return _NR_LEER.sub(' ', str(s or '')).strip()
+
+
+def _kuerzen(s, n):
+    s = str(s or '')
+    if len(s) <= n:
+        return s
+    schnitt = s[:n].rsplit(' ', 1)[0]
+    return (schnitt if len(schnitt) > n * 0.6 else s[:n]).rstrip(' ,;:-–—') + ' …'
+
+
+def sicherer_feed_link(u):
+    u = str(u or '').strip()
+    return u if (_re.match(r'^https?://', u, _re.I) and len(u) <= 1000 and not any(ord(ch) < 33 for ch in u)) else ''
+
+
+def _titel_schluessel(t):
+    """Gleicher Titel aus mehreren Quellen (Google News bringt Zeitungsmeldungen noch einmal, mit „ - Quelle")."""
+    t = _re.sub(r'\s+[-–—|]\s+[^-–—|]{2,60}$', '', str(t or '').lower())
+    return _re.sub(r'[\W_]+', '', t)[:90]
+
+
+def nachricht_aus_roh(roh, quelle, jetzt=None):
+    """Rohmeldung → gespeicherte Meldung, oder None, wenn sie nicht passt: kein Titel, älter als NACHRICHTEN_TAGE,
+    bei weltweiten Quellen kein Land der Route, bei gefilterten Quellen kein Thema."""
+    jetzt = int(jetzt or time.time())
+    titel = _kuerzen(_einzeilig(html_zu_text(roh.get('titel'))), NACHRICHT_TITEL_MAX)
+    if len(titel) < 3:
+        return None
+    link = sicherer_feed_link(roh.get('link'))
+    text = _WP_FUSS_RE.sub('', _einzeilig(html_zu_text(roh.get('text')))).strip()
+    if 'news.google.' in (urlparse(quelle.get('url') or '').hostname or '') or text.lower() == titel.lower():
+        text = ''      # Google News schickt als Beschreibung nur den Titel und Links
+    text = _kuerzen(text, NACHRICHT_TEXT_MAX)
+    zeit = feed_zeit(roh.get('datum'))
+    if zeit > jetzt + 86400:
+        zeit = jetzt   # Datum in der Zukunft (falsche Zeitzone, Termin) → Abrufzeit
+    if zeit and zeit < jetzt - NACHRICHTEN_TAGE * 86400:
+        return None
+    extra = roh.get('extra') or {}
+    alles = ' '.join([titel, text, ' '.join(roh.get('kategorien') or []), extra.get('country', '')])
+    laender = []
+    if quelle.get('land') in LAND_NAME:
+        laender.append(quelle['land'])
+    iso3 = {x.upper() for x in _re.split(r'[,;\s]+', extra.get('iso3', '')) if x}
+    for code, drei in LAND_ISO3.items():
+        if drei in iso3 and code not in laender:
+            laender.append(code)
+    for code in laender_erkennen(alles):
+        if code not in laender:
+            laender.append(code)
+    if quelle.get('nur_route') and not laender:
+        return None
+    themen = themen_zuordnen(alles)
+    fest = quelle.get('thema') or ''
+    if fest in THEMEN_IDS:
+        themen = [fest] + [t for t in themen if t != fest]
+    elif not themen:
+        if quelle.get('filter'):
+            return None
+        themen = [quelle['ersatz'] if quelle.get('ersatz') in THEMEN_IDS else 'sonstiges']
+    if 'alertlevel' in extra:
+        kritisch = extra['alertlevel'].strip().lower() in ('orange', 'red')
+    else:
+        kritisch = bool(KRITISCH_RE.search(alles))
+    kennung = (roh.get('guid') or link or titel).strip()[:500]
+    return {'id': hashlib.sha1(f'{quelle.get("id")}|{kennung}'.encode('utf-8', 'replace')).hexdigest()[:16],
+            'quelle': quelle.get('id'), 'quelle_name': _kuerzen(_einzeilig(quelle.get('name')), 80),
+            'titel': titel, 'text': text, 'link': link, 'zeit': zeit, 'laender': laender[:6],
+            'themen': themen[:4], 'kritisch': kritisch}
+
+
+# ── eigene Quellen ──
+_QUELLNAME_RE = _re.compile(r'^[^\x00-\x1f\x7f<>]{1,80}$')
+
+
+def _schreibe_privat_atomar(pfad, text):
+    tmp = pfad.with_name(pfad.name + '.tmp')
+    schreibe_privat(tmp, text)
+    os.replace(tmp, pfad)
+
+
+def _eigene_quelle_pruefen(d, neu=True):
+    name = _einzeilig(d.get('name'))
+    url = str(d.get('url') or '').strip()
+    land = str(d.get('land') or '').strip().upper()
+    thema = str(d.get('thema') or '').strip()
+    if not _QUELLNAME_RE.match(name):
+        raise ValueError('Bitte einen Namen mit 1 bis 80 Zeichen angeben (ohne < und >).')
+    grund = feed_url_pruefen(url)
+    if grund:
+        raise ValueError(grund)
+    if land and land not in LAND_NAME:
+        raise ValueError('Unbekanntes Land.')
+    if thema and thema not in THEMEN_IDS:
+        raise ValueError('Unbekanntes Thema.')
+    if neu:
+        qid = 'eigen-' + secrets.token_hex(4)
+    else:
+        qid = str(d.get('id') or '')
+        if not _re.match(r'^eigen-[0-9a-f]{8}$', qid):
+            raise ValueError('Ungültige Kennung.')
+    try:
+        angelegt = int(d.get('angelegt') or time.time())
+    except (TypeError, ValueError):
+        angelegt = int(time.time())
+    return {'id': qid, 'name': name, 'url': url, 'land': land, 'thema': thema, 'filter': bool(d.get('filter', True)),
+            'aktiv': bool(d.get('aktiv', True)), 'nur_route': False, 'art': 'eigen', 'geprueft': False,
+            'angelegt': angelegt}
+
+
+def feeds_lesen():
+    """~/.safari-assistant-feeds.json — eigene Quellen und abgeschaltete eingebaute. Was nicht passt, fällt weg (die
+    Datei könnte von Hand verändert sein)."""
+    try:
+        d = json.loads(FEEDS_DATEI.read_text(encoding='utf-8'))
+        d = d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        d = {}
+    eigene, gesehen = [], set()
+    for q in d.get('eigene') or []:
+        if not isinstance(q, dict):
+            continue
+        try:
+            e = _eigene_quelle_pruefen(q, neu=False)
+        except ValueError:
+            continue
+        if e['id'] not in gesehen:
+            gesehen.add(e['id'])
+            eigene.append(e)
+    aus = sorted({i for i in (d.get('aus') or []) if isinstance(i, str) and i in _QUELLEN_IDS})
+    return {'eigene': eigene[:EIGENE_QUELLEN_MAX], 'aus': aus}
+
+
+def feeds_schreiben(cfg):
+    _schreibe_privat_atomar(FEEDS_DATEI, json.dumps({'version': 1, 'eigene': cfg['eigene'], 'aus': cfg['aus']},
+                                                    ensure_ascii=False, indent=1))
+
+
+def nachrichten_quellen_aktiv(cfg=None):
+    cfg = cfg or feeds_lesen()
+    aus = set(cfg['aus'])
+    return [q for q in NACHRICHTEN_QUELLEN if q['id'] not in aus] + [q for q in cfg['eigene'] if q.get('aktiv')]
+
+
+def eigene_quelle_anlegen(d):
+    q = _eigene_quelle_pruefen(d, neu=True)
+    with FEEDS_LOCK:
+        cfg = feeds_lesen()
+        if len(cfg['eigene']) >= EIGENE_QUELLEN_MAX:
+            raise ValueError(f'Höchstens {EIGENE_QUELLEN_MAX} eigene Quellen.')
+        bekannt = {x['url'].rstrip('/').lower() for x in cfg['eigene'] + NACHRICHTEN_QUELLEN}
+        if q['url'].rstrip('/').lower() in bekannt:
+            raise ValueError('Diese Adresse ist schon eingetragen.')
+        cfg['eigene'].append(q)
+        feeds_schreiben(cfg)
+    return q
+
+
+def _nachrichten_ohne_quelle(qid):
+    """Meldungen einer entfernten Quelle gleich aus dem Speicher nehmen (läuft gerade ein Abruf, erledigt das der
+    nächste — angezeigt werden sie ohnehin nur von aktiven Quellen)."""
+    if NACHRICHTEN_STATE['laeuft']:
+        return
+    d = nachrichten_lesen()
+    if not any(e.get('quelle') == qid for e in d['eintraege']):
+        return
+    d['eintraege'] = [e for e in d['eintraege'] if e.get('quelle') != qid]
+    d['quellen'].pop(qid, None)
+    _nachrichten_schreiben(d)
+
+
+def eigene_quelle_loeschen(qid):
+    with FEEDS_LOCK:
+        cfg = feeds_lesen()
+        rest = [q for q in cfg['eigene'] if q['id'] != qid]
+        if len(rest) == len(cfg['eigene']):
+            raise ValueError('Diese eigene Quelle gibt es nicht (eingebaute Quellen lassen sich nur abschalten).')
+        cfg['eigene'] = rest
+        feeds_schreiben(cfg)
+    _nachrichten_ohne_quelle(qid)
+
+
+def quelle_schalten(qid, aktiv):
+    with FEEDS_LOCK:
+        cfg = feeds_lesen()
+        if qid in _QUELLEN_IDS:
+            aus = set(cfg['aus'])
+            if aktiv:
+                aus.discard(qid)
+            else:
+                aus.add(qid)
+            cfg['aus'] = sorted(aus)
+        else:
+            treffer = [q for q in cfg['eigene'] if q['id'] == qid]
+            if not treffer:
+                raise ValueError('Diese Quelle gibt es nicht.')
+            treffer[0]['aktiv'] = bool(aktiv)
+        feeds_schreiben(cfg)
+
+
+# ── Speicher, Abruf, Wache ──
+def nachrichten_lesen():
+    try:
+        d = json.loads(NACHRICHTEN_DATEI.read_text(encoding='utf-8'))
+        d = d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        d = {}
+    try:
+        geholt = int(d.get('geholt') or 0)
+    except (TypeError, ValueError):
+        geholt = 0
+    return {'geholt': geholt,
+            'quellen': d.get('quellen') if isinstance(d.get('quellen'), dict) else {},
+            'eintraege': [e for e in (d.get('eintraege') or []) if isinstance(e, dict) and e.get('id') and e.get('titel')]}
+
+
+def _nachrichten_schreiben(d):
+    _schreibe_privat_atomar(NACHRICHTEN_DATEI, json.dumps(
+        {'version': 1, 'geholt': d['geholt'], 'quellen': d['quellen'], 'eintraege': d['eintraege']}, ensure_ascii=False))
+
+
+def _nachrichten_aufraeumen(eintraege, quellen, jetzt):
+    """Nur aktive Quellen, nicht älter als NACHRICHTEN_TAGE, jeder Titel einmal (die amtliche bzw. zuerst gesehene
+    Meldung bleibt), höchstens NACHRICHTEN_MAX — die neuesten."""
+    art = {q['id']: q.get('art') or 'eigen' for q in quellen}
+    grenze = jetzt - NACHRICHTEN_TAGE * 86400
+    liste = [e for e in eintraege if e.get('quelle') in art and (e.get('zeit') or 0) >= grenze]
+    liste.sort(key=lambda e: (_ART_RANG.get(art.get(e.get('quelle')), 9), e.get('gesehen') or 0))
+    titel, ergebnis = set(), []
+    for e in liste:
+        k = _titel_schluessel(e.get('titel'))
+        if k and k in titel:
+            continue
+        titel.add(k)
+        ergebnis.append(e)
+    ergebnis.sort(key=lambda e: e.get('zeit') or 0, reverse=True)
+    return ergebnis[:NACHRICHTEN_MAX]
+
+
+def _ist_netzfehler(ex):
+    if isinstance(ex, urllib.error.HTTPError):
+        return False
+    return isinstance(ex, (urllib.error.URLError, socket.timeout, socket.gaierror, TimeoutError, ConnectionError))
+
+
+def _feed_fehlertext(ex):
+    if isinstance(ex, urllib.error.HTTPError):
+        return f'HTTP {ex.code}' + {404: ' — nicht gefunden', 403: ' — Zugriff verweigert', 410: ' — entfernt',
+                                    429: ' — zu viele Anfragen', 500: ' — Fehler beim Anbieter',
+                                    503: ' — Anbieter nicht erreichbar'}.get(ex.code, '')
+    grund = getattr(ex, 'reason', None)
+    if isinstance(ex, socket.gaierror) or isinstance(grund, socket.gaierror):
+        return 'Name nicht auflösbar — offline?'
+    if isinstance(ex, (socket.timeout, TimeoutError)) or isinstance(grund, (socket.timeout, TimeoutError)):
+        return 'Zeitüberschreitung'
+    if isinstance(ex, ssl.SSLError) or isinstance(grund, ssl.SSLError):
+        return 'Verschlüsselung fehlgeschlagen (Zertifikat?)'
+    if isinstance(ex, ValueError):
+        return str(ex)
+    return f'{ex.__class__.__name__}: {grund or ex}'
+
+
+def nachrichten_aktualisieren(nur=None):
+    """Holt alle aktiven Quellen (oder nur die mit Kennung in `nur`). Jede Quelle kann einzeln scheitern; was da ist,
+    wird gespeichert. Ohne Netz bricht der Lauf nach drei Verbindungsfehlern ohne einen einzigen Erfolg ab, statt jede
+    Quelle in ihr Zeitlimit laufen zu lassen."""
+    with NACHRICHTEN_LOCK:
+        if NACHRICHTEN_STATE['laeuft']:
+            if nur:
+                NACHRICHTEN_NACHHOLEN.update(nur)
+            return nachrichten_status()
+        NACHRICHTEN_STATE.update({'laeuft': True, 'letzter_versuch': time.time(), 'meldung': 'Abruf läuft …'})
+    try:
+        cfg = feeds_lesen()
+        aktiv = nachrichten_quellen_aktiv(cfg)
+        quellen = [q for q in aktiv if not nur or q['id'] in nur]
+        alt = nachrichten_lesen()
+        eintraege = {e['id']: e for e in alt['eintraege']}
+        status = dict(alt['quellen'])
+        jetzt = int(time.time())
+        erfolge = netzfehler = fehler = neu_gesamt = 0
+        abgebrochen = False
+        for q in quellen:
+            s = dict(status.get(q['id']) or {})
+            try:
+                daten, etag, geaendert = feed_holen(q['url'], s.get('etag', ''), s.get('modified', ''))
+                erfolge += 1
+                netzfehler = 0
+                if daten is None:
+                    s.update({'ok': True, 'zeit': jetzt, 'fehler': '', 'unveraendert': True, 'neu': 0, 'erfolg': jetzt})
+                else:
+                    titel, roh = feed_parsen(daten)
+                    anzahl = neu = 0
+                    for r in roh:
+                        n = nachricht_aus_roh(r, q, jetzt)
+                        if not n:
+                            continue
+                        anzahl += 1
+                        if anzahl > NACHRICHTEN_JE_QUELLE:
+                            break
+                        vorher = eintraege.get(n['id'])
+                        n['gesehen'] = (vorher or {}).get('gesehen') or jetzt
+                        n['zeit'] = n['zeit'] or n['gesehen']
+                        neu += 0 if vorher else 1
+                        eintraege[n['id']] = n
+                    neu_gesamt += neu
+                    s = {'ok': True, 'zeit': jetzt, 'fehler': '', 'anzahl': min(anzahl, NACHRICHTEN_JE_QUELLE),
+                         'roh': len(roh), 'neu': neu, 'titel': titel, 'etag': etag, 'modified': geaendert,
+                         'erfolg': jetzt, 'unveraendert': False}
+            except Exception as ex:
+                fehler += 1
+                s.update({'ok': False, 'zeit': jetzt, 'fehler': _kuerzen(_feed_fehlertext(ex), 200)})
+                if _ist_netzfehler(ex):
+                    netzfehler += 1
+                    if not erfolge and netzfehler >= 3:
+                        abgebrochen = True
+                        break
+            status[q['id']] = s
+            time.sleep(0.2)
+        if erfolge:
+            ids = {q['id'] for q in aktiv}
+            # Ein Einzelabruf (neue eigene Quelle) verschiebt den Zeitplan des Gesamtabrufs nicht
+            d = {'geholt': jetzt if not nur else alt['geholt'],
+                 'quellen': {k: v for k, v in status.items() if k in ids},
+                 'eintraege': _nachrichten_aufraeumen(list(eintraege.values()), aktiv, jetzt)}
+            # „neu" erst nach dem Aufräumen zählen: Doppelte, die eine zweite Quelle noch einmal bringt, sind nicht neu
+            alte_ids = {e['id'] for e in alt['eintraege']}
+            je_quelle = {}
+            for e in d['eintraege']:
+                if e['id'] not in alte_ids:
+                    je_quelle[e.get('quelle')] = je_quelle.get(e.get('quelle'), 0) + 1
+            for qid, st in d['quellen'].items():
+                if st.get('ok') and st.get('zeit') == jetzt:
+                    st['neu'] = je_quelle.get(qid, 0)
+            neu_gesamt = sum(je_quelle.values())
+            _nachrichten_schreiben(d)
+            NACHRICHTEN_STATE['meldung'] = (f'Abruf abgeschlossen: {erfolge} Quellen erreicht'
+                                            + (f', {fehler} mit Fehler' if fehler else '') + f', {neu_gesamt} neue Meldungen.')
+            print(f'📰 Nachrichten: {erfolge} Quellen, {fehler} Fehler, {neu_gesamt} neu')
+        else:
+            NACHRICHTEN_STATE['meldung'] = ('Keine Quelle erreichbar — vermutlich offline. Der letzte Stand bleibt '
+                                            'gespeichert.' if abgebrochen or fehler else 'Keine aktive Quelle.')
+    finally:
+        with NACHRICHTEN_LOCK:
+            NACHRICHTEN_STATE['laeuft'] = False
+            nachholen = set(NACHRICHTEN_NACHHOLEN)
+            NACHRICHTEN_NACHHOLEN.clear()
+        if nachholen:
+            threading.Thread(target=nachrichten_aktualisieren, kwargs={'nur': nachholen}, daemon=True).start()
+    return nachrichten_status()
+
+
+def nachrichten_anstossen(nur=None):
+    """Abruf im Hintergrund starten (blockiert nie eine Anfrage). Läuft schon einer, kommt eine einzelne neue Quelle
+    gleich danach an die Reihe — sonst wartete sie bis zum nächsten Gesamtabruf."""
+    with NACHRICHTEN_LOCK:
+        if NACHRICHTEN_STATE['laeuft']:
+            if nur:
+                NACHRICHTEN_NACHHOLEN.update(nur)
+            return False
+    threading.Thread(target=nachrichten_aktualisieren, kwargs={'nur': nur}, daemon=True).start()
+    return True
+
+
+def starte_nachrichten_wache():
+    """Alle NACHRICHTEN_ALLE_H Stunden abrufen, sobald Netz da ist; ohne Netz frühestens alle
+    NACHRICHTEN_WIEDERHOLUNG_MIN Minuten ein neuer Versuch (der nach drei Fehlern abbricht)."""
+    def wache():
+        time.sleep(60)   # Start nicht ausbremsen; die Reisewarnungen kommen zuerst
+        while True:
+            try:
+                geholt = nachrichten_lesen()['geholt']
+                faellig = not geholt or (time.time() - geholt) >= NACHRICHTEN_ALLE_H * 3600
+                zuletzt = time.time() - NACHRICHTEN_STATE['letzter_versuch']
+                if faellig and not NACHRICHTEN_STATE['laeuft'] and zuletzt >= NACHRICHTEN_WIEDERHOLUNG_MIN * 60:
+                    nachrichten_aktualisieren()
+            except Exception as e:
+                print(f'⚠️  Nachrichten-Wache: {e.__class__.__name__}: {e}')
+            time.sleep(60)
+    threading.Thread(target=wache, daemon=True).start()
+
+
+def nachrichten_status(d=None, cfg=None):
+    d = d or nachrichten_lesen()
+    cfg = cfg or feeds_lesen()
+    ids = [q['id'] for q in nachrichten_quellen_aktiv(cfg)]
+    st = d.get('quellen') or {}
+    geholt = d.get('geholt') or 0
+    return {'geholt': geholt, 'alter_h': round((time.time() - geholt) / 3600, 1) if geholt else None,
+            'quellen_aktiv': len(ids), 'quellen_ok': sum(1 for i in ids if (st.get(i) or {}).get('ok') is True),
+            'quellen_fehler': sum(1 for i in ids if (st.get(i) or {}).get('ok') is False),
+            'laeuft': NACHRICHTEN_STATE['laeuft'], 'meldung': NACHRICHTEN_STATE['meldung'],
+            'alle_h': NACHRICHTEN_ALLE_H, 'tage': NACHRICHTEN_TAGE}
+
+
+def _themen_oeffentlich():
+    return [{'id': t['id'], 'name': t['name'], 'icon': t['icon']} for t in THEMEN]
+
+
+def nachrichten_antwort():
+    """GET /api/nachrichten — auch fürs iPhone: die Meldungen aktiver Quellen, neueste zuerst."""
+    d, cfg = nachrichten_lesen(), feeds_lesen()
+    ids = {q['id'] for q in nachrichten_quellen_aktiv(cfg)}
+    grenze = time.time() - NACHRICHTEN_TAGE * 86400
+    liste = [e for e in d['eintraege'] if e.get('quelle') in ids and (e.get('zeit') or 0) >= grenze]
+    liste.sort(key=lambda e: e.get('zeit') or 0, reverse=True)
+    felder = ('id', 'quelle', 'quelle_name', 'titel', 'text', 'zeit', 'gesehen', 'laender', 'themen', 'kritisch')
+    return {'eintraege': [dict({k: e.get(k) for k in felder}, link=sicherer_feed_link(e.get('link')))
+                          for e in liste[:NACHRICHTEN_ANTWORT_MAX]],
+            'themen': _themen_oeffentlich(), 'laender': dict(LAND_NAME), 'status': nachrichten_status(d, cfg),
+            'hinweis': ('Titel und Anriss stammen unverändert aus den Feeds; Themen und Länder ordnet eine feste '
+                        'Stichwortliste zu, keine KI. Für Entscheidungen den Originalartikel lesen.')}
+
+
+def nachrichten_quellen_liste():
+    """GET /api/nachrichten/quellen (nur Mac): alle Quellen mit Stand des letzten Abrufs."""
+    cfg = feeds_lesen()
+    st = nachrichten_lesen()['quellen']
+    aus = set(cfg['aus'])
+
+    def mit(q, aktiv):
+        s = st.get(q['id']) or {}
+        return {'id': q['id'], 'name': q['name'], 'url': q['url'], 'land': q.get('land') or '',
+                'thema': q.get('thema') or '', 'filter': bool(q.get('filter')), 'art': q.get('art') or 'eigen',
+                'eigen': q.get('art') == 'eigen', 'aktiv': bool(aktiv), 'geprueft': bool(q.get('geprueft')),
+                'sprache': q.get('sprache') or '',
+                'status': {k: s[k] for k in ('ok', 'zeit', 'fehler', 'anzahl', 'roh', 'neu', 'titel', 'erfolg',
+                                             'unveraendert') if k in s}}
+    return {'quellen': [mit(q, q['id'] not in aus) for q in NACHRICHTEN_QUELLEN]
+                       + [mit(q, q.get('aktiv')) for q in cfg['eigene']],
+            'themen': _themen_oeffentlich(), 'laender': dict(LAND_NAME), 'max_eigene': EIGENE_QUELLEN_MAX,
+            'status': nachrichten_status(None, cfg)}
+
+
+def feed_probe(d):
+    """„Prüfen": eine Adresse einmal holen, ohne zu speichern, und sagen, was dabei herauskäme. Mit `id` die
+    Einstellungen einer vorhandenen Quelle, sonst die aus dem Formular."""
+    qid = str(d.get('id') or '')
+    if qid:
+        q = next((x for x in NACHRICHTEN_QUELLEN + feeds_lesen()['eigene'] if x['id'] == qid), None)
+        if q is None:
+            return {'ok': False, 'fehler': 'Diese Quelle gibt es nicht.'}
+    else:
+        land = str(d.get('land') or '').upper()
+        thema = str(d.get('thema') or '')
+        q = {'id': 'probe', 'name': 'Probe', 'url': str(d.get('url') or '').strip(),
+             'land': land if land in LAND_NAME else '', 'thema': thema if thema in THEMEN_IDS else '',
+             'filter': bool(d.get('filter', True)), 'nur_route': False}
+    grund = feed_url_pruefen(q['url'])
+    if grund:
+        return {'ok': False, 'fehler': grund}
+    try:
+        daten, _, _ = feed_holen(q['url'])
+        titel, roh = feed_parsen(daten or b'')
+    except Exception as ex:
+        return {'ok': False, 'fehler': _feed_fehlertext(ex)}
+    jetzt = int(time.time())
+    passend = [n for n in (nachricht_aus_roh(r, q, jetzt) for r in roh) if n]
+    zeiten = [z for z in (feed_zeit(r.get('datum')) for r in roh) if z]
+    return {'ok': True, 'titel': titel, 'roh': len(roh), 'passend': len(passend), 'neuester': max(zeiten) if zeiten else 0,
+            'beispiele': [{'titel': n['titel'], 'themen': n['themen'], 'laender': n['laender'], 'kritisch': n['kritisch']}
+                          for n in passend[:5]]}
+
+
 # ── SICHERHEIT (2026-09-05-1) ─────────────────────────────────
 # Der Server ist ein Werkzeug für localhost + Fahrzeug-WLAN. Trotzdem gilt: Was aus dem
 # Netz kommt, ist nicht vertrauenswürdig. Drei Regeln:
@@ -1685,11 +3202,22 @@ class SafariServer(ThreadingHTTPServer):
     MAX_VERBINDUNGEN = 64
     MAX_JE_ADRESSE = 16       # ein einzelnes Gerät im WLAN darf nicht alle Plätze belegen (Loopback: frei)
 
-    def __init__(self, adresse, handler, ssl_kontext=None):
+    def __init__(self, adresse, handler, ssl_kontext=None, lan=False):
         self.ssl_kontext = ssl_kontext
+        self.lan = lan      # 2026-10-18-1: der WLAN-Listener fürs iPhone — dort entscheidet das erste Byte
         self._je_adresse = {}
         self._je_adresse_lock = threading.Lock()
         super().__init__(adresse, handler)
+
+    def server_bind(self):
+        """Wie http.server.HTTPServer.server_bind, aber ohne Rückwärts-DNS (2026-10-11-1). Das Original
+        setzt server_name = socket.getfqdn(host) — für die WLAN-Adresse eine Namensabfrage beim Router,
+        die am Mac Sekunden dauern kann. „iPhone-Modus an" lief damit in die 8-Sekunden-Frist der Seite
+        („Fetch is aborted"), obwohl der Zugang danach offen war. server_name braucht hier niemand."""
+        socketserver.TCPServer.server_bind(self)
+        host, port = self.server_address[:2]
+        self.server_name = host
+        self.server_port = port
 
     # 2026-09-27 (Audit H2): Der TLS-Handshake lief im Accept-Thread. Sieben stumme Verbindungen
     # aus dem WLAN — ohne Zugangscode — legten damit den iPhone-Zugang lahm. Jetzt nimmt der
@@ -1735,14 +3263,46 @@ class SafariServer(ThreadingHTTPServer):
             self._platz_freigeben(client_address[0] if client_address else '')
 
     def finish_request(self, request, client_address):
-        if self.ssl_kontext is None:
+        """2026-10-18-1 (wie Wingfoilscout 2.5.0): Ein Port, zwei Protokolle. Auf dem WLAN-Listener entscheidet
+        das erste Byte der Verbindung — 0x16 ist ein TLS-Handshake und bekommt TLS 1.2+, alles andere ist
+        http. Ob http dann etwas bekommt, entscheidet der Weg der Freigabe (zugang_pruefen). Das Lesen des
+        ersten Bytes und der Handshake laufen unter derselben Frist wie bisher — eine stumme Verbindung hält
+        keinen Platz länger fest. Der Hauptserver auf 127.0.0.1 bleibt reines http."""
+        if not getattr(self, 'lan', False):
+            if self.ssl_kontext is None:
+                self.RequestHandlerClass(request, client_address, self)
+                return
+            erstes = b'\x16'
+        else:
+            try:
+                request.settimeout(10)
+                erstes = request.recv(1, socket.MSG_PEEK)
+            except (OSError, ValueError):
+                erstes = b''
+            if not erstes:
+                try:
+                    request.close()
+                except OSError:
+                    pass
+                return
+        if erstes != b'\x16':
             self.RequestHandlerClass(request, client_address, self)
+            return
+        if self.ssl_kontext is None:
+            # TLS ohne Zertifikat (Weg ohne Zertifikat, openssl fehlt): nichts zu sagen — schließen.
+            try:
+                request.close()
+            except OSError:
+                pass
             return
         try:
             request.settimeout(10)
             tls = self.ssl_kontext.wrap_socket(request, server_side=True)
         except (ssl.SSLError, OSError, ValueError):
-            # Ein abgelehnter Handshake (z. B. Zertifikat am iPhone noch nicht vertraut) ist kein Serverfehler.
+            # Ein abgelehnter Handshake (z. B. Zertifikat am iPhone noch nicht vertraut) ist kein Serverfehler —
+            # aber die Einstellungen sagen es (GET /api/netz/stand).
+            if getattr(self, 'lan', False):
+                handy_melden('abgebrochen')
             try:
                 request.close()
             except OSError:
@@ -1752,7 +3312,6 @@ class SafariServer(ThreadingHTTPServer):
             self.RequestHandlerClass(tls, client_address, self)
         finally:
             self.shutdown_request(tls)
-
 
 def oeffne_server(port):
     """Bindet den Server und liefert (server, adresse, lan). Standard ist 127.0.0.1 — nur dieser Mac;
@@ -2094,6 +3653,7 @@ KIWIX_PROC = None
 # unter /wiki nicht, startet der Server sie wie bisher ohne den Schalter (KIWIX_ROOT bleibt leer)
 # und die App sagt dem Nutzer, warum das Öffnen am iPhone nicht geht.
 KIWIX_ROOT = ''
+KIWIX_NUR_LOKAL = True     # False: kiwix-serve kennt --address nicht und lauscht auf allen Schnittstellen (2026-11-14-1: steht jetzt auch im Status)
 # Wiki-RAG-Suchbegriffe: die ZIMs sind englisch → deutsche Frage vor der Suche in englische
 # Stichwörter übersetzen (schnelles lokales Modell). Fällt bei Ollama-Problemen auf die Rohfrage
 # zurück (englische Fragen funktionieren dann weiterhin).
@@ -2219,7 +3779,7 @@ def start_kiwix():
     # lesbar). Achtung: kiwix-serve 3.8.2 lehnte „--address 0.0.0.0" mit „Arguments did not match
     # expected patterns" ab und beendete sich; deshalb wird jeder Aufruf geprüft und notfalls der
     # nächste versucht — zuletzt exakt der von Hand funktionierende: kiwix-serve --port 8090 <zims>.
-    global KIWIX_ROOT
+    global KIWIX_ROOT, KIWIX_NUR_LOKAL
     KIWIX_ROOT = ''
     versuche = ((['--address=127.0.0.1', '--urlRootLocation', '/wiki'], True, True),
                 (['--urlRootLocation', '/wiki'], True, False),
@@ -2252,6 +3812,7 @@ def start_kiwix():
             break
         stoppe_kiwix()
     if kiwix_laeuft():
+        KIWIX_NUR_LOKAL = bool(nur_lokal)
         print(f'📚 Offline-Wikipedia: kiwix-serve auf :{KIWIX_PORT} — {len(zims)} ZIM ({", ".join(z.name for z in zims)})')
         if not nur_lokal:
             print('⚠️  Diese kiwix-Version kennt --address nicht: Wikipedia lauscht auf allen Schnittstellen '
@@ -2412,6 +3973,253 @@ def orte_suche(query, k=8):
              'typ': typ_label.get(o[4], 'Ort'), 'pop': o[5]} for _, _, o in treffer[:k]]
 
 
+# ── SICHERUNG DER BROWSER-DATEN AUF DIE PLATTE (2026-11-14-1, Review U2) ──
+# Logbuch, Notfallkarte, Fristen, Notizen und Chats lagen nur im Browser-Speicher EINER Adresse (http://localhost:8765).
+# Ein anderer Port (Ausweichport 8766), 127.0.0.1 statt localhost, „Website-Daten löschen" oder Safaris 7-Tage-Regel —
+# und die App wirkt leer. Jetzt spiegelt die Mac-Seite ihre Daten bei jeder Änderung hierher (POST /api/sicherung, nur
+# vom Mac, nur aus der eigenen Seite) und bietet sie bei leerem oder fremdem Speicher zum Wiederherstellen an.
+# - Ordner ~/.safari-assistant-sicherung (0700), Dateien 0600, außerhalb des Projektordners.
+# - daten.json = letzter Stand; tag-JJJJ-MM-TT.json = letzter Stand der vergangenen Tage (SICHERUNG_TAGE);
+#   vor-schrumpfen-….json, wenn ein neuer Stand plötzlich sehr viel kleiner ist (versehentlich geleerter Speicher).
+# - Der Claude-Key und die GPS-Position werden hier noch einmal entfernt, egal was die Seite schickt.
+# - Die Notfallkarte daraus bekommt das iPhone nur auf Wunsch (Schalter), nur mit Zugangscode, nur verschlüsselt.
+SICHERUNG_DIR = Path(os.environ.get('SAFARI_SICHERUNG_DIR') or (Path.home() / '.safari-assistant-sicherung'))
+SICHERUNG_TAGE = 7
+SICHERUNG_MAX_BYTES = 24 * 1024 * 1024
+SICHERUNG_LOCK = threading.Lock()
+_SICHERUNG_SCHLUESSEL = _re.compile(r'^safari-[a-z0-9-]{1,40}$')
+_SICHERUNG_GEHEIM = ('anthropicKey', 'iphoneAnthropicKey', 'userLat', 'userLng', 'userLocationTime')
+_SICHERUNG_LETZTE = {'kennung': None}       # Kennung des Speichers, der zuletzt geschrieben hat (None = noch nicht gelesen)
+
+
+# ═══ CLAUDE-KEY VOM MAC AUFS iPHONE (2026-11-14-4) ═══════════════════════════════════════════════════════════════
+# Wunsch 14.11.: den Key nicht am iPhone abtippen. Ablauf: Das iPhone fragt an (POST /api/schluessel/anfrage) und
+# zeigt einen vierstelligen Code. Der Mac zeigt Gerät, Adresse und denselben Code; erst nach „Erlauben" schickt die
+# Seite des Macs den Key hierher, und das iPhone holt ihn EINMAL ab. Danach ist er hier wieder vergessen.
+# - Der Key liegt nur im Arbeitsspeicher, nie in einer Datei, und höchstens SCHLUESSEL_FRIST_S lang.
+# - Aus dem WLAN nur über https (sonst ginge er im Klartext durchs Netz) und nur mit Zugangscode (zugang_pruefen).
+# - Abholen nur mit der zufälligen Kennung der Anfrage UND von derselben Adresse, die angefragt hat.
+# - Es gibt immer höchstens eine offene Anfrage; eine neue ersetzt die alte. Der Code ist die eigentliche Prüfung:
+#   Gerätename und Adresse lassen sich fälschen, der Code steht nur auf dem Bildschirm des anfragenden Geräts.
+SCHLUESSEL_FRIST_S = 120
+_SCHLUESSEL_LOCK = threading.Lock()
+_SCHLUESSEL = {'anfrage': None}
+_SCHLUESSEL_FORMAT = _re.compile(r'^sk-ant-[A-Za-z0-9_-]{20,200}$')
+
+
+def geraet_aus_ua(ua):
+    """„Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) …" → „iPhone · iOS 18.1". Nur zur Anzeige."""
+    ua = str(ua or '')[:400]
+    m = _re.search(r'\((iPhone|iPad|iPod)[^)]*?OS (\d+)[_.](\d+)', ua)
+    if m:
+        system = 'iPadOS' if m.group(1) == 'iPad' else 'iOS'
+        return '%s · %s %s.%s' % (m.group(1), system, m.group(2), m.group(3))
+    if 'Android' in ua:
+        return 'Android-Gerät'
+    if 'Macintosh' in ua:
+        return 'Mac (oder iPad mit Desktop-Ansicht)'
+    return 'unbekanntes Gerät'
+
+
+def _schluessel_aktuell(jetzt=None):
+    """Offene Anfrage oder None; abgelaufene werden hier vergessen (samt Key)."""
+    a = _SCHLUESSEL['anfrage']
+    if a is None:
+        return None
+    if (jetzt or time.time()) - a['zeit'] > SCHLUESSEL_FRIST_S:
+        _SCHLUESSEL['anfrage'] = None
+        return None
+    return a
+
+
+def schluessel_anfrage_neu(ip, ua):
+    with _SCHLUESSEL_LOCK:
+        a = {'id': secrets.token_urlsafe(24), 'code': '%04d' % secrets.randbelow(10000), 'ip': str(ip),
+             'geraet': geraet_aus_ua(ua), 'zeit': time.time(), 'status': 'wartet', 'key': None}
+        _SCHLUESSEL['anfrage'] = a
+        return {'id': a['id'], 'code': a['code'], 'frist_s': SCHLUESSEL_FRIST_S}
+
+
+def schluessel_offen():
+    """Für die Seite des Macs: die wartende Anfrage ohne Key (oder None)."""
+    with _SCHLUESSEL_LOCK:
+        a = _schluessel_aktuell()
+        if a is None or a['status'] != 'wartet':
+            return None
+        return {'id': a['id'], 'code': a['code'], 'ip': a['ip'], 'geraet': a['geraet'],
+                'alter_s': int(time.time() - a['zeit']), 'rest_s': max(0, int(SCHLUESSEL_FRIST_S - (time.time() - a['zeit'])))}
+
+
+def schluessel_antwort(anfrage_id, erlauben, key):
+    """Antwort des Macs. ValueError bei unbekannter/abgelaufener Anfrage oder ungültigem Key."""
+    with _SCHLUESSEL_LOCK:
+        a = _schluessel_aktuell()
+        if a is None or not secrets.compare_digest(str(anfrage_id or ''), a['id']) or a['status'] != 'wartet':
+            raise ValueError('Die Anfrage gibt es nicht mehr (abgelaufen oder ersetzt).')
+        if not erlauben:
+            a['status'] = 'abgelehnt'
+            return 'abgelehnt'
+        key = str(key or '').strip()
+        if not _SCHLUESSEL_FORMAT.match(key):
+            raise ValueError('Am Mac ist kein gültiger Claude-Key eingetragen (beginnt mit sk-ant-).')
+        a['status'], a['key'] = 'erlaubt', key
+        return 'erlaubt'
+
+
+def schluessel_abholen(anfrage_id, ip):
+    """Für das iPhone: Stand der eigenen Anfrage. Den Key gibt es genau einmal, danach ist er hier gelöscht."""
+    with _SCHLUESSEL_LOCK:
+        a = _SCHLUESSEL['anfrage']
+        if a is None or not secrets.compare_digest(str(anfrage_id or ''), a['id']) or a['ip'] != str(ip):
+            return {'status': 'unbekannt'}
+        if _schluessel_aktuell() is None:
+            return {'status': 'abgelaufen'}
+        if a['status'] == 'erlaubt':
+            key = a['key']
+            _SCHLUESSEL['anfrage'] = None
+            return {'status': 'erlaubt', 'key': key}
+        if a['status'] == 'abgelehnt':
+            _SCHLUESSEL['anfrage'] = None
+            return {'status': 'abgelehnt'}
+        return {'status': 'wartet', 'rest_s': max(0, int(SCHLUESSEL_FRIST_S - (time.time() - a['zeit'])))}
+
+
+def sicherung_pruefen(d):
+    """Body von POST /api/sicherung → bereinigtes Objekt. ValueError, wenn nichts Brauchbares drin ist."""
+    if not isinstance(d, dict) or not isinstance(d.get('daten'), dict):
+        raise ValueError('daten erforderlich')
+    daten = {}
+    for k, v in d['daten'].items():
+        if isinstance(k, str) and _SICHERUNG_SCHLUESSEL.match(k) and isinstance(v, str):
+            daten[k] = v
+    if not daten:
+        raise ValueError('Keine Daten zum Sichern.')
+    roh = daten.get('safari-settings')
+    if roh is not None:
+        try:
+            st = json.loads(roh)
+            if isinstance(st, dict):
+                for geheim in _SICHERUNG_GEHEIM:
+                    st.pop(geheim, None)
+                daten['safari-settings'] = json.dumps(st, ensure_ascii=False)
+            else:
+                del daten['safari-settings']
+        except ValueError:
+            del daten['safari-settings']
+    return {'version': 1, 'zeit': time.time(),
+            'herkunft': _nur_ascii(d.get('herkunft') if isinstance(d.get('herkunft'), str) else '', 120),
+            'kennung': _nur_ascii(d.get('kennung') if isinstance(d.get('kennung'), str) else '', 40),
+            'daten': daten}
+
+
+def _sicherung_kopie(quelle, name):
+    try:
+        schreibe_privat(SICHERUNG_DIR / name, quelle.read_text(encoding='utf-8'))
+    except OSError:
+        pass
+
+
+def _sicherung_aufraeumen():
+    for muster, behalten in (('tag-*.json', SICHERUNG_TAGE), ('vor-schrumpfen-*.json', 3), ('vor-wechsel-*.json', 3)):
+        for alt in sorted(SICHERUNG_DIR.glob(muster))[:-behalten]:
+            try:
+                alt.unlink()
+            except OSError:
+                pass
+
+
+def sicherung_schreiben(obj):
+    text = json.dumps(obj, ensure_ascii=False)
+    groesse = len(text.encode('utf-8'))
+    if groesse > SICHERUNG_MAX_BYTES:
+        raise ValueError(f'Sicherung zu groß ({groesse // (1024 * 1024)} MB) — Limit {SICHERUNG_MAX_BYTES // (1024 * 1024)} MB')
+    with SICHERUNG_LOCK:
+        SICHERUNG_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+        try:
+            os.chmod(str(SICHERUNG_DIR), 0o700)
+        except OSError:
+            pass
+        ziel = SICHERUNG_DIR / 'daten.json'
+        try:
+            alt = ziel.stat()
+        except OSError:
+            alt = None
+        if alt is not None:
+            alt_tag = time.strftime('%Y-%m-%d', time.localtime(alt.st_mtime))
+            stempel = time.strftime('%Y-%m-%d-%H%M%S')
+            if _SICHERUNG_LETZTE['kennung'] is None:
+                _SICHERUNG_LETZTE['kennung'] = str((sicherung_lesen() or {}).get('kennung') or '')
+            if _SICHERUNG_LETZTE['kennung'] != obj.get('kennung'):
+                # ein ANDERER Browser-Speicher schreibt („Den Stand hier behalten") — den bisherigen Stand nie verlieren
+                _sicherung_kopie(ziel, f'vor-wechsel-{stempel}.json')
+            elif alt_tag != time.strftime('%Y-%m-%d'):
+                _sicherung_kopie(ziel, f'tag-{alt_tag}.json')              # letzter Stand des vergangenen Tages
+            elif alt.st_size > 50000 and groesse < alt.st_size * 0.2:
+                _sicherung_kopie(ziel, f'vor-schrumpfen-{stempel}.json')
+        _schreibe_privat_atomar(ziel, text)
+        _SICHERUNG_LETZTE['kennung'] = str(obj.get('kennung') or '')
+        _sicherung_aufraeumen()
+    return groesse
+
+
+def sicherung_lesen():
+    try:
+        d = json.loads((SICHERUNG_DIR / 'daten.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(d, dict) or not isinstance(d.get('daten'), dict):
+        return None
+    return d
+
+
+def sicherung_einstellungen():
+    try:
+        d = json.loads((SICHERUNG_DIR / 'einstellungen.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        d = {}
+    return {'notfallkarte_iphone': isinstance(d, dict) and d.get('notfallkarte_iphone') is True}
+
+
+def sicherung_einstellen(d):
+    neu = {'notfallkarte_iphone': isinstance(d, dict) and d.get('notfallkarte_iphone') is True}
+    with SICHERUNG_LOCK:
+        SICHERUNG_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+        _schreibe_privat_atomar(SICHERUNG_DIR / 'einstellungen.json', json.dumps(neu))
+    return neu
+
+
+def sicherung_status():
+    """GET /api/sicherung/status (nur vom Mac): gibt es eine Sicherung, von wann, von welchem Browser-Speicher?"""
+    grund = {'vorhanden': False, 'notfallkarte_iphone': sicherung_einstellungen()['notfallkarte_iphone']}
+    d = sicherung_lesen()
+    if d is None:
+        return grund
+    try:
+        groesse = (SICHERUNG_DIR / 'daten.json').stat().st_size
+    except OSError:
+        return grund
+    zeit = d.get('zeit') if isinstance(d.get('zeit'), (int, float)) and not isinstance(d.get('zeit'), bool) else 0
+    return dict(grund, vorhanden=True, zeit=zeit, bytes=groesse, eintraege=len(d['daten']),
+                herkunft=str(d.get('herkunft') or ''), kennung=str(d.get('kennung') or ''),
+                tage=sorted(p.name[4:-5] for p in SICHERUNG_DIR.glob('tag-*.json'))[-SICHERUNG_TAGE:])
+
+
+def notfallkarte_fuers_iphone():
+    """Die Notfallkarte aus der Sicherung — nur wenn der Schalter am Mac an ist. Liefert ein Objekt für das iPhone."""
+    if not sicherung_einstellungen()['notfallkarte_iphone']:
+        return {'freigegeben': False}
+    d = sicherung_lesen()
+    try:
+        karte = json.loads((d or {}).get('daten', {}).get('safari-notfallkarte') or 'null')
+    except ValueError:
+        karte = None
+    if not isinstance(karte, dict):
+        return {'freigegeben': True, 'karte': None}
+    if isinstance(karte.get('fahrzeug'), dict):
+        karte['fahrzeug'].pop('Schlüssel-Versteck', None)      # bleibt am Mac — ein verlorenes iPhone soll das nicht verraten
+    return {'freigegeben': True, 'karte': karte, 'zeit': (d or {}).get('zeit') or 0}
+
+
 # ── RAG-MOBILE: Chunk-Store + Suche (v2026-07-14-1) ──────────
 # (server.py Stand 2026-07-16-1: CORS auf JEDER Antwort (end_headers-Override) — Fix für cross-origin
 #  Glyph-Fetches (Seite :8766 → API :8765), die vorher "Load failed"/schwarze Vektor-Karte verursachten;
@@ -2545,6 +4353,517 @@ def host_ohne_port(host):
     return h.rsplit(':', 1)[0] if h.count(':') == 1 else h
 
 
+# ── VPN-PRÜFUNG (2026-10-30-1) ────────────────────────────────
+# Wunsch vom 30.10.2026: in der App „deutlich (!) darstellen, wenn ich online bin und EINE aktive VPN-Verbindung habe
+# bzw. KEINE aktive VPN-Verbindung habe". Das VPN läuft am Reiserouter (GL.iNet Mango 2, Abo eines Anbieters) — der Mac
+# selbst sieht davon nichts. Geprüft wird darum das Ergebnis, so wie es draußen ankommt:
+#   1. Mit welcher Adresse erscheint der Mac im Internet — getrennt für IPv4 und IPv6 (ein Tunnel nur für IPv4 lässt
+#      IPv6 vorbei: das „Leck")? Quelle: Cloudflare /cdn-cgi/trace, ersatzweise ipify. Nur https mit Zertifikats- und
+#      Namensprüfung: Ein manipuliertes WLAN kann keine falsche Adresse unterschieben, also auch kein falsches Grün.
+#   2. Zu welchem Netz (AS-Nummer) gehört die Adresse? Quelle: RIPEstat (RIPE NCC) — nur bei einer neuen Adresse.
+#   3. Vergleich mit den Netzen, die man sich bei eingeschaltetem VPN gemerkt hat („Das ist mein VPN").
+# Stufen (vpn_bewerten): vpn = grün · kein_vpn, leck = rot · einrichten, unklar, anmeldung = gelb · offline, pruefe,
+# aus = grau. Grün nur mit Beleg und nur frisch: Eine Messung gilt höchstens einen Takt plus VPN_TOLERANZ_S und nach
+# einem Netzwechsel des Macs sofort nicht mehr. Starlink ist der Zugang, nie das VPN — es lässt sich nicht merken.
+# Datensparsam: gemessen wird nur, solange eine Seite der App den Stand abfragt (VPN_BEDARF_S), im eingestellten Takt;
+# eine Messung sind wenige Kilobyte. Nichts davon blockiert eine Anfrage. Einstellungen und gemerkte Netze liegen in
+# ~/.safari-assistant-vpn.json (0600, außerhalb des Projektordners); Adressen nur im Speicher, nie in einer Datei.
+VPN_DATEI = Path.home() / '.safari-assistant-vpn.json'
+VPN_PORT = 443
+VPN_QUELLEN = (('www.cloudflare.com', '/cdn-cgi/trace', 'trace'),   # Antwort: Zeilen key=value (ip=, loc=)
+               ('', '/?format=json', 'ipify'))                     # Antwort: {"ip": "…"}; Host je Familie (VPN_IPIFY)
+VPN_IPIFY = {socket.AF_INET: 'api.ipify.org', socket.AF_INET6: 'api6.ipify.org'}
+VPN_CAPTIVE = ('captive.apple.com', '/hotspot-detect.html', 80)  # ohne Anmeldeseite: 200 und „Success"
+VPN_RIPE_NETZ = 'https://stat.ripe.net/data/network-info/data.json?resource={ip}&sourceapp=safari-assistant'
+VPN_RIPE_NAME = 'https://stat.ripe.net/data/as-overview/data.json?resource=AS{asn}&sourceapp=safari-assistant'
+VPN_INTERVALLE = (30, 60, 120, 300, 900)      # Takt in Sekunden, wählbar in den Einstellungen
+VPN_INTERVALL_STANDARD = 60
+VPN_TOLERANZ_S = 90         # so lange über den Takt hinaus gilt eine Messung noch (eine Messung darf etwas dauern)
+VPN_BEDARF_S = 180          # gemessen wird nur, wenn eine Seite den Stand in dieser Zeit abgefragt hat
+VPN_TAKT_S = 5              # so oft schaut die Wache, ob eine Messung fällig ist (kostet nichts)
+VPN_MAX_GEMERKT = 30
+# Zugangsnetze: Dorthin geht der Verkehr OHNE Tunnel — als Ausgang heißt das immer „kein VPN".
+VPN_ZUGANGSNETZE = {'14593': 'Starlink'}      # AS14593 „SPACEX-STARLINK" (RIPEstat as-overview, geprüft 30.10.2026)
+# Anbieter-Erkennung (2026-11-02-1): Manche Anbieter sagen selbst, ob eine Adresse einer ihrer Ausgänge ist. Dann muss man
+# nicht jedes Netz einzeln merken (Mullvad mietet Server bei vielen Rechenzentren). Nur auf Wunsch (Einstellungen), nur
+# https mit Systemzertifikaten, je Familie auf dem eigenen Weg — und die Antwort zählt nur für genau die gemessene
+# Adresse. Gilt ausdrücklich nur für diesen Anbieter; jedes andere VPN bleibt „nicht als dein VPN bekannt".
+VPN_ANBIETER = {'mullvad': {'name': 'Mullvad', 'feld': 'mullvad_exit_ip', 'pfad': '/json',
+                            'hosts': {socket.AF_INET: 'ipv4.am.i.mullvad.net', socket.AF_INET6: 'ipv6.am.i.mullvad.net'}}}
+VPN_LOG = {'vpn': 'VPN aktiv', 'kein_vpn': 'KEIN VPN', 'leck': 'VPN-LECK', 'einrichten': 'noch kein VPN-Netz gemerkt',
+           'unklar': 'unklar', 'anmeldung': 'das WLAN verlangt eine Anmeldung', 'offline': 'offline',
+           'pruefe': 'wird geprüft', 'aus': 'aus'}
+VPN_STATE = {'messung': None, 'laeuft': False, 'nachfrage': 0.0, 'netzwechsel': 0.0, 'letzte_stufe': ''}
+VPN_LOCK = threading.Lock()
+_VPN_CFG = {'wert': None}
+_VPN_NETZ_CACHE = {}        # Adresse → (Zeit, [AS-Nummern], Präfix) — nur im Speicher
+_VPN_NAMEN_CACHE = {}       # AS-Nummer → (Zeit, Name)
+
+
+def _vpn_text(s, n):
+    """Fremder Text (Netzname aus RIPEstat) → eine Zeile ohne Steuerzeichen, höchstens n Zeichen."""
+    return _re.sub(r'\s+', ' ', _re.sub(r'[\x00-\x1f\x7f]', ' ', str(s if s is not None else ''))).strip()[:n]
+
+
+def vpn_einstellungen():
+    """Einstellungen und gemerkte VPN-Netze. Beim Lesen nur bekannte, gültige Felder — eine von Hand oder fremd
+    veränderte Datei kann nichts einschleusen (auch kein Zugangsnetz als „VPN")."""
+    if _VPN_CFG['wert'] is None:
+        try:
+            roh = json.loads(VPN_DATEI.read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            roh = {}
+        if not isinstance(roh, dict):
+            roh = {}
+        takt = roh.get('intervall_s')
+        cfg = {'aktiv': roh.get('aktiv') is not False,
+               'intervall_s': takt if (isinstance(takt, int) and not isinstance(takt, bool)
+                                       and takt in VPN_INTERVALLE) else VPN_INTERVALL_STANDARD,
+               'gemerkt': [], 'anbieter': []}
+        liste = roh.get('gemerkt') if isinstance(roh.get('gemerkt'), list) else []
+        for g in liste:
+            if not isinstance(g, dict):
+                continue
+            asn = str(g.get('asn') or '')
+            if (not _re.fullmatch(r'\d{1,10}', asn) or asn in VPN_ZUGANGSNETZE
+                    or any(x['asn'] == asn for x in cfg['gemerkt'])):
+                continue
+            land = str(g.get('land') or '')
+            seit = g.get('seit')
+            cfg['gemerkt'].append({'asn': asn, 'name': _vpn_text(g.get('name'), 120),
+                                   'land': land if _re.fullmatch(r'[A-Z]{2}', land) else '',
+                                   'seit': int(seit) if isinstance(seit, (int, float)) and seit > 0 else 0})
+            if len(cfg['gemerkt']) >= VPN_MAX_GEMERKT:
+                break
+        for n in (roh.get('anbieter') if isinstance(roh.get('anbieter'), list) else []):
+            if isinstance(n, str) and n in VPN_ANBIETER and n not in cfg['anbieter']:
+                cfg['anbieter'].append(n)             # nur bekannte Anbieter — nichts Fremdes aus der Datei
+        _VPN_CFG['wert'] = cfg
+    return json.loads(json.dumps(_VPN_CFG['wert']))      # Kopie: niemand ändert den Zwischenspeicher aus Versehen
+
+
+def vpn_speichern(cfg):
+    schreibe_privat(VPN_DATEI, json.dumps({'version': 1, 'aktiv': bool(cfg.get('aktiv', True)),
+                                           'intervall_s': cfg.get('intervall_s', VPN_INTERVALL_STANDARD),
+                                           'gemerkt': cfg.get('gemerkt') or [],
+                                           'anbieter': cfg.get('anbieter') or []}, ensure_ascii=False, indent=1))
+    _VPN_CFG['wert'] = None                              # beim nächsten Lesen wieder geprüft
+
+
+class _VpnVerbindung(http.client.HTTPSConnection):
+    """https-Verbindung, die nur Adressen EINER Familie nimmt (IPv4 oder IPv6). So wird jeder Weg ins Internet einzeln
+    gemessen — sonst nähme das System still den anderen. Zertifikat und Name prüft der Kontext (Standard: System)."""
+
+    def __init__(self, host, familie, timeout, kontext, port=None):
+        http.client.HTTPSConnection.__init__(self, host, port or VPN_PORT, timeout=timeout, context=kontext)
+        self._vpn_familie = familie
+        self._vpn_kontext = kontext
+
+    def connect(self):
+        letzter = None
+        for fam, typ, proto, _name, adresse in socket.getaddrinfo(self.host, self.port, self._vpn_familie,
+                                                                 socket.SOCK_STREAM)[:4]:
+            if fam == socket.AF_INET6 and ipaddress.ip_address(adresse[0].split('%')[0]).ipv4_mapped:
+                continue                  # ::ffff:a.b.c.d wäre in Wahrheit wieder der IPv4-Weg
+            s = socket.socket(fam, typ, proto)
+            try:
+                s.settimeout(self.timeout)
+                s.connect(adresse)
+                self.sock = self._vpn_kontext.wrap_socket(s, server_hostname=self.host)
+                return
+            except OSError as e:          # auch ssl.SSLError (Zertifikat, Name) — dann die nächste Adresse
+                s.close()
+                letzter = e
+        # Nichts zu versuchen (z. B. lieferte das System für diese Familie nur ::ffff:-Adressen) heißt: auf diesem Weg
+        # gibt es kein Netz — dieselbe Fehlerart wie „Netzwerk nicht erreichbar“, auf jedem Betriebssystem.
+        raise letzter or OSError(errno.EADDRNOTAVAIL, 'keine Adresse dieser Familie')
+
+
+def vpn_ssl_kontext():
+    return ssl.create_default_context()
+
+
+def _vpn_holen(host, pfad, familie, timeout=6.0, max_bytes=16 * 1024):
+    """GET über https auf genau einem Weg (Familie) → Text. Weiterleitungen werden nicht verfolgt."""
+    v = _VpnVerbindung(host, familie, timeout, vpn_ssl_kontext())
+    try:
+        v.request('GET', pfad, headers={'User-Agent': PROJEKT_UA, 'Accept': 'text/plain, application/json',
+                                        'Connection': 'close'})
+        r = v.getresponse()
+        daten = r.read(max_bytes + 1)
+        if r.status != 200:
+            raise ValueError(f'HTTP {r.status}')
+        if len(daten) > max_bytes:
+            raise ValueError('Antwort zu groß')
+        return daten.decode('utf-8', 'replace')
+    finally:
+        v.close()
+
+
+def _vpn_adresse(roh, familie):
+    """Antwort eines Prüfdienstes → geprüfte öffentliche Adresse der erwarteten Familie (sonst ValueError)."""
+    ip = ipaddress.ip_address(str(roh or '').strip())
+    if ip.version != (4 if familie == socket.AF_INET else 6):
+        raise ValueError('Adresse passt nicht zum Weg')
+    if not ip.is_global:
+        raise ValueError('keine öffentliche Adresse')
+    return str(ip)
+
+
+def _vpn_land(code):
+    c = str(code or '').strip().upper()
+    return c if _re.fullmatch(r'[A-Z]{2}', c) and c not in ('XX', 'T1') else ''   # XX = unbekannt, T1 = Tor
+
+
+def vpn_ausgang(familie):
+    """Ein Weg ins Internet (IPv4 oder IPv6) → {'ip', 'land', 'quelle'}. Erst Cloudflare, dann ipify; die letzte
+    Ausnahme geht nach oben (für die Fehlerart)."""
+    letzter = None
+    for host, pfad, art in VPN_QUELLEN:
+        try:
+            text = _vpn_holen(VPN_IPIFY[familie] if art == 'ipify' else host, pfad, familie,
+                              timeout=6.0 if familie == socket.AF_INET else 4.0)
+            if art == 'trace':
+                werte = {}
+                for zeile in text.splitlines()[:60]:
+                    k, _, v = zeile.partition('=')
+                    if k.strip():
+                        werte[k.strip()] = v.strip()
+                return {'ip': _vpn_adresse(werte.get('ip'), familie), 'land': _vpn_land(werte.get('loc')),
+                        'quelle': art}
+            d = json.loads(text)
+            return {'ip': _vpn_adresse(d.get('ip') if isinstance(d, dict) else '', familie), 'land': '',
+                    'quelle': art}
+        except Exception as e:
+            letzter = e
+    raise letzter or OSError('kein Prüfdienst')
+
+
+def vpn_anbieter_pruefen(name, ip, familie):
+    """Fragt den Anbieter selbst, ob GENAU diese Adresse einer seiner Ausgänge ist (https, Systemzertifikat, auf dem
+    gemessenen Weg). True nur bei eindeutiger Antwort — das Feld ist wahr (nicht der Text „true") und die Adresse in der
+    Antwort ist dieselbe. Alles andere ist False: nie ein „ja" aus Unklarem."""
+    a = VPN_ANBIETER.get(name)
+    if not a or familie not in a['hosts']:
+        return False
+    try:
+        d = json.loads(_vpn_holen(a['hosts'][familie], a['pfad'], familie,
+                                  timeout=6.0 if familie == socket.AF_INET else 4.0))
+        return bool(isinstance(d, dict) and d.get(a['feld']) is True and _vpn_adresse(d.get('ip'), familie) == ip)
+    except Exception:
+        return False
+
+
+def _vpn_fehlerart(e):
+    """Ausnahme → kurzer Code für die Anzeige: kein_netz, zeit, tls, verbindung, antwort."""
+    if isinstance(e, socket.gaierror):
+        return 'kein_netz'
+    if isinstance(e, (socket.timeout, TimeoutError)):
+        return 'zeit'
+    if isinstance(e, (ssl.SSLError, ssl.CertificateError)):
+        return 'tls'
+    if isinstance(e, OSError):
+        if e.errno in (errno.ENETUNREACH, errno.EHOSTUNREACH, errno.EADDRNOTAVAIL, errno.ENETDOWN):
+            return 'kein_netz'
+        return 'verbindung'
+    return 'antwort'
+
+
+def vpn_anmeldung_noetig(timeout=5.0):
+    """Nur wenn kein Weg geklappt hat: Fängt das WLAN Anfragen ab (Anmeldeseite eines Hotels, Camps, Flughafens)?
+    True = ja, False = das Internet ist frei (dann lag es an den Prüfdiensten), None = auch hier keine Verbindung."""
+    host, pfad, port = VPN_CAPTIVE
+    v = http.client.HTTPConnection(host, port, timeout=timeout)
+    try:
+        v.request('GET', pfad, headers={'User-Agent': PROJEKT_UA, 'Connection': 'close'})
+        r = v.getresponse()
+        daten = r.read(64 * 1024)
+        return not (r.status == 200 and b'Success' in daten)
+    except Exception:
+        return None
+    finally:
+        v.close()
+
+
+def vpn_netz(ip):
+    """Adresse → ([AS-Nummern], Präfix) über RIPEstat, zwischengespeichert (6 h). Klappt der Abruf nicht, gilt ein bis
+    zu 24 h alter Eintrag weiter; sonst (None, '') = nicht zuzuordnen."""
+    jetzt = time.time()
+    c = _VPN_NETZ_CACHE.get(ip)
+    if c and jetzt - c[0] < 6 * 3600:
+        return list(c[1]), c[2]
+    try:
+        d = json.loads(_hole(VPN_RIPE_NETZ.format(ip=ip), timeout=8, max_bytes=256 * 1024))
+        data = d.get('data') if isinstance(d, dict) and d.get('status') == 'ok' else None
+        if not isinstance(data, dict):
+            raise ValueError('unerwartete Antwort')
+        asns = [str(a) for a in (data.get('asns') or []) if _re.fullmatch(r'\d{1,10}', str(a))][:4]
+        prefix = _vpn_text(data.get('prefix'), 64)
+    except Exception:
+        if c and jetzt - c[0] < 24 * 3600:
+            return list(c[1]), c[2]
+        return None, ''
+    if len(_VPN_NETZ_CACHE) >= 128:
+        _VPN_NETZ_CACHE.clear()
+    _VPN_NETZ_CACHE[ip] = (jetzt, asns, prefix)
+    return list(asns), prefix
+
+
+def vpn_netzname(asn):
+    """AS-Nummer → Name des Netzes (RIPEstat „holder"), zwischengespeichert (14 Tage); offline wenigstens der Name,
+    unter dem das Netz gemerkt wurde."""
+    jetzt = time.time()
+    c = _VPN_NAMEN_CACHE.get(asn)
+    if c and jetzt - c[0] < 14 * 86400:
+        return c[1]
+    try:
+        d = json.loads(_hole(VPN_RIPE_NAME.format(asn=asn), timeout=8, max_bytes=256 * 1024))
+        data = d.get('data') if isinstance(d, dict) else None
+        name = _vpn_text(data.get('holder') if isinstance(data, dict) else '', 120)
+    except Exception:
+        if c:
+            return c[1]
+        return next((g['name'] for g in vpn_einstellungen()['gemerkt'] if g['asn'] == asn), '')
+    if len(_VPN_NAMEN_CACHE) >= 256:
+        _VPN_NAMEN_CACHE.clear()
+    _VPN_NAMEN_CACHE[asn] = (jetzt, name)
+    return name
+
+
+def _vpn_zugang(a):
+    for n in a.get('asns') or []:
+        if n in VPN_ZUGANGSNETZE:
+            return VPN_ZUGANGSNETZE[n]
+    return 'Starlink' if 'STARLINK' in str(a.get('name') or '').upper() else ''
+
+
+def vpn_bewerten(ausgaenge, gemerkt, captive=None, anbieter=()):
+    """Messung → (Stufe, Weg mit Leck). Setzt je Ausgang 'zugang' und 'vpn' (True / False / None = nicht zuzuordnen).
+    gemerkt: Menge der AS-Nummern (Text) des eigenen VPNs. Grün nur, wenn JEDER gemessene Weg im VPN-Netz liegt.
+    anbieter: Namen der eingeschalteten Anbieter-Erkennungen — ein vom Anbieter bestätigter Ausgang zählt (nur dort)."""
+    if not ausgaenge:
+        if captive is True:
+            return 'anmeldung', ''
+        return ('unklar', '') if captive is False else ('offline', '')
+    for a in ausgaenge:
+        a['zugang'] = _vpn_zugang(a)
+        a['anbieter_name'] = ''
+        if a['zugang']:
+            a['vpn'] = False
+        elif a.get('anbieter') in VPN_ANBIETER and a.get('anbieter') in anbieter:
+            a['vpn'] = True                  # der Anbieter selbst hat diese Adresse als seinen Ausgang bestätigt
+            a['anbieter_name'] = VPN_ANBIETER[a['anbieter']]['name']
+        elif a.get('asns'):
+            a['vpn'] = any(n in gemerkt for n in a['asns'])
+        else:
+            a['vpn'] = None
+    werte = [a['vpn'] for a in ausgaenge]
+    if all(v is True for v in werte):
+        return 'vpn', ''
+    if any(v is False for v in werte):
+        if any(v is True for v in werte):
+            return 'leck', next(a['familie'] for a in ausgaenge if a['vpn'] is False)
+        if gemerkt or anbieter or any(a['zugang'] for a in ausgaenge):
+            return 'kein_vpn', ''
+        return 'einrichten', ''
+    return 'unklar', ''
+
+
+def vpn_messen():
+    """Eine Messung: beide Wege gleichzeitig, dann das Netz zu jeder Adresse. Gespeichert werden nur Rohdaten — die
+    Stufe rechnet vpn_status() bei jedem Abruf neu aus, damit Merken und Vergessen sofort wirken."""
+    with VPN_LOCK:
+        if VPN_STATE['laeuft']:
+            return False
+        VPN_STATE['laeuft'] = True
+    try:
+        beginn = time.time()
+        wege = {}
+        anbieter_an = vpn_einstellungen()['anbieter']
+
+        def weg(name, familie):
+            try:
+                w = vpn_ausgang(familie)
+                w['anbieter'] = next((n for n in anbieter_an if vpn_anbieter_pruefen(n, w['ip'], familie)), '')
+                wege[name] = w
+            except Exception as e:
+                wege[name] = {'fehler': _vpn_fehlerart(e)}
+
+        faeden = [threading.Thread(target=weg, args=a, daemon=True)
+                  for a in (('IPv4', socket.AF_INET), ('IPv6', socket.AF_INET6))]
+        for t in faeden:
+            t.start()
+        for t in faeden:
+            t.join(40)
+        ausgaenge, fehler = [], {}
+        for name in ('IPv4', 'IPv6'):
+            w = wege.get(name) or {'fehler': 'zeit'}
+            if 'ip' not in w:
+                fehler[name] = w.get('fehler') or 'antwort'
+                continue
+            asns, prefix = vpn_netz(w['ip'])
+            ausgaenge.append({'familie': name, 'ip': w['ip'], 'land': w['land'], 'quelle': w['quelle'],
+                              'asns': asns, 'prefix': prefix, 'name': vpn_netzname(asns[0]) if asns else '',
+                              'anbieter': w.get('anbieter') or ''})
+        captive = vpn_anmeldung_noetig() if not ausgaenge else None
+        with VPN_LOCK:
+            VPN_STATE['messung'] = {'zeit': time.time(), 'dauer_s': round(time.time() - beginn, 1),
+                                    'ausgaenge': ausgaenge, 'fehler': fehler, 'captive': captive}
+        st = vpn_status(nachfrage=False)
+        if st['stufe'] != VPN_STATE['letzte_stufe']:
+            VPN_STATE['letzte_stufe'] = st['stufe']
+            netze = ', '.join(f"{a['familie']} AS{a['asn'] or '?'} {a['name']}".strip() for a in st['ausgaenge'])
+            print(('🔒' if st['stufe'] == 'vpn' else '⚠️ ') + f' VPN-Prüfung: {VPN_LOG.get(st["stufe"], st["stufe"])}'
+                  + (f' — {netze}' if netze else ''))
+        return True
+    finally:
+        VPN_STATE['laeuft'] = False
+
+
+def vpn_anstossen():
+    """Messung im Hintergrund starten (blockiert nie eine Anfrage)."""
+    if VPN_STATE['laeuft'] or not vpn_einstellungen()['aktiv']:
+        return False
+    VPN_STATE['nachfrage'] = time.time()
+    threading.Thread(target=vpn_messen, daemon=True).start()
+    return True
+
+
+def _vpn_ausgang_fuer(a, fuer_mac):
+    d = {'familie': a.get('familie'), 'asn': (a.get('asns') or [''])[0], 'name': a.get('name') or '',
+         'land': a.get('land') or '', 'land_app': LAND_NAME.get(a.get('land') or '', ''), 'vpn': a.get('vpn'),
+         'zugang': a.get('zugang') or '', 'anbieter': a.get('anbieter_name') or ''}
+    if fuer_mac:     # Adressen nur am Mac selbst — ins WLAN geht nur, was die Anzeige braucht
+        d.update({'ip': a.get('ip') or '', 'prefix': a.get('prefix') or '', 'quelle': a.get('quelle') or ''})
+    return d
+
+
+def vpn_status(fuer_mac=True, nachfrage=True):
+    """GET /api/vpn/status — auch fürs iPhone. Jede Abfrage zählt als Bedarf: Solange eine Seite fragt, misst die
+    Wache im Takt. Eine zu alte Messung (oder eine von vor einem Netzwechsel) zeigt „pruefe", nie die alte Farbe."""
+    jetzt = time.time()
+    if nachfrage:
+        VPN_STATE['nachfrage'] = jetzt
+    cfg = vpn_einstellungen()
+    m = VPN_STATE['messung']
+    st = {'aktiv': cfg['aktiv'], 'intervall_s': cfg['intervall_s'], 'laeuft': VPN_STATE['laeuft'],
+          'eingerichtet': bool(cfg['gemerkt'] or cfg['anbieter']), 'stufe': 'pruefe', 'zuletzt': '', 'leck': '', 'fehler': {},
+          'geprueft': 0, 'alter_s': None, 'ausgaenge': []}
+    if m and cfg['aktiv']:
+        ausgaenge = [dict(a) for a in m['ausgaenge']]
+        stufe, leck = vpn_bewerten(ausgaenge, {g['asn'] for g in cfg['gemerkt']}, m.get('captive'), set(cfg['anbieter']))
+        frisch = (jetzt - m['zeit'] <= cfg['intervall_s'] + VPN_TOLERANZ_S
+                  and VPN_STATE['netzwechsel'] <= m['zeit'])
+        st.update({'stufe': stufe if frisch else 'pruefe', 'zuletzt': stufe, 'leck': leck,
+                   'fehler': dict(m.get('fehler') or {}), 'geprueft': int(m['zeit']),
+                   'alter_s': max(0, int(jetzt - m['zeit'])),
+                   'ausgaenge': [_vpn_ausgang_fuer(a, fuer_mac) for a in ausgaenge]})
+    if not cfg['aktiv']:
+        st['stufe'] = 'aus'
+    if fuer_mac:
+        st.update({'gemerkt': cfg['gemerkt'], 'intervalle': list(VPN_INTERVALLE),
+                   'anbieter': [{'id': k, 'name': v['name'], 'an': k in cfg['anbieter']} for k, v in VPN_ANBIETER.items()],
+                   'dauer_s': (m or {}).get('dauer_s')})
+    return st
+
+
+def vpn_merken(asn):
+    """„Das ist mein VPN": Nur ein Netz, über das der Mac GERADE ins Internet geht (letzte Messung höchstens 15 min
+    alt), und nie ein Zugangsnetz wie Starlink."""
+    asn = str(asn or '').strip().upper()
+    if asn.startswith('AS'):
+        asn = asn[2:]
+    if not _re.fullmatch(r'\d{1,10}', asn):
+        raise ValueError('Ungültige Netznummer.')
+    m = VPN_STATE['messung']
+    if not m or time.time() - m['zeit'] > 15 * 60:
+        raise ValueError('Keine aktuelle Messung — bitte zuerst „Jetzt prüfen“.')
+    a = next((dict(x) for x in m['ausgaenge'] if asn in (x.get('asns') or [])), None)
+    if not a:
+        raise ValueError('Über dieses Netz geht der Mac gerade nicht ins Internet.')
+    if _vpn_zugang(a):
+        raise ValueError('Starlink ist dein Zugang ins Internet, kein VPN — das lässt sich nicht als VPN merken.')
+    with VPN_LOCK:
+        cfg = vpn_einstellungen()
+        if any(g['asn'] == asn for g in cfg['gemerkt']):
+            return
+        if len(cfg['gemerkt']) >= VPN_MAX_GEMERKT:
+            raise ValueError(f'Höchstens {VPN_MAX_GEMERKT} VPN-Netze.')
+        cfg['gemerkt'].append({'asn': asn, 'name': _vpn_text(a.get('name'), 120), 'land': a.get('land') or '',
+                               'seit': int(time.time())})
+        vpn_speichern(cfg)
+    print(f'🔒 VPN-Prüfung: AS{asn} {a.get("name") or ""}'.rstrip() + ' als VPN gemerkt')
+
+
+def vpn_vergessen(asn):
+    asn = str(asn or '').strip().upper()
+    if asn.startswith('AS'):
+        asn = asn[2:]
+    with VPN_LOCK:
+        cfg = vpn_einstellungen()
+        neu = [g for g in cfg['gemerkt'] if g['asn'] != asn]
+        if len(neu) == len(cfg['gemerkt']):
+            raise ValueError('Dieses Netz ist nicht gemerkt.')
+        cfg['gemerkt'] = neu
+        vpn_speichern(cfg)
+
+
+def vpn_einstellen(d):
+    with VPN_LOCK:
+        cfg = vpn_einstellungen()
+        if 'aktiv' in d:
+            cfg['aktiv'] = d['aktiv'] is True
+        if 'intervall_s' in d:
+            takt = d['intervall_s']
+            if not (isinstance(takt, int) and not isinstance(takt, bool) and takt in VPN_INTERVALLE):
+                raise ValueError('Ungültiger Takt.')
+            cfg['intervall_s'] = takt
+        vpn_speichern(cfg)
+    if cfg['aktiv']:
+        vpn_anstossen()
+
+
+def vpn_anbieter_einstellen(name, an):
+    """Anbieter-Erkennung ein-/ausschalten (nur Namen aus VPN_ANBIETER). Die bisherige Messung kennt die Antwort des
+    Anbieters nicht — sie zählt nicht mehr (zeigt „pruefe"), bis neu gemessen ist."""
+    if not isinstance(name, str) or name not in VPN_ANBIETER:
+        raise ValueError('Unbekannter Anbieter.')
+    with VPN_LOCK:
+        cfg = vpn_einstellungen()
+        cfg['anbieter'] = [n for n in cfg['anbieter'] if n != name] + ([name] if an is True else [])
+        vpn_speichern(cfg)
+    VPN_STATE['netzwechsel'] = time.time()
+    print(f'🔒 VPN-Prüfung: {VPN_ANBIETER[name]["name"]}-Erkennung ' + ('AN' if an is True else 'AUS'))
+    if cfg['aktiv']:
+        vpn_anstossen()
+
+
+def starte_vpn_wache():
+    """Misst im eingestellten Takt, solange eine Seite der App den Stand abfragt; nach einem Netzwechsel des Macs
+    (andere Adresse der Route — auch VPN an/aus am Mac) sofort — bis dahin gilt die alte Messung nicht mehr
+    (vpn_status zeigt „pruefe"). Darum lan_ip_route(), nicht lan_ip(): die Tunnel-Adresse ist hier gerade das Signal."""
+    def wache():
+        netz = None
+        while True:
+            try:
+                cfg = vpn_einstellungen()
+                jetzt = time.time()
+                ip = lan_ip_route()
+                if netz is not None and ip != netz:
+                    VPN_STATE['netzwechsel'] = jetzt
+                netz = ip
+                m = VPN_STATE['messung']
+                faellig = (m is None or jetzt - m['zeit'] >= cfg['intervall_s']
+                           or VPN_STATE['netzwechsel'] > m['zeit'])
+                if (cfg['aktiv'] and faellig and not VPN_STATE['laeuft']
+                        and jetzt - VPN_STATE['nachfrage'] <= VPN_BEDARF_S):
+                    vpn_messen()
+            except Exception as e:
+                print(f'⚠️  VPN-Wache: {e.__class__.__name__}: {e}')
+            time.sleep(VPN_TAKT_S)
+    threading.Thread(target=wache, daemon=True).start()
+
+
 class SafariHandler(SimpleHTTPRequestHandler):
     server_version = 'SafariAssistant'   # kein Python-/Bibliotheksstempel im Server-Header
     sys_version = ''
@@ -2570,8 +4889,15 @@ class SafariHandler(SimpleHTTPRequestHandler):
             self.send_header('Access-Control-Allow-Origin', origin)
             self.send_header('Vary', 'Origin')
         if self._cookie_setzen:
-            sicher = '; Secure' if isinstance(self.connection, ssl.SSLSocket) else ''
-            self.send_header('Set-Cookie', f'safari_zugang={self._cookie_setzen}; Path=/; Max-Age=31536000; SameSite=Lax; HttpOnly{sicher}')
+            # 2026-10-18-1 (wie Wingfoilscout 2.5.2): über https ein eigenes Cookie mit Secure — Safari
+            # schickt es nie über http, auch nicht von einem alten Symbol oder Link. Das ohne Secure
+            # bleibt für den Weg ohne Zertifikat. 400 Tage statt eines Jahres.
+            verschl = isinstance(self.connection, ssl.SSLSocket)
+            name, sicher = (COOKIE_HTTPS, '; Secure') if verschl else (COOKIE_HTTP, '')
+            self.send_header('Set-Cookie', f'{name}={self._cookie_setzen}; Path=/; Max-Age={COOKIE_MAX_ALTER}; SameSite=Lax; HttpOnly{sicher}')
+            if verschl and self._cookie(COOKIE_HTTP):
+                # Ein Code von vor 2026-10-18-1 (ein Cookie für beide Wege) zieht um, das alte wird gelöscht
+                self.send_header('Set-Cookie', f'{COOKIE_HTTP}=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly; Secure')
             self._cookie_setzen = None
         # 2026-09-27 (Audit L1): Grundschutz auf jeder Antwort. Kein Einbetten in fremde Seiten
         # (Klick-Hijacking von „Beenden"/„iPhone-Modus"), kein MIME-Raten, Referer nur als Origin.
@@ -2632,22 +4958,114 @@ class SafariHandler(SimpleHTTPRequestHandler):
         if ist_loopback(ip):
             return True
         if not LAN_STATE['an']:
-            self._error(403, 'iPhone-Modus ist aus. Am Mac einschalten: ⚙️ Einstellungen → iPhone-Modus.')
+            self._error(403, 'iPhone-Modus ist aus. Am Mac einschalten: ⚙️ Einstellungen → Mobile App → „QR-Code zeigen".')
+            return False
+        verschluesselt = isinstance(self.connection, ssl.SSLSocket)
+        # 2026-10-18-1 (wie Wingfoilscout 2.6.0, F-01): Läuft die Freigabe für den Weg mit Zertifikat, bekommt
+        # http nichts — auch nicht /api/ping oder /go/ —, und zwar bevor Code oder Cookie gelesen werden.
+        if LAN_STATE.get('weg') == 'sicher' and not verschluesselt:
+            self._nur_verschluesselt()
             return False
         if path == '/api/ping':
             return True
         if path.startswith('/go/'):
             return True
-        wert = self._cookie('safari_zugang') or params.get('t', [''])[0] or self.headers.get('X-Safari-Zugang', '')
+        if verschluesselt:
+            cookie = self._cookie(COOKIE_HTTPS) or self._cookie(COOKIE_HTTP)
+        else:
+            cookie = self._cookie(COOKIE_HTTP)
+        wert = cookie or params.get('t', [''])[0] or self.headers.get('X-Safari-Zugang', '')
         if token_gueltig(wert):
-            if params.get('t') and not self._cookie('safari_zugang'):
+            if verschluesselt and not self._cookie(COOKIE_HTTPS):
+                self._cookie_setzen = wert      # aus ?t=, dem Header oder dem alten Cookie ins Secure-Cookie
+            elif not verschluesselt and params.get('t') and not self._cookie(COOKIE_HTTP):
                 self._cookie_setzen = wert
             LAN_STATE['anfragen'] += 1
             LAN_STATE['letzte'] = time.time()
+            handy_melden('verbunden', verschluesselt)
+            handy_bewaehrt(verschluesselt)
             return True
-        self._error(403, 'Zugangscode fehlt oder ist falsch. Am Mac unter ⚙️ Einstellungen → iPhone-Modus steht die '
-                         'vollständige Adresse (http://<Mac-IP>:8765/go/<Code>) — diese einmal am iPhone öffnen.')
+        handy_melden('ohne_schluessel')
+        # 2026-11-14-1 (Review U6): Wortlaut nach dem Ablauf vom 18.10. — vorher „⚙️ Einstellungen → iPhone-Modus …
+        # (http://<Mac-IP>:8765/go/<Code>)", obwohl es seit dem 18.10. den QR-Code und im sicheren Weg kein http mehr gibt.
+        self._error(403, 'Zugangscode fehlt oder ist falsch. Am Mac: ⚙️ Einstellungen → Mobile App → „QR-Code zeigen“ — '
+                         'den Code mit der Kamera des iPhones scannen.')
         return False
+
+    def _nur_verschluesselt(self):
+        """Antwort auf http, solange die Freigabe für den Weg mit Zertifikat läuft: kein Cookie, kein Code —
+        nur, wie es weitergeht. Für den Browser als Seite (etwa ein altes http-Symbol auf dem Home-Bildschirm),
+        sonst JSON."""
+        text = ('Der Safari Assistant nimmt im WLAN gerade nur verschlüsselte Verbindungen an (https). Am Mac: '
+                '⚙️ Einstellungen → Mobile App → den QR-Code mit der Kamera des iPhones scannen. Ist das Profil am '
+                'iPhone noch nicht installiert: die Schritte darüber.')
+        if 'text/html' not in (self.headers.get('Accept') or ''):
+            self._error(403, text)
+            return
+        name = bonjour_name()
+        ziel = f'https://{name}:{self.server.server_port}/mobile.html' if name else ''
+        link = (f'<p><a href="{_html.escape(ziel, quote=True)}" style="color:#c8a95a">{_html.escape(ziel)}</a></p>'
+                if ziel else '')
+        body = ('<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" '
+                'content="width=device-width, initial-scale=1"><title>Safari Assistant</title></head>'
+                '<body style="margin:0;padding:28px 20px;background:#0f0e0c;color:#e8e4dc;'
+                'font:16px/1.6 -apple-system,system-ui,sans-serif"><h1 style="font-size:20px">Nur verschlüsselt</h1>'
+                f'<p>{_html.escape(text)}</p>{link}'
+                '<p style="color:#9a9589;font-size:13px">Only encrypted connections (https) right now — on the Mac: '
+                '⚙️ Settings → Mobile app → scan the QR code with the iPhone camera.</p></body></html>').encode('utf-8')
+        self.send_response(403)
+        self.send_header('Content-Type', 'text/html; charset=utf-8')
+        self.send_header('Content-Length', str(len(body)))
+        self.send_header('Cache-Control', 'no-store')
+        self.end_headers()
+        self.wfile.write(body)
+
+    def fremde_seite(self):
+        """2026-11-14-1 (Review S2): Kommt die Anfrage aus der Seite einer FREMDEN Herkunft? Für Routen, die kein
+        Mutations-Gate haben, weil das iPhone sie braucht (Ollama-Durchgriff, Dokumentensuche): Ein Browser schickt
+        bei jeder fremden POST-Anfrage den Origin mit, neuere Browser zusätzlich Sec-Fetch-Site. Ohne beide Kopfzeilen
+        (curl, die eigenen Tests) gibt es keinen Browser und damit keine fremde Seite. Vorher konnte jede im Browser
+        des Macs offene Webseite über /api/ollama/api/chat Modell-Läufe anstoßen — Ollama selbst lehnt fremde
+        Origins ab, der Durchgriff hob diesen Schutz auf."""
+        origin = self.headers.get('Origin')
+        if origin and not self.origin_passt(origin, eigene_hosts()):
+            return True
+        return (self.headers.get('Sec-Fetch-Site') or '').strip().lower() == 'cross-site'
+
+    def _fremde_seite_abweisen(self):
+        if not self.fremde_seite():
+            return False
+        self._error(403, 'Anfrage von fremder Webseite abgelehnt.')
+        return True
+
+    def wiki_port_fuer_anfrage(self):
+        """Port, unter dem DIESER Aufrufer die Wikipedia auf eigener Herkunft erreicht — 0, wenn es keinen gibt
+        (Port ließ sich nicht öffnen; aus dem WLAN: der zweite Listener fehlt)."""
+        w = WIKI_STATE.get('port') or 0
+        if not w:
+            return 0
+        if ist_loopback(self.client_ip()) or WIKI_STATE.get('lan') is not None or SERVER_INFO.get('offen'):
+            return w
+        return 0
+
+    def _wiki_umleiten(self, path, query):
+        """/wiki auf dem App-Port → 302 auf den Wikipedia-Port (alte Lesezeichen, Links aus Antworten). False heißt:
+        kein eigener Port erreichbar — dann wird wie früher durchgereicht."""
+        w = self.wiki_port_fuer_anfrage()
+        if not w:
+            return False
+        host = host_ohne_port(self.headers.get('Host') or '') or ('localhost' if ist_loopback(self.client_ip()) else (LAN_STATE.get('ip') or ''))
+        if not host:
+            return False
+        if ':' in host:
+            host = f'[{host}]'
+        schema = 'https' if isinstance(self.connection, ssl.SSLSocket) else 'http'
+        self.send_response(302)
+        self.send_header('Location', f'{schema}://{host}:{w}{path}' + (f'?{query}' if query else ''))
+        self.send_header('Content-Length', '0')
+        self.send_header('Cache-Control', 'no-store')
+        self.end_headers()
+        return True
 
     def mutation_erlaubt(self):
         """Schreibende/löschende/beendende Endpunkte: nur vom Mac selbst (Loopback) UND — falls
@@ -2680,6 +5098,21 @@ class SafariHandler(SimpleHTTPRequestHandler):
             return None
         return length
 
+    def _json_body_klein(self, limit=16 * 1024):
+        """Kleiner JSON-Objekt-Body (Formulare der Einstellungen). None heißt: Fehler ist schon gesendet."""
+        length = self._body_length(limit)
+        if length is None:
+            return None
+        try:
+            d = json.loads(self.rfile.read(length).decode('utf-8'))
+        except (ValueError, UnicodeDecodeError):
+            self._error(400, 'Ungültiger JSON-Body')
+            return None
+        if not isinstance(d, dict):
+            self._error(400, 'JSON-Objekt erwartet')
+            return None
+        return d
+
     def _int_param(self, params, name, default, maximum):
         try:
             return max(0, min(int(params.get(name, [str(default)])[0]), maximum))
@@ -2694,6 +5127,9 @@ class SafariHandler(SimpleHTTPRequestHandler):
     def do_OPTIONS(self):
         parsed = urlparse(self.path)
         if not self.zugang_pruefen(parsed.path, parse_qs(parsed.query)):
+            return
+        if getattr(self.server, 'nur_wiki', False):
+            self._error(404, 'Nicht gefunden')
             return
         self.send_response(200)
         self.send_cors()
@@ -2718,6 +5154,14 @@ class SafariHandler(SimpleHTTPRequestHandler):
         if not self.zugang_pruefen(path, params):
             return
 
+        # ── 2026-11-14-1 (Review S3): der Wikipedia-Port liefert NUR die Wikipedia — keine Seite, keine API ──
+        if getattr(self.server, 'nur_wiki', False):
+            if KIWIX_ROOT and (path == '/wiki' or path.startswith('/wiki/')):
+                self._proxy_kiwix(path, parsed.query)
+            else:
+                self._error(404, 'Nicht gefunden')
+            return
+
         # ── PING: eindeutige Kennung dieses Servers ───────────────
         # Beantwortet „läuft da unser Server, auf welchem Port, mit welcher PID?" — für den
         # Launcher (wartet darauf, bevor er den Browser öffnet), für die Einstellungen im
@@ -2727,7 +5171,9 @@ class SafariHandler(SimpleHTTPRequestHandler):
             if ist_loopback(self.client_ip()):
                 self._json(dict(SERVER_INFO, app=APP_SIGNATUR, version=SERVER_VERSION,
                                 pid=os.getpid(), laeuft_seit_s=int(time.time() - START_ZEIT),
-                                mac_ip=lan_ip(), lan=LAN_STATE['an'], iphone=lan_status()))
+                                mac_ip=lan_ip(), lan=LAN_STATE['an'], iphone=lan_status(),
+                                # 2026-11-14-1: stand bisher nur im Log — kiwix-serve ohne --address lauscht im ganzen WLAN
+                                kiwix_offen=bool(KIWIX_PROC is not None and not KIWIX_NUR_LOKAL)))
             else:
                 self._json({'app': APP_SIGNATUR, 'version': SERVER_VERSION, 'port': SERVER_INFO.get('port'), 'lan': True})
             return
@@ -2742,6 +5188,67 @@ class SafariHandler(SimpleHTTPRequestHandler):
                                     'der Quelle lesen — Stand und Link stehen bei jedem Eintrag.')})
             return
 
+        # ── NACHRICHTEN (2026-10-18-2): Meldungen nach Themen — offline lesbar, auch vom iPhone ──
+        if path == '/api/nachrichten':
+            self._json(nachrichten_antwort())
+            return
+        # Quellen samt Adressen und Fehlern: nur am Mac (dort werden sie verwaltet)
+        if path == '/api/nachrichten/quellen':
+            if not ist_loopback(self.client_ip()):
+                self._error(403, 'Nur vom Mac selbst abrufbar.')
+                return
+            self._json(nachrichten_quellen_liste())
+            return
+
+        # ── VPN-PRÜFUNG (2026-10-30-1): Stand — auch vom iPhone (dann ohne Adressen und ohne die gemerkten Netze) ──
+        if path == '/api/vpn/status':
+            self._json(vpn_status(fuer_mac=ist_loopback(self.client_ip())))
+            return
+
+        # ── SICHERUNG DER BROWSER-DATEN (2026-11-14-1, Review U2): Stand und Inhalt nur für den Mac selbst ──
+        if path in ('/api/sicherung/status', '/api/sicherung'):
+            if not ist_loopback(self.client_ip()):
+                self._error(403, 'Nur vom Mac selbst abrufbar.')
+                return
+            if self._fremde_seite_abweisen():
+                return
+            if path == '/api/sicherung/status':
+                self._json(sicherung_status())
+                return
+            d = sicherung_lesen()
+            if d is None:
+                self._error(404, 'Es gibt noch keine Sicherung.')
+                return
+            self._json(d)
+            return
+        # ── CLAUDE-KEY FÜRS iPHONE (2026-11-14-4) ──
+        if path == '/api/schluessel/offen':          # die Seite des Macs fragt: wartet ein Gerät?
+            if not ist_loopback(self.client_ip()):
+                self._error(403, 'Nur vom Mac selbst abrufbar.')
+                return
+            if self._fremde_seite_abweisen():
+                return
+            self._json_privat({'anfrage': schluessel_offen()})
+            return
+        if path == '/api/schluessel/anfrage':        # das iPhone fragt: erlaubt?
+            if self._fremde_seite_abweisen():
+                return
+            if not ist_loopback(self.client_ip()) and not isinstance(self.connection, ssl.SSLSocket):
+                self._error(403, 'Den Claude-Key gibt es nur über die verschlüsselte Verbindung (https).')
+                return
+            self._json_privat(schluessel_abholen(params.get('id', [''])[0], self.client_ip()))
+            return
+        # Notfallkarte fürs iPhone (Review U1): nur auf Wunsch, mit Zugangscode (zugang_pruefen lief), aus dem WLAN
+        # nur über https — über http ginge sie im Klartext durchs Netz.
+        if path == '/api/notfallkarte':
+            if self._fremde_seite_abweisen():
+                return
+            if not ist_loopback(self.client_ip()) and not isinstance(self.connection, ssl.SSLSocket):
+                self._json({'freigegeben': False, 'grund': 'nur_https'})
+                return
+            self._json(notfallkarte_fuers_iphone())
+            return
+
         # ── iPHONE-MODUS: Status (nur vom Mac) ────────────────────
         if path == '/api/netz/status':
             if not ist_loopback(self.client_ip()):
@@ -2750,11 +5257,63 @@ class SafariHandler(SimpleHTTPRequestHandler):
             self._json(lan_status())
             return
 
+        # ── 2026-10-18-1: was vom iPhone ankommt (nur vom Mac; nie der Code) ──
+        if path == '/api/netz/stand':
+            if not ist_loopback(self.client_ip()):
+                self._error(403, 'Nur vom Mac selbst abrufbar.')
+                return
+            self._json(handy_meldung())
+            return
+
+        # ── 2026-10-18-1: das Profil fürs iPhone (.mobileconfig, per AirDrop) — nur am Mac ──
+        if path == '/api/tls/profil':
+            if not ist_loopback(self.client_ip()):
+                self._error(403, 'Nur vom Mac selbst abrufbar.')
+                return
+            if not TLS_CA_CRT.exists():
+                self._error(404, 'Es gibt noch kein Zertifikat — erst Schritt 1: „Zertifikat erzeugen".')
+                return
+            try:
+                body = iphone_profil()
+            except Exception as e:
+                self._fehler_intern('tls/profil', e)
+                return
+            zustand_merken(profil=ca_kennung(), profil_zeit=time.time())
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/x-apple-aspen-config')
+            self.send_header('Content-Disposition', f'attachment; filename="{PROFIL_DATEINAME}"')
+            self.send_header('Content-Length', str(len(body)))
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        # ── 2026-10-18-1: Service Worker + der Hinweis, den er am iPhone ablegt (Zugangscode nötig wie überall) ──
+        if path == '/sw.js':
+            body = SW_JS.replace('__VERSION__', SERVER_VERSION).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/javascript; charset=utf-8')
+            self.send_header('Content-Length', str(len(body)))
+            self.send_header('Cache-Control', 'no-cache')
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if path == '/api/netz/hinweis':
+            body = HINWEIS_HTML.encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.send_header('Content-Length', str(len(body)))
+            self.send_header('Cache-Control', 'no-cache')
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
         # ── /go/<code>: Zugangscode als Cookie setzen, dann zur iPhone-Seite ──
         if path.startswith('/go/'):
             code = path[len('/go/'):].strip('/').lower()
             if not token_gueltig(code):
-                self._error(403, 'Dieser Zugangscode ist ungültig. Aktuelle Adresse am Mac: ⚙️ Einstellungen → iPhone-Modus.')
+                handy_melden('ohne_schluessel')
+                self._error(403, 'Dieser Zugangscode ist ungültig. Am Mac: ⚙️ Einstellungen → Mobile App → „QR-Code zeigen“.')
                 return
             self._cookie_setzen = code
             self.send_response(302)
@@ -2768,11 +5327,16 @@ class SafariHandler(SimpleHTTPRequestHandler):
         # Rest der App. Gegenstelle ist fest verdrahtet (kein SSRF), der Pfad bleibt unterhalb von
         # /wiki, und der Zugangscode gilt wie überall (zugang_pruefen lief schon).
         if KIWIX_ROOT and (path == '/wiki' or path.startswith('/wiki/')):
+            # 2026-11-14-1 (Review S3): auf dem App-Port nur noch die Umleitung zur eigenen Herkunft
+            if self._wiki_umleiten(path, parsed.query):
+                return
             self._proxy_kiwix(path, parsed.query)
             return
 
         # ── OLLAMA-PROXY für das iPhone (GET /api/ollama/api/tags — mobile.html nutzt SERVER_URL + '/api/ollama' als Ollama-Basis) ──
         if path == '/api/ollama/api/tags':
+            if self._fremde_seite_abweisen():      # 2026-11-14-1 (Review S2)
+                return
             self._proxy_ollama('GET', '/api/tags', None)
             return
 
@@ -2780,7 +5344,11 @@ class SafariHandler(SimpleHTTPRequestHandler):
         # ── KIWIX-STATUS (Offline-Wikipedia — Frontend fragt vor dem Öffnen) ──
         if path == '/api/kiwix/status':
             self._json({'running': kiwix_laeuft(), 'port': KIWIX_PORT, 'proxy': kiwix_proxy_pfad(),
-                        'zims': [z.name for z in find_kiwix_zims()], 'grund': kiwix_grund()})
+                        'zims': [z.name for z in find_kiwix_zims()], 'grund': kiwix_grund(),
+                        # 2026-11-14-1 (Review S3): eigener Port = eigene Herkunft; 0 → wie bisher über den App-Port
+                        'wiki_port': self.wiki_port_fuer_anfrage() if KIWIX_ROOT else 0,
+                        # kiwix lauscht auf allen Schnittstellen (alte Version ohne --address) — stand bisher nur im Log
+                        'offen_im_netz': bool(kiwix_laeuft() and not KIWIX_NUR_LOKAL)})
             return
 
         # ── OFFLINE-ORTSSUCHE (Suchfeld der POI-Karte) ────────────
@@ -3142,20 +5710,109 @@ class SafariHandler(SimpleHTTPRequestHandler):
         path = parsed.path
         if not self.zugang_pruefen(path, parse_qs(parsed.query)):
             return
+        if getattr(self.server, 'nur_wiki', False):
+            self._error(404, 'Nicht gefunden')
+            return
 
         # Schreibende/beendende Endpunkte: nur vom Mac selbst (siehe mutation_erlaubt)
         if path in ('/api/shutdown', '/api/docs/upload', '/api/extract-pdf', '/api/rag/sync',
                     '/api/netz/an', '/api/netz/aus', '/api/netz/neuer-code',
-                    '/api/reisewarnungen/aktualisieren', '/api/tls/zeigen'):
+                    '/api/reisewarnungen/aktualisieren', '/api/tls/zeigen', '/api/tls/vorbereiten'):
             ok, grund = self.mutation_erlaubt()
             if not ok:
                 self._error(403, grund)
                 return
 
+        # 2026-10-18-2: alles unter /api/nachrichten/ (Abruf anstoßen, Quellen anlegen, prüfen, schalten,
+        # entfernen) nur vom Mac selbst und nur aus einer Seite dieses Servers — wie die übrigen Schalter
+        if path.startswith('/api/nachrichten/'):
+            ok, grund = self.mutation_erlaubt()
+            if not ok:
+                self._error(403, grund)
+                return
+        # 2026-10-30-1: alles unter /api/vpn/ (prüfen, merken, vergessen, einstellen) ebenso nur vom Mac selbst
+        if path.startswith('/api/vpn/'):
+            ok, grund = self.mutation_erlaubt()
+            if not ok:
+                self._error(403, grund)
+                return
+        # 2026-11-14-1 (Review U2): die Sicherung der Browser-Daten schreibt und schaltet nur der Mac selbst
+        if path == '/api/sicherung' or path.startswith('/api/sicherung/'):
+            ok, grund = self.mutation_erlaubt()
+            if not ok:
+                self._error(403, grund)
+                return
+
+        # ── CLAUDE-KEY FÜRS iPHONE (2026-11-14-4): anfragen darf das iPhone, antworten nur der Mac ──
+        if path == '/api/schluessel/anfrage':
+            if self._fremde_seite_abweisen():
+                return
+            if not ist_loopback(self.client_ip()) and not isinstance(self.connection, ssl.SSLSocket):
+                self._error(403, 'Den Claude-Key gibt es nur über die verschlüsselte Verbindung (https).')
+                return
+            self._json_privat(schluessel_anfrage_neu(self.client_ip(), self.headers.get('User-Agent', '')))
+            return
+        if path == '/api/schluessel/antwort':
+            ok, grund = self.mutation_erlaubt()
+            if not ok:
+                self._error(403, grund)
+                return
+            d = self._json_body_klein()
+            if d is None:
+                return
+            try:
+                self._json_privat({'ok': True, 'status': schluessel_antwort(d.get('id'), d.get('erlauben') is True, d.get('key'))})
+            except ValueError as e:
+                self._error(400, str(e))
+            return
+
+        # ── SICHERUNG DER BROWSER-DATEN (2026-11-14-1, Review U2) — Gate siehe oben ──
+        if path == '/api/sicherung':
+            try:
+                daten = self._read_json_body()
+                groesse = sicherung_schreiben(sicherung_pruefen(daten))
+                self._json(dict(sicherung_status(), ok=True, geschrieben=groesse))
+            except ValueError as e:
+                self._error(400, str(e))
+            except Exception as e:
+                self._fehler_intern('sicherung', e)
+            return
+        if path == '/api/sicherung/einstellungen':
+            d = self._json_body_klein()
+            if d is None:
+                return
+            try:
+                sicherung_einstellen(d)
+                self._json(dict(sicherung_status(), ok=True))
+            except Exception as e:
+                self._fehler_intern('sicherung/einstellungen', e)
+            return
+
         # ── iPHONE-MODUS schalten (nur vom Mac, nur aus der eigenen Seite) ──
         if path == '/api/netz/an':
-            ok, st = lan_an()
+            # 2026-10-18-1: {"weg": "sicher"} oder {"weg": "schnell"} — alles andere zählt als „sicher"
+            weg = 'sicher'
+            try:
+                n = int(self.headers.get('Content-Length') or 0)
+            except ValueError:
+                n = 0
+            if n > 1024:
+                self._error(413, 'Zu groß')
+                return
+            if n > 0:
+                try:
+                    d = json.loads(self.rfile.read(n).decode('utf-8'))
+                    if isinstance(d, dict) and d.get('weg') in WEGE:
+                        weg = d['weg']
+                except (ValueError, UnicodeDecodeError):
+                    pass
+            ok, st = lan_an(weg)
             self._json(dict(st, ok=ok))
+            return
+        # ── 2026-10-18-1: Schritt 1 — Zertifikat erzeugen bzw. prüfen, ohne schon freizugeben ──
+        if path == '/api/tls/vorbereiten':
+            ctx, grund = tls_vorbereiten()
+            self._json(dict(lan_status(), ok=ctx is not None, grund=grund or ''))
             return
         if path == '/api/netz/aus':
             self._json(dict(lan_aus(), ok=True))
@@ -3185,8 +5842,62 @@ class SafariHandler(SimpleHTTPRequestHandler):
             self._json(dict(reisewarnungen_status(), gestartet=gestartet))
             return
 
+        # ── NACHRICHTEN (2026-10-18-2): Abruf anstoßen, Quellen verwalten (Gate siehe oben) ──
+        if path == '/api/nachrichten/aktualisieren':
+            gestartet = nachrichten_anstossen()
+            self._json(dict(nachrichten_status(), gestartet=gestartet))
+            return
+        if path in ('/api/nachrichten/quelle', '/api/nachrichten/quelle/loeschen', '/api/nachrichten/quelle/schalten',
+                    '/api/nachrichten/pruefen'):
+            d = self._json_body_klein()
+            if d is None:
+                return
+            try:
+                if path == '/api/nachrichten/pruefen':
+                    self._json(feed_probe(d))
+                    return
+                if path == '/api/nachrichten/quelle':
+                    q = eigene_quelle_anlegen(d)
+                    nachrichten_anstossen(nur={q['id']})     # die neue Quelle gleich einmal holen
+                    self._json(dict(nachrichten_quellen_liste(), neu=q['id']))
+                    return
+                qid = str(d.get('id') or '')
+                if path == '/api/nachrichten/quelle/loeschen':
+                    eigene_quelle_loeschen(qid)
+                else:
+                    quelle_schalten(qid, bool(d.get('aktiv')))
+                self._json(nachrichten_quellen_liste())
+            except ValueError as e:
+                self._error(400, str(e))
+            return
+
+        # ── VPN-PRÜFUNG (2026-10-30-1): jetzt prüfen, Netz merken/vergessen, Einstellungen (Gate siehe oben) ──
+        if path == '/api/vpn/pruefen':
+            gestartet = vpn_anstossen()
+            self._json(dict(vpn_status(), gestartet=gestartet))
+            return
+        if path in ('/api/vpn/merken', '/api/vpn/vergessen', '/api/vpn/einstellungen', '/api/vpn/anbieter'):
+            d = self._json_body_klein()
+            if d is None:
+                return
+            try:
+                if path == '/api/vpn/merken':
+                    vpn_merken(d.get('asn'))
+                elif path == '/api/vpn/vergessen':
+                    vpn_vergessen(d.get('asn'))
+                elif path == '/api/vpn/anbieter':
+                    vpn_anbieter_einstellen(d.get('anbieter'), d.get('an') is True)
+                else:
+                    vpn_einstellen(d)
+                self._json(vpn_status())
+            except ValueError as e:
+                self._error(400, str(e))
+            return
+
         # ── OLLAMA-PROXY (iPhone): POST /api/ollama/api/chat ──────
         if path == '/api/ollama/api/chat':
+            if self._fremde_seite_abweisen():      # 2026-11-14-1 (Review S2)
+                return
             try:
                 length = self._body_length(MAX_JSON_BODY)
                 if length is None:
@@ -3199,8 +5910,9 @@ class SafariHandler(SimpleHTTPRequestHandler):
                 self._error(400, 'Ungültiger JSON-Body')
                 return
             erlaubt = {k: daten[k] for k in ('model', 'messages', 'stream', 'options', 'think', 'format', 'keep_alive') if k in daten}
-            if not ist_loopback(self.client_ip()):
-                erlaubt = ollama_optionen_begrenzen(erlaubt)
+            # 2026-11-14-1 (Review S2): die Deckel gelten für jede Anfrage über den Durchgriff, auch vom Mac selbst —
+            # die Mac-Seite spricht Ollama direkt an, der Durchgriff ist nur für das iPhone da.
+            erlaubt = ollama_optionen_begrenzen(erlaubt)
             self._proxy_ollama('POST', '/api/chat', json.dumps(erlaubt).encode('utf-8'))
             return
 
@@ -3242,6 +5954,8 @@ class SafariHandler(SimpleHTTPRequestHandler):
             return
 
         if path == '/api/rag/search':
+            if self._fremde_seite_abweisen():      # 2026-11-14-1 (Review S2)
+                return
             self._handle_rag_search()
             return
 
@@ -3252,6 +5966,9 @@ class SafariHandler(SimpleHTTPRequestHandler):
         path = parsed.path
         params = parse_qs(parsed.query)
         if not self.zugang_pruefen(path, params):
+            return
+        if getattr(self.server, 'nur_wiki', False):
+            self._error(404, 'Nicht gefunden')
             return
 
         if path == '/api/docs/delete':
@@ -3465,6 +6182,17 @@ class SafariHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _json_privat(self, data):
+        """Wie _json, aber nie zwischenspeichern (Key, Codes)."""
+        body = json.dumps(data, ensure_ascii=False).encode('utf-8')
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', len(body))
+        self.send_header('Cache-Control', 'no-store')
+        self.send_cors()
+        self.end_headers()
+        self.wfile.write(body)
+
     def _fehler_intern(self, wo, e):
         """Interne Ausnahmen: Details nur ins Server-Log, nach außen ein allgemeiner Text (N6)."""
         print(f'⚠️  Fehler in {wo}: {e.__class__.__name__}: {e}')
@@ -3510,15 +6238,27 @@ class SafariHandler(SimpleHTTPRequestHandler):
 
 
 if __name__ == '__main__':
+    # 2026-10-11-1: zeilenweise schreiben. Der Launcher leitet die Ausgabe nach server.log um; Python
+    # puffert in Dateien blockweise, deshalb blieb die Datei leer, solange der Server lief.
+    for _strom in (sys.stdout, sys.stderr):
+        try:
+            _strom.reconfigure(line_buffering=True)
+        except (AttributeError, ValueError):
+            pass
     port = int(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].isdigit() else 8765
     server, bind, lan = oeffne_server(port)  # parallel: Karte + RAG + Statik gleichzeitig
     port = server.server_port                # kann abgewichen sein (belegter Port, siehe oben)
     SERVER_INFO.update({'port': port, 'bind': bind, 'lan': lan, 'basis': str(BASE_DIR),
                         'offen': bind.startswith('0.0.0.0'), 'mac_ip': lan_ip()})
     runtime_schreiben(port, bind)
+    # 2026-11-14-1 (Review S3): die Wikipedia bekommt einen eigenen Port (eigene Herkunft im Browser)
+    _wiki_port = wiki_server_oeffnen(port, '0.0.0.0' if bind.startswith('0.0.0.0') else '127.0.0.1')
+    SERVER_INFO['wiki_port'] = _wiki_port
     starte_eltern_wache()
     starte_lan_wache()
     starte_reisewarn_wache()
+    starte_nachrichten_wache()
+    starte_vpn_wache()
     if lan:   # --lan/SAFARI_LAN=1: Tor sofort offen (nur Entwicklung/Tests)
         LAN_STATE.update({'an': True, 'ip': lan_ip(), 'seit': time.time()})
     mbtiles = find_mbtiles()
@@ -3554,6 +6294,10 @@ if __name__ == '__main__':
         os._exit(0)
     signal.signal(signal.SIGTERM, _sigterm)
     start_kiwix()
+    if KIWIX_ROOT and _wiki_port:
+        print(f'📚 Wikipedia auf eigener Adresse: http://localhost:{_wiki_port}/wiki/ (getrennt vom Speicher der App)')
+    elif KIWIX_ROOT:
+        print(f'⚠️  Kein freier Port für die Wikipedia ({port + WIKI_PORT_ABSTAND}–{port + WIKI_PORT_ABSTAND + 9}) — sie läuft unter der Adresse der App.')
     print(f'📡 http://localhost:{port}')
     try:
         server.serve_forever()

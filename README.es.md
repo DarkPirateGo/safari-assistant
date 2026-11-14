@@ -14,7 +14,7 @@ Para Macs con Apple Silicon. En inglés, alemán, francés y español. Gratis pa
 > [!IMPORTANT]
 > - **Solo Macs con Apple Silicon.**
 > - **Qué Mac necesitas:** consulta [Qué modelo para cada Mac](#qué-modelo-para-cada-mac).
-> - **Estado:** el autor lo usa para preparar el viaje. Aún no se ha probado sobre el terreno. Probado en un solo equipo (Apple Silicon, 36 GB).
+> - **Estado:** el autor lo usa en un viaje overland desde noviembre de 2026. Probado en un Mac (Apple Silicon, 36 GB) y un iPhone.
 
 <p align="center">
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/en/chat-dark.png"><img src="docs/img/en/chat-light.png" width="250" alt="Un chat con uno de los módulos de Safari Assistant"></picture>
@@ -49,8 +49,8 @@ Cada módulo tiene su propio prompt del sistema, su propio historial de chat y s
 | 🌍 Situación de seguridad — en directo | Situación de seguridad actual, con búsqueda web (en línea) | Claude, a elegir |
 | ✦ Claude — IA en línea | Asistente general en línea con búsqueda web (en línea) | Claude, a elegir |
 
-- Un solo ajuste cambia todos los módulos locales a otro modelo: ⚙️ Ajustes → **Modelo global**.
-- El modelo en línea se elige en ⚙️ Ajustes → Claude API → **Cargar lista**, que pregunta a Anthropic qué modelos puede usar tu clave.
+- Un solo ajuste cambia todos los módulos locales a otro modelo: ⚙️ Ajustes → IA y modelos → **Modelo global**.
+- El modelo en línea se elige en ⚙️ Ajustes → IA y modelos → **Cargar lista**, que pregunta a Anthropic qué modelos puede usar tu clave; ahí también se ajusta el nivel de esfuerzo. Por defecto: `claude-sonnet-5-5`.
 - **Tus propios manuales:** sube PDF, por ejemplo un manual de taller, un libro de primeros auxilios o una guía de viaje, y asígnalos a un módulo (requiere PyMuPDF, ver [Inicio rápido](#inicio-rápido)). El módulo busca en ellos sin conexión y cita el documento, el capítulo y la página.
 - **Fotos:** adjunta una foto de una señal, una pieza, una planta o un animal y pregunta. Con los módulos locales, el modelo la analiza en tu Mac; no se sube nada.
 - Los módulos también pueden buscar en una Wikipedia sin conexión opcional y citarla.
@@ -71,14 +71,36 @@ Cada módulo tiene su propio prompt del sistema, su propio historial de chat y s
 - Tu posición en grados decimales, grados/minutos/segundos y Plus Code, para la radio o el mensajero satelital.
 - 8 protocolos de primeros auxilios como texto fijo (**Protocolos inmediatos**), legibles con un solo toque.
 - Campos personales (médicos, documentos, vehículo, contactos), tipo de cambio, horas de salida y puesta del sol, plazos de documentos.
+- Un botón rojo **Emergencia** está arriba en la barra lateral (Ctrl+Mayús+N) y abre la ficha de emergencia.
+- Si la IA local no responde, Medicina, Chat de emergencia, Perro y Supervivencia muestran en su lugar el protocolo inmediato correspondiente y los números de emergencia del país.
+
+### Noticias por temas
+
+- 📰 **Noticias:** noticias de feeds RSS, ordenadas en nueve temas — Seguridad, Fronteras y entrada, Combustible y suministros, Dinero y efectivo, Salud, Fenómenos naturales y tiempo, Carreteras y transbordadores, Parques y campings, Otras noticias. El país en el que estás aparece primero; **Solo importantes** muestra situaciones como fronteras cerradas, toques de queda o ciclones.
+- Vienen 50 fuentes integradas: GDACS, CDC y UK FCDO, un periódico por país (o AllAfrica) y una búsqueda por palabras clave en Google News. Cada una se puede desactivar, y puedes añadir tus propios feeds en **Fuentes**; **Comprobar** muestra antes lo que entregaría un feed.
+- El Mac descarga los feeds cada 6 horas en cuanto está en línea; sin conexión, el último estado sigue legible, también en el iPhone.
 
 ### Herramientas de viaje
 
 Listas de control, plazos de documentos, un plan de mantenimiento (plantilla para el Toyota HZJ78 / 1HZ, más tus propios puntos), un cuaderno de bitácora para combustible y mantenimiento, notas, respuestas guardadas, historial de chats y copias de seguridad.
 
+- **Copia de seguridad automática en el Mac:** unos segundos después de cada cambio, los datos del navegador (cuaderno de bitácora, ficha de emergencia, plazos, notas, chats, ajustes) se copian en `~/.safari-assistant-sicherung/` (solo legible por ti), con una copia diaria durante una semana. Si la app se abre vacía (otro puerto, `127.0.0.1` en lugar de `localhost`, datos del sitio borrados), una banda ofrece restaurar. Los documentos subidos y los datos del iPhone no se incluyen; la clave de Claude, nunca. ⚙️ Ajustes → Datos y copia de seguridad.
+- **Copias de seguridad con contraseña:** el archivo exportado puede cifrarse (AES-256-GCM, clave derivada con PBKDF2-SHA256 y 310 000 iteraciones, en el navegador). Una contraseña olvidada no se puede recuperar.
+
+### Comprobación de VPN
+
+- 🔒 Muestra claramente si el Mac está en línea **con o sin VPN**: verde, rojo («Sin VPN» o «Fuga de VPN» cuando IPv4 o IPv6 evitan el túnel), amarillo (configurar, dudoso, página de acceso Wi-Fi) o gris. Un recuadro arriba en la barra lateral, una banda roja sobre todas las vistas sin VPN y una barra en el iPhone.
+- Se mide desde fuera, así que también funciona con una VPN en un router de viaje: con qué dirección pública aparece el Mac (IPv4 e IPv6 por separado) y a qué red pertenece. Guardas una vez la red de tu VPN; opcionalmente, Mullvad confirma sus propias salidas.
+- Starlink cuenta como acceso, nunca como VPN. Entre dos comprobaciones una VPN puede caerse sin que se note; ayuda un kill switch en el router. ⚙️ Ajustes → Red y VPN.
+
 ### Vista móvil a través de tu propia Wi-Fi
 
-`mobile.html` funciona en un iPhone conectado a la misma Wi-Fi: los mismos módulos, una hoja de emergencia 🚨 y el mapa, todo a través del Mac por HTTPS con un código de acceso. Consulta [Modo iPhone](#modo-iphone).
+`mobile.html` funciona en un iPhone conectado a la misma Wi-Fi: los mismos módulos, una hoja de emergencia 🚨, las noticias 📰 y el mapa, todo a través del Mac por HTTPS con un código de acceso. Consulta [Modo iPhone](#modo-iphone).
+
+- Una cabecera sencilla: ⚙️ Ajustes · el área actual (tócala para cambiar de área y abrir las herramientas) · 🚨 Emergencia.
+- **🆘 Enviar posición:** el primer botón de la hoja 🚨 obtiene una posición GPS reciente y la pone debajo de tu mensaje preparado (coordenadas, precisión, hora, enlace de mapa, Plus Code). Un toque más abre Mensajes (iMessage o SMS, el iPhone decide por contacto) o WhatsApp con todo rellenado; allí tocas **Enviar**. Destinatarios y texto se configuran una vez y se quedan en el iPhone.
+- **Sin el Mac:** una vez que el iPhone se ha conectado por HTTPS, la página también se abre cuando el Mac duerme, está cerrado o no comparte. Los protocolos inmediatos, los números de emergencia, tu posición y el SOS funcionan; las respuestas de la IA, no. Opcionalmente, una copia de tu ficha de emergencia se guarda en el iPhone (en el Mac ⚙️ Ajustes → Datos y copia de seguridad, desactivado por defecto).
+- **Clave de Claude desde el Mac:** en el iPhone ⚙️ → **Obtener del Mac** muestra un código de cuatro cifras; el Mac muestra el dispositivo, su dirección y el mismo código, y allí lo permites. Opcionalmente, una clave aparte solo para el iPhone.
 
 ### Opcional
 
@@ -207,17 +229,18 @@ El mapa sin conexión, la Wikipedia sin conexión y todos los demás detalles: [
 
 ## Modo iPhone
 
-1. En el Mac: ⚙️ Ajustes → **Modo iPhone** → **Activar**. El Mac abre un segundo punto de escucha en su dirección Wi-Fi, en el mismo puerto 8765, por HTTPS. La primera vez, Safari Assistant crea para ello una autoridad de certificación (CA) local.
-2. Una vez por iPhone, confía en esa CA:
-   - Los Ajustes de Safari Assistant muestran el archivo del certificado con un botón **Mostrar en el Finder**. Envía el archivo al iPhone con AirDrop.
-   - iPhone: Ajustes → **Perfil descargado** → Instalar.
-   - iPhone: Ajustes → General → Información → **Ajustes de confianza de certificados** → activa **«Safari Assistant lokale CA»** (el certificado lleva este nombre en alemán; instalaciones antiguas: «DARK lokale CA» o «Safari Assistent lokale CA»). Este paso de confianza es el que la gente olvida.
-3. Escanea el código QR de los Ajustes con la cámara del iPhone, o abre `https://<your-mac>.local:8765/go/<code>` en Safari. Así se guarda el código de acceso y se abre la vista móvil.
-4. Compartir → **Añadir a pantalla de inicio**.
+1. En el Mac: ⚙️ Ajustes → **iPhone** → **App móvil**. La primera vez, los Ajustes te guían en cinco pasos; el código QR va al final:
+   - **Crear certificado** (Mac): Safari Assistant crea una vez una autoridad de certificación (CA) local para este Mac.
+   - **Descargar perfil** (Mac): el navegador guarda `Safari Assistant iPhone.mobileconfig` en Descargas; envíalo al iPhone con AirDrop.
+   - **Instalar** (iPhone): Ajustes → **Perfil descargado** → Instalar. Después Ajustes → General → Información → **Ajustes de confianza de certificados** → activa **«Safari Assistant lokale CA»** (el certificado lleva este nombre en alemán; instalaciones antiguas: «DARK lokale CA» o «Safari Assistent lokale CA»). Este paso de confianza es el que la gente olvida.
+2. **Mostrar código QR** (Mac) y escanéalo con la cámara del iPhone. El Mac escucha entonces también en su dirección Wi-Fi, en el mismo puerto 8765, y solo acepta HTTPS. Mientras se comparte, los Ajustes muestran lo que llega del iPhone: conectado, una conexión interrumpida (normalmente falta la confianza) o un código de acceso incorrecto.
+3. Compartir → **Añadir a pantalla de inicio**. Cuando ya ha funcionado una vez, los Ajustes se abren directamente con **Mostrar código QR**.
+4. **¿No funciona?** al final de los Ajustes enumera las causas habituales. Solo si el perfil no se puede instalar: el camino sin certificado (http, aviso de conexión no segura de Safari desactivado) — sin cifrar y sin GPS en el iPhone.
 
 Conviene saber:
 
 - El modo iPhone está siempre desactivado después de cada inicio. Se desactiva solo tras 12 horas sin peticiones del móvil y cuando Safari Assistant se cierra.
+- Si el Mac no responde, la página del iPhone se abre igualmente con su contenido de emergencia en lugar de una página vacía (en cuanto se haya conectado una vez por HTTPS).
 - **Nunca lo actives en una Wi-Fi en la que no confíes** (lodge, campamento, frontera). Usa tu propio router o el punto de acceso de un móvil.
 - Subir, borrar, apagar y cambiar el modo solo funcionan en el propio Mac.
 - La dirección contiene el nombre de red del Mac, y el certificado también. Dale antes al Mac un nombre neutro: Ajustes del Sistema → General → Compartir → Nombre de host local.
@@ -233,13 +256,16 @@ Sin conexión, nada sale del Mac. Con conexión, esto es todo lo que envía Safa
 |---|---|---|---|
 | Avisos de viaje | A partir de 20 s después del inicio: siempre que la caché tenga más de 12 h; se reintenta cada 15 min | Auswärtiges Amt, UK FCDO, US State Department. Sin datos personales | Aún no hay interruptor ([hoja de ruta](docs/ROADMAP.md)) |
 | Áreas de las zonas de advertencia | Tras una consulta de avisos, cuando ha cambiado un texto de advertencia o aún no existen áreas (como mucho cada 6 h) | Overpass API (OpenStreetMap). Sin datos personales | `SAFARI_OHNE_WARNZONEN_AUTO=1` |
+| Noticias (RSS) | A partir de 60 s después del inicio: siempre que la última descarga tenga más de 6 h (`SAFARI_NACHRICHTEN_H`); se reintenta como mucho cada 30 min; además **Obtener ahora**, **Comprobar** y al añadir una fuente propia | Las fuentes activadas: gdacs.org, cdc.gov, gov.uk, un periódico por país o allafrica.com, news.google.com (nombre del país y palabras de búsqueda) y tus propios feeds. Sin datos personales | Desactivar fuentes (📰 Noticias → Fuentes) |
 | Tipos de cambio | Cuando se abre la Ficha de emergencia (Mac) o la hoja 🚨 (móvil) | open.er-api.com. Sin posición | Aún no hay interruptor ([hoja de ruta](docs/ROADMAP.md)) |
 | Teselas del mapa | Mientras el mapa muestra teselas en línea, lo predeterminado hasta que exista un `karte.mbtiles` sin conexión. Con un mapa sin conexión, se siguen cargando unas pocas teselas de vista general cada vez que se abre el mapa, antes de que cambie | tile.openstreetmap.org. Las teselas revelan la zona que estás mirando | Genera el mapa sin conexión |
 | Glifos de las etiquetas del mapa | Solo si existe `karte.mbtiles` pero falta su carpeta `fonts/` | fonts.openmaptiles.org | `setup-offline-karte.sh` instala `fonts/` |
 | Bibliotecas del mapa | Solo si faltan archivos en `vendor/` | unpkg.com (la página del mapa recurre a la CDN) | Mantén `vendor/` completo (`./deploy.sh`) |
 | Búsqueda de lugares | Solo cuando pulsas Intro en la búsqueda del mapa | nominatim.openstreetmap.org. El texto de búsqueda | Si escribes sin pulsar Intro, solo se busca sin conexión |
 | Panel del tiempo | Solo cuando haces clic en **Hoy** o **🌐 cargar** en el mapa | api.open-meteo.com. Posición redondeada a aproximadamente 1 km | No hagas clic |
-| Anthropic | Con una clave API: cuando usas el módulo Claude o Situación de seguridad o el módulo Tiempo y temporadas de lluvias en el Mac, y con **Probar** / **Cargar lista** en los Ajustes | api.anthropic.com. La clave, tu pregunta, una foto adjunta, el contexto del chat y, si está guardada, tu posición (±100 m) | Borra la clave |
+| Comprobación de VPN | Mientras haya una página de Safari Assistant abierta (Mac o iPhone), más o menos una vez por minuto (de 30 s a 15 min, ajustable), y con **Comprobar ahora** | www.cloudflare.com (`/cdn-cgi/trace`), si no api.ipify.org / api6.ipify.org: tu dirección pública. stat.ripe.net: la red de esa dirección. captive.apple.com: detección de una página de acceso Wi-Fi. ipv4/ipv6.am.i.mullvad.net solo si la confirmación de Mullvad está activada. Sin posición, nada personal aparte de la dirección que ve cualquier web | ⚙️ Ajustes → Red y VPN → **Desactivar** |
+| Anthropic | Con una clave API: cuando usas el módulo Claude o Situación de seguridad o el módulo Tiempo y temporadas de lluvias en el Mac, y con **Probar** / **Cargar lista** en los Ajustes. En el iPhone, Claude y Situación de seguridad llaman a Anthropic directamente desde el teléfono | api.anthropic.com. La clave, tu pregunta, una foto adjunta, el contexto del chat y, si está guardada, tu posición (±100 m) | Borra la clave |
+| Mensaje SOS | Solo cuando tocas un botón de envío en la hoja 🚨 y después **Enviar** en Mensajes o WhatsApp | Tus destinatarios, por Mensajes (iMessage/SMS) o WhatsApp: tu texto y tu posición | No enviar |
 | Scripts puntuales | Solo cuando los ejecutas | `deploy.sh` → unpkg.com (solo los archivos de `vendor/` que falten; con `DEPLOY_LIZENZEN=1` también raw.githubusercontent.com para los textos de licencia originales). `fetch-*.py` → Overpass, GeoNames, NASA POWER. `fauna-gbif-check.py` → GBIF. Generación del mapa → GitHub, Geofabrik y los archivos de océanos y de Natural Earth que descarga Planetiler | No los ejecutes |
 | Ollama | Nunca para Safari Assistant | El lanzador inicia Ollama con `OLLAMA_NO_CLOUD=1` si no está en marcha. Un Ollama que hayas iniciado tú mantiene su propia configuración | – |
 
@@ -258,8 +284,11 @@ Safari Assistant da consejos sobre medicina, mordeduras de serpiente, reparació
 - Los **Protocolos inmediatos** en inglés, francés y español son traducciones del texto alemán, todavía sin revisar por profesionales de primeros auxilios.
 - La **columna de embajadas recoge embajadas de Alemania**, para ciudadanos alemanes. Todos los demás deben recurrir a su propia embajada o consulado.
 - Las **áreas de advertencia de viaje** son una lectura automatizada del texto oficial, no fronteras oficiales. Siempre prevalece el texto oficial; cada entrada enlaza con él.
+- Las **noticias** se asignan a temas y países con una lista fija de palabras clave, no con IA: una noticia puede acabar en el tema equivocado, e **Importante** solo reconoce palabras conocidas. El título y el extracto vienen tal cual de la fuente; los periódicos y Google News no son fuentes oficiales. Lee el artículo y el aviso oficial de viaje antes de decidir.
 - La **capa de lluvia** es una climatología 2001–2020 de NASA POWER, no una previsión. Las temporadas de lluvias se desplazan semanas de un año a otro.
 - Con el **perfil ligero**, las respuestas médicas y de emergencia también proceden del modelo pequeño `gemma4:e4b`. Los Mac con menos de 36 GB no se han probado con Safari Assistant; consulta [Qué modelo para cada Mac](#qué-modelo-para-cada-mac).
+- El **SOS** prepara un mensaje; no lo envía y no es un servicio de rescate. El SMS necesita cobertura móvil; iMessage y WhatsApp, internet. Enviar a varios destinatarios SMS a la vez usa un formato de enlace de iOS que Apple no documenta: pruébalo una vez con tu propio número.
+- La **comprobación de VPN** muestra lo que midió, como mucho hace uno o dos minutos; una VPN puede caerse entre dos comprobaciones.
 - Los prompts del sistema no están traducidos. Están escritos para un viajero de habla alemana: por ejemplo, los números de embajada son alemanes y el módulo Idiomas da la pronunciación para lectores alemanes. Aun así, las respuestas llegan en el idioma que elijas. El módulo Mecánica y el plan de mantenimiento están pensados para un único vehículo. Un perfil de viaje está en la [hoja de ruta](docs/ROADMAP.md). Los tipos de cambio usan el EUR como moneda base.
 - Los prompts del sistema piden al modelo que exprese su incertidumbre y que diga pronto cuándo hace falta ayuda profesional. Eso reduce el riesgo; no lo elimina.
 

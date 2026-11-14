@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Safari Assistant index.html v2026-10-06-1 -->
+<!-- Safari Assistant index.html v2026-11-14-5 -->
 <html lang="de">
 <head>
 <meta charset="UTF-8">
@@ -295,6 +295,287 @@
   .wissen-delete-btn { font-size: 11px; color: var(--text3); background: none; border: none; cursor: pointer; padding: 0; transition: color 0.15s; }
   .wissen-delete-btn:hover { color: var(--accent3); }
   .wissen-empty { text-align: center; padding: 3rem 1rem; font-size: 12px; color: var(--text3); line-height: 2; }
+  /* 2026-10-30-1: VPN-Prüfung — Kachel oben in der Seitenleiste, rotes Band über allen Bereichen, Bereich in ⚙️ */
+  .vpn-kachel { display: flex; align-items: center; gap: 10px; width: calc(100% - 1.5rem); margin: 10px 0.75rem 2px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border2); background: var(--surface2); color: var(--text2); cursor: pointer; text-align: left; font-family: inherit; flex-shrink: 0; }
+  .vpn-kachel:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .vpn-kachel-icon { font-size: 20px; line-height: 1; flex-shrink: 0; }
+  .vpn-kachel-text { min-width: 0; }
+  .vpn-kachel-titel { display: block; font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.25; }
+  .vpn-kachel-zeile { display: block; font-size: 10px; line-height: 1.45; margin-top: 3px; opacity: 0.95; overflow-wrap: anywhere; }
+  .vpn-kachel.gruen, .vpn-detail.gruen { background: #1f7a3a; border-color: #2fa352; color: #fff; }
+  .vpn-kachel.rot, .vpn-detail.rot { background: #b3261e; border-color: #ff5a4f; color: #fff; }
+  .vpn-kachel.gelb, .vpn-detail.gelb { background: #8a6200; border-color: #d39b1e; color: #fff; }
+  .vpn-kachel.rot { animation: vpnPuls 1.6s ease-in-out infinite; }
+  @keyframes vpnPuls { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,90,79,0); } 50% { box-shadow: 0 0 0 4px rgba(255,90,79,0.55); } }
+  .vpn-band { display: flex; align-items: center; gap: 12px; padding: 10px 1.5rem; background: #b3261e; color: #fff; border-bottom: 2px solid #ff5a4f; flex-shrink: 0; font-size: 12px; line-height: 1.5; }
+  .vpn-band-icon { font-size: 24px; line-height: 1; flex-shrink: 0; }
+  .vpn-band-inhalt { flex: 1; min-width: 0; }
+  .vpn-band-titel { display: block; font-size: 15px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+  .vpn-band-zeile { display: block; font-size: 11px; opacity: 0.95; overflow-wrap: anywhere; }
+  .vpn-band-btn { background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.55); color: #fff; border-radius: 6px; padding: 6px 10px; font: inherit; font-size: 11px; cursor: pointer; white-space: nowrap; }
+  .vpn-band-btn:hover { background: rgba(255,255,255,0.26); }
+  .vpn-band-x { background: none; border: none; color: #fff; font-size: 15px; cursor: pointer; opacity: 0.85; padding: 4px 6px; }
+  .vpn-detail { border: 1px solid var(--border2); background: var(--surface2); color: var(--text); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+  .vpn-detail-titel { font-size: 15px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+  .vpn-detail-zeile { font-size: 11px; line-height: 1.6; margin-top: 4px; overflow-wrap: anywhere; }
+  .vpn-weg { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 11px; line-height: 1.5; }
+  .vpn-weg:last-child { border-bottom: none; }
+  .vpn-marke { font-size: 10px; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--border2); white-space: nowrap; }
+  .vpn-marke.ja { color: #fff; background: #1f7a3a; border-color: #2fa352; }
+  .vpn-marke.nein { color: #fff; background: #b3261e; border-color: #ff5a4f; }
+  @media (prefers-reduced-motion: reduce) { .vpn-kachel.rot { animation: none; } }
+  /* 2026-11-14-1: Hinweis-Band (Sicherung gefunden), Dialog (Passwort fürs Backup), Erläuterung unter einer Einstellung */
+  .hinweis-band { position: fixed; left: 50%; top: 14px; transform: translateX(-50%); z-index: 400; width: min(720px, calc(100vw - 32px)); display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: var(--surface); border: 1px solid var(--accent); border-radius: 12px; padding: 14px 16px; box-shadow: 0 12px 40px rgba(0,0,0,0.55); }
+  .hinweis-band-text { flex: 1; min-width: 260px; font-size: 13px; line-height: 1.5; color: var(--text2); }
+  .hinweis-band-text b { display: block; color: var(--text); font-size: 14px; margin-bottom: 2px; }
+  .hinweis-band-text span { display: block; }
+  .hinweis-band-text span span { display: inline; }
+  .hinweis-band-text span b { display: inline; margin: 0; font-size: inherit; }
+  .hinweis-band-text .schluessel-code { font-size: 20px; letter-spacing: 0.12em; color: var(--accent); vertical-align: -2px; }
+  .dialog-overlay { position: fixed; inset: 0; z-index: 500; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; }
+  .dialog { width: 420px; max-width: calc(100vw - 32px); background: var(--surface); border: 1px solid var(--border2); border-radius: 14px; padding: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
+  .dialog-titel { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+  .dialog-text { font-size: 13px; line-height: 1.55; color: var(--text2); margin-bottom: 14px; }
+  .dialog-feld { display: block; width: 100%; margin-bottom: 8px; background: var(--surface2); border: 1px solid var(--border2); border-radius: 8px; padding: 10px 12px; color: var(--text); font-size: 15px; outline: none; }
+  .dialog-feld:focus { border-color: var(--accent); }
+  .dialog-fehler { min-height: 18px; font-size: 12px; color: var(--accent3); margin-bottom: 8px; }
+  .dialog-knoepfe { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+  .settings-note { display: block; font-size: 11px; line-height: 1.5; color: var(--text3); margin-top: 3px; max-width: 520px; }
+</style>
+<style id="oberflaeche-2">
+  /* ═══ OBERFLÄCHE 2026-11-14-2 — ruhiger, größer, weniger gleichzeitig ═══
+     Anlass: „Die Mac-Oberfläche ist sehr heavy." Messung vom 13.11.: 57–81 % des sichtbaren Textes kleiner als 12 px
+     (Festbreitenschrift), 33 gleich schwere Einträge in der Seitenleiste, Notfall unter dem sichtbaren Bereich,
+     Einstellungen viereinhalb Bildschirme lang. Diese zweite Stilebene liegt bewusst HINTER der ersten: Sie ändert
+     Schrift, Größen, Abstände und Gewichtung, nicht die Bausteine — jede Regel oben bleibt als Grundlage stehen.
+     - Systemschrift statt Festbreite (--mono zeigt jetzt auf --sans; Festbreite nur noch für Code: --code).
+     - Größen: nichts unter 12 px; Lesetext 15–16 px. Die vielen Größen in style-Attributen hebt die Regelgruppe
+       „Größen aus style-Attributen" an, ohne dass ein Baustein angefasst werden muss.
+     - Ein Akzent (Gold) nur für die Hauptaktion und die Auswahl; Rot nur für Notfall und Warnungen. */
+  :root {
+    --sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', 'Segoe UI', system-ui, sans-serif;
+    --code: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+    --mono: var(--sans);
+    --serif: var(--sans);
+    --bg: #161615; --surface: #1e1e1c; --surface2: #292927; --border: #2c2c2a; --border2: #3c3c39;
+    --text: #f3f1ec; --text2: #bdb9af; --text3: #98948b;
+    --auswahl: rgba(255,255,255,0.09);
+    --notfall: #c0362c;
+  }
+  body { font-family: var(--sans); font-size: 14px; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  code, pre, kbd, .position-card .pos-dd, .position-card .pos-sub { font-family: var(--code); }
+  button, input, select, textarea { font-family: var(--sans); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* Größen aus style-Attributen: 9/10 → 12, 11 → 13, 12 → 14, 13 → 15 */
+  [style*="font-size:9px"], [style*="font-size: 9px"], [style*="font-size:10px"], [style*="font-size: 10px"] { font-size: 12px !important; }
+  [style*="font-size:11px"], [style*="font-size: 11px"] { font-size: 13px !important; }
+  [style*="font-size:12px"], [style*="font-size: 12px"] { font-size: 14px !important; }
+  [style*="font-size:13px"], [style*="font-size: 13px"] { font-size: 15px !important; }
+
+  /* ── Seitenleiste ── */
+  .sidebar { width: 248px; min-width: 248px; }
+  .logo { padding: 18px 16px 10px; border-bottom: none; }
+  .logo-title { font-size: 18px; }
+  .logo-sub { display: none; }
+  .notfall-knopf { display: flex; align-items: center; justify-content: center; gap: 8px; width: calc(100% - 24px); margin: 2px 12px 8px; padding: 10px 12px; border: none; border-radius: 10px;
+    background: var(--notfall); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
+  .notfall-knopf:hover { background: #d23e33; }
+  .notfall-knopf:focus-visible { outline-color: #fff; }
+  .notfall-knopf-icon { font-size: 16px; line-height: 1; }
+  .vpn-kachel { width: calc(100% - 24px); margin: 0 12px 6px; padding: 8px 10px; gap: 9px; border-radius: 10px; flex-shrink: 0; }
+  .vpn-kachel-icon { font-size: 17px; }
+  .vpn-kachel-titel { font-size: 13px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+  .vpn-kachel-zeile { font-size: 12px; margin-top: 1px; }
+  .vpn-kachel.rot .vpn-kachel-titel { font-size: 14px; font-weight: 700; }
+  /* ohne Befund (offline, aus, wird geprüft): eine leise Zeile statt einer Kachel */
+  .vpn-kachel.grau { background: transparent; border-color: transparent; color: var(--text3); padding: 4px 10px; }
+  .vpn-kachel.grau:hover { background: rgba(255,255,255,0.05); }
+  .vpn-kachel.grau .vpn-kachel-zeile { display: none; }
+  .vpn-kachel.grau .vpn-kachel-titel { font-weight: 500; }
+  .vpn-kachel.grau .vpn-kachel-icon { font-size: 13px; }
+  .nav-section { padding: 2px 10px 10px; }
+  .nav-group { margin-bottom: 8px; }
+  .nav-group-header { padding: 8px 8px 4px; border-radius: 6px; }
+  .nav-label, .nav-label[style] { font-size: 12px; font-weight: 600; letter-spacing: 0.01em; text-transform: none; color: var(--text3) !important; }
+  .nav-group-arrow { font-size: 12px; }
+  .nav-item { gap: 9px; padding: 0 8px; min-height: 30px; border: none !important; border-radius: 7px; font-size: 13px; color: var(--text); margin-bottom: 1px; }
+  .nav-item[hidden] { display: none; }
+  .nav-item:hover { background: rgba(255,255,255,0.05); }
+  .nav-item.active { background: var(--auswahl); }
+  .nav-icon { width: 20px; height: 20px; background: transparent !important; border-radius: 0; font-size: 15px; }
+  .nav-dot { display: none; }
+  .wartung-badge { font-size: 12px; padding: 1px 6px; }
+  .status-section { padding: 10px 12px 12px; }
+  .status-row { font-size: 12px; color: var(--text2); margin-bottom: 4px; }
+  .model-badge { font-size: 12px; background: none; border: none; padding: 0; margin: 2px 0 0 14px; color: var(--text3); font-family: var(--code); }
+  .nav-fuss { display: flex; gap: 6px; margin-top: 10px; }
+  .nav-fuss .nav-fuss-knopf { flex: 1 1 auto; min-width: 0; justify-content: center; gap: 6px; min-height: 32px; padding: 0 8px; background: var(--surface2); border-radius: 8px; margin: 0; white-space: nowrap; }
+  .nav-fuss .nav-fuss-knopf:hover { background: #33332f; }
+  .nav-fuss .nav-fuss-knopf.active { background: var(--auswahl); box-shadow: inset 0 0 0 1px var(--border2); }
+  .nav-fuss .nav-fuss-knopf .nav-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .ui-lang-row { margin-top: 10px; flex-wrap: nowrap; }
+  .ui-lang button, .ui-help { font-size: 12px; min-height: 24px; padding: 2px 8px; font-family: var(--sans); }
+  .ui-help { width: 26px; padding: 2px 0; border-radius: 50%; }
+  /* Beenden: selten gebraucht, darf nicht aus Versehen getroffen werden — klein, ganz rechts unten, rot erst beim Zeigen */
+  #shutdown.fuss-aus { flex: 0 0 26px; width: 26px; min-height: 24px; height: 26px; padding: 0; margin: 0 0 0 2px; justify-content: center; border: 1px solid var(--border2) !important; border-radius: 50%; position: relative; color: var(--text3); }
+  #shutdown.fuss-aus .nav-icon { width: auto; height: auto; font-size: 12px; }
+  #shutdown.fuss-aus .nav-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  #shutdown.fuss-aus:hover { background: rgba(192,54,44,0.3); color: var(--text); border-color: rgba(192,54,44,0.7) !important; }
+
+  /* ── Kopf und Gespräch ── */
+  .topbar { padding: 10px 24px; min-height: 54px; background: var(--bg); }
+  #ctx-icon { font-size: 20px !important; }
+  .ctx-badge { font-size: 17px; font-weight: 600; background: none; border: none; padding: 0; border-radius: 0; color: var(--text); letter-spacing: -0.01em; }
+  .icon-btn { width: 34px; height: 34px; border: none; border-radius: 8px; font-size: 15px; }
+  .icon-btn:hover { background: var(--surface2); }
+  .chat-container { padding: 24px 28px; gap: 14px; }
+  .msg { max-width: min(78%, 760px); }
+  .msg-bubble { font-size: 15px; line-height: 1.6; padding: 11px 15px; border-radius: 14px; }
+  .msg-user .msg-bubble { background: #353530; border: none; border-bottom-right-radius: 5px; }
+  .msg-assistant .msg-bubble { border-bottom-left-radius: 5px; }
+  .msg-meta { font-size: 12px; }
+  .welcome { padding: 56px 16px 24px; }
+  .welcome-title, .welcome-title[style] { font-size: 26px; font-weight: 600; font-style: normal !important; color: var(--text); letter-spacing: -0.015em; }
+  .welcome-sub { font-size: 13px; letter-spacing: 0; }
+  .quick-grid { max-width: 720px; gap: 10px; margin-top: 28px; }
+  .quick-card { border-radius: 12px; padding: 14px 16px; }
+  .quick-card-title { font-size: 14px; font-weight: 500; margin-bottom: 3px; }
+  .quick-card-desc { font-size: 12px; }
+  .model-divider span { font-size: 12px; letter-spacing: 0; }
+  #chat-tabs { padding: 8px 24px 0; }
+  .chat-tab { font-size: 12px; }
+
+  /* ── Eingabe: eine Zeile zum Schreiben, darunter links die Antwortsprache, rechts die Werkzeuge ── */
+  .input-area { padding: 12px 24px 12px; background: var(--bg); display: grid; grid-template-columns: auto 1fr; column-gap: 12px; align-items: center;
+    grid-template-areas: "warn warn" "bild bild" "eingabe eingabe" "sprache werkzeuge" "hinweis hinweis"; }
+  .input-area > #ctx-warning { grid-area: warn; font-size: 13px; }
+  .input-area > #img-preview-container { grid-area: bild; }
+  .input-area > .input-row { grid-area: eingabe; }
+  .input-area > .lang-bar { grid-area: sprache; margin: 8px 0 0; justify-content: flex-start; gap: 3px; }
+  .input-bottom-row { display: contents; }
+  .input-extra-btns { grid-area: werkzeuge; justify-content: flex-end; flex-wrap: wrap; margin-top: 8px; }
+  .input-hint { grid-area: hinweis; font-size: 12px; margin-top: 6px; }
+  .input-box { font-size: 15px; line-height: 1.45; padding: 11px 14px; min-height: 46px; border-radius: 12px; background: var(--surface); }
+  .attach-btn { width: 46px; height: 46px; border-radius: 12px; background: var(--surface); border-color: var(--border2); }
+  .send-btn { height: 46px; padding: 0 20px; border-radius: 12px; font-size: 14px; font-weight: 600; color: #1a1711; }
+  .lang-bar .lang-btn { font-size: 12px; padding: 4px 10px; border-color: transparent; color: var(--text2); border-radius: 7px; }
+  .lang-bar .lang-btn.active { background: var(--surface2); border-color: var(--border2); color: var(--text); }
+  /* Antwortsprache: gezeigt wird die gewählte; die übrigen erscheinen, sobald die Maus darauf steht oder die Tastatur sie erreicht */
+  .lang-bar:not(:hover):not(:focus-within) .lang-btn:not(.active) { display: none; }
+  .extra-btn { font-size: 12px; padding: 5px 11px; border-radius: 8px; letter-spacing: 0; }
+  .fast-btn, .kurz-btn, .kondensier-btn, .vollkontext-btn, .rag-btn, .wiki-btn { color: var(--text2); border-color: var(--border2); opacity: 1; }
+  .fast-btn:hover, .kurz-btn:hover, .kondensier-btn:hover, .vollkontext-btn:hover, .rag-btn:hover, .wiki-btn:hover { background: var(--surface2); color: var(--text); }
+  .kurz-btn.active, .vollkontext-btn.active, .rag-btn.active, .wiki-btn.active { color: var(--text); background: rgba(200,169,90,0.16); border-color: rgba(200,169,90,0.55); box-shadow: none; font-weight: 500; opacity: 1; }
+  .src-pill { font-size: 12px; }
+
+  /* ── Hinweise über dem Gespräch ── */
+  .main > .hinweis-band { position: static; transform: none; width: auto; flex: none; margin: 12px 24px 0; padding: 12px 14px; box-shadow: none; border-color: rgba(200,169,90,0.55); }
+  .start-banner { margin: 10px 24px 0; padding: 0; border-radius: 10px; background: var(--surface); border: 1px solid var(--border2); font-size: 13px; line-height: 1.55; }
+  .start-banner-klapp > summary { display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; list-style: none; }
+  .start-banner-klapp > summary::-webkit-details-marker { display: none; }
+  .start-banner-title { margin: 0; font-weight: 600; white-space: nowrap; }
+  .start-banner-klapp .start-banner-title::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent3); margin-right: 8px; }
+  .start-banner-kurz { flex: 1; min-width: 0; color: var(--text3); }
+  .start-banner-actions { margin-left: 0; }
+  .start-banner-klapp .start-banner-body { padding: 2px 12px 12px; color: var(--text2); }
+  .start-banner > .start-banner-title { padding: 10px 12px 0; white-space: normal; }
+  .start-banner > .start-banner-body { padding: 4px 12px 12px; }
+  .start-banner-body code, #server-status code { font-size: 12px; }
+  .start-banner-adresse { display: block; margin: 6px 0 2px; font-family: var(--code); font-size: 12px; color: var(--text3); }
+  .start-banner-klapp .start-banner-body .start-banner-actions { display: flex; margin-top: 8px; }
+  .wartung-bar { font-size: 13px; }
+  .wartung-row .w-stat, .wartung-row button, .wartung-tools button, .wartung-tools input { font-size: 12px; }
+  .vpn-band { padding: 10px 24px; font-size: 13px; }
+  .vpn-band-titel { font-size: 15px; letter-spacing: 0; text-transform: none; }
+  .vpn-band-zeile { font-size: 12px; }
+  .vpn-band-btn { font-size: 12px; border-radius: 7px; }
+  .vpn-detail-titel { font-size: 16px; letter-spacing: 0; text-transform: none; }
+  .vpn-detail-zeile, .vpn-weg { font-size: 13px; }
+  .vpn-marke { font-size: 12px; }
+
+  /* ── Bereiche ── */
+  .panel-header { padding: 18px 28px 12px; }
+  .panel-title, .panel-title[style] { font-size: 20px; font-weight: 600; font-style: normal; color: var(--text) !important; letter-spacing: -0.01em; }
+  .panel-sub { font-size: 13px; color: var(--text3); margin-top: 2px; }
+  .panel-content, .panel-body { padding: 22px 28px; }
+  .panel-toolbar { padding: 12px 28px; align-items: center; }
+  .toolbar-btn { font-size: 13px; padding: 6px 13px; border-radius: 8px; border-color: var(--border2); color: var(--text); }
+  .toolbar-btn:hover { background: var(--surface2); }
+  .toolbar-btn.primary { color: #1a1711; font-weight: 600; }
+  .toolbar-btn.primary:hover { background: var(--accent); opacity: 0.9; }
+  .btn-small { font-size: 12px; padding: 5px 10px; border-radius: 7px; }
+  .note-card, .history-item, .wissen-card { border-radius: 12px; }
+  .note-card-title, .history-preview, .wissen-card-title { font-size: 14px; }
+  .note-card-preview, .wissen-card-body { font-size: 13px; }
+  .note-card-date, .history-meta, .wissen-card-date, .history-group-head, .wissen-expand-btn, .wissen-delete-btn { font-size: 12px; }
+  .note-title-input { font-size: 22px; font-weight: 600; }
+  .note-body-input { font-size: 15px; line-height: 1.6; color: var(--text); }
+  .wissen-tag { font-size: 12px; }
+  .wissen-empty { font-size: 14px; }
+
+  /* ── Notfall: Protokolle groß und über die ganze Breite ── */
+  .sofort-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+  .sofort-card { padding: 12px 14px; border-radius: 12px; }
+  .sofort-card-title { font-size: 15px; }
+  .sofort-card-sub { font-size: 12px; }
+  .sofort-card.open { grid-column: 1 / -1; padding: 16px 20px; }
+  .sofort-card.open .sofort-card-title { font-size: 19px; }
+  .sofort-card.open .sofort-card-sub { display: none; }
+  .sofort-steps { font-size: 16px; line-height: 1.6; color: var(--text); padding-left: 26px; margin-top: 12px; }
+  .sofort-steps li { margin-bottom: 10px; hyphens: manual; overflow-wrap: break-word; }
+  .position-card { border-radius: 12px; }
+  .position-card .pos-sub { font-size: 13px; }
+  .position-card .pos-hint { font-size: 12px; }
+
+  /* ── Einstellungen in Bereichen ── */
+  .einst-tabs { display: flex; gap: 2px; padding: 10px 24px 0; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .einst-tabs button { background: none; border: none; border-bottom: 2px solid transparent; padding: 8px 12px 10px; font-size: 14px; font-weight: 500; color: var(--text2); cursor: pointer; border-radius: 6px 6px 0 0; }
+  .einst-tabs button:hover { color: var(--text); }
+  .einst-tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
+  #panel-settings .settings-group[data-bereich] { display: none; max-width: 760px; }
+  #panel-settings[data-bereich="allgemein"] .settings-group[data-bereich="allgemein"],
+  #panel-settings[data-bereich="ki"] .settings-group[data-bereich="ki"],
+  #panel-settings[data-bereich="iphone"] .settings-group[data-bereich="iphone"],
+  #panel-settings[data-bereich="netz"] .settings-group[data-bereich="netz"],
+  #panel-settings[data-bereich="daten"] .settings-group[data-bereich="daten"] { display: block; }
+  .settings-group { margin-bottom: 28px; }
+  .settings-group-title, .settings-group-title[style] { font-size: 13px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--text); margin-bottom: 6px; }
+  .settings-row { font-size: 14px; color: var(--text); padding: 11px 0; gap: 16px; }
+  .settings-row > span:first-child, .settings-row > label { flex: 1; min-width: 0; }
+  .settings-val { font-size: 13px; }
+  .settings-input, select { font-size: 13px; border-radius: 7px; border-color: var(--border2); }
+  /* Kontrast (nachgemessen am 14.11.): Rot und Grün als Textfarbe lagen auf den dunklen Flächen bei 3,7 und 4,3 : 1, das graue
+     Abzeichen „kein Stand" bei 3,5 : 1 — jetzt alle über 4,5 : 1. Nur die Textfarbe (style beginnt damit oder „;color:"),
+     nicht border-color/background-color. */
+  .w-faellig, [style^="color:#e24b4a"], [style*=";color:#e24b4a"] { color: #f0706a !important; }
+  [style^="color:#3a9d6b"], [style*=";color:#3a9d6b"] { color: #4fbf88 !important; }
+  [style*="background:#6b6b6b"] { background: #8a8a8a !important; }
+  .lang-btn { font-size: 12px; }
+  /* Felder ohne eigene Klasse (Logbuch, Checklisten, Notfall-Karte) kamen so, wie der Browser sie liefert: weiß auf dunklem Grund.
+     :where() hält das Gewicht bei null — jede Regel mit Klasse geht weiter vor. */
+  :where(.main) :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]), textarea) {
+    background: var(--surface2); border: 1px solid var(--border2); border-radius: 7px; padding: 6px 10px; color: var(--text);
+    font-family: var(--sans); font-size: 13px; outline: none; color-scheme: dark; }
+  :where(.main) :where(input, textarea, select):focus-visible { border-color: var(--accent); }
+  .settings-note { font-size: 12px; }
+  .about-card { max-width: 260px; padding: 10px 14px; border-radius: 12px; }
+
+  /* ── Anleitung „iPhone verbinden" ── */
+  .anleitung { max-width: 720px; }
+  .anleitung-karte { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; }
+  .anleitung-titel { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .anleitung-karte p { font-size: 14px; line-height: 1.55; color: var(--text); margin: 0 0 6px; }
+  .anleitung-karte p.anleitung-leise { font-size: 13px; color: var(--text3); }
+  .anleitung-karte code { font-size: 12px; background: var(--surface2); padding: 1px 6px; border-radius: 4px; }
+  .anleitung-karte .toolbar-btn { margin-top: 6px; }
+  .anleitung-warnung { border-color: rgba(224,122,95,0.45); }
+  .anleitung-mehr { margin-top: 18px; }
+  .anleitung-mehr > summary { cursor: pointer; font-size: 13px; color: var(--text2); padding: 8px 2px; list-style-position: inside; }
+  .anleitung-mehr > summary:hover { color: var(--text); }
+  .anleitung-alt { font-size: 13px; line-height: 1.65; color: var(--text2); margin-top: 8px; }
+  .anleitung-alt code { font-family: var(--code); font-size: 12px; }
 </style>
 </head>
 <body>
@@ -303,19 +584,51 @@
   <div class="logo">
     <div class="logo-title" data-i18n-skip><span>Safari</span> <span class="logo-akzent">Assistant</span></div>
     <div class="logo-sub">Offline-Feldassistent · Afrika</div>
-    <div class="ui-lang-row">
-      <!-- 2026-10-04-3: data-i18n-skip an den Knöpfen (Sprachnamen bleiben), nicht an der Gruppe — deren aria-label wird übersetzt -->
-      <div class="ui-lang" role="group" aria-label="Sprache der Oberfläche">
-        <button data-ui-lang="de" onclick="DARK_I18N.set('de')" title="Deutsch" data-i18n-skip>DE</button>
-        <button data-ui-lang="en" onclick="DARK_I18N.set('en')" title="English" data-i18n-skip>EN</button>
-        <button data-ui-lang="fr" onclick="DARK_I18N.set('fr')" title="Français" data-i18n-skip>FR</button>
-        <button data-ui-lang="es" onclick="DARK_I18N.set('es')" title="Español" data-i18n-skip>ES</button>
-      </div>
-      <a class="ui-help" href="hilfe?lang=de&amp;from=/index.html" onclick="return oeffneHilfe()" target="_blank" rel="noopener" title="Anleitung öffnen (README in der gewählten Sprache)" aria-label="Hilfe">?</a>
-    </div>
   </div>
 
+  <!-- 2026-11-14-2: Notfall mit einem Klick — immer sichtbar, über allem anderen. Öffnet die Notfall-Karte
+       (Notrufnummern, Position, Sofort-Protokolle — alles ohne KI). Tastenkürzel: Ctrl+Umschalt+N. -->
+  <button type="button" class="notfall-knopf" id="notfall-knopf" onclick="oeffneNotfall()" title="Notrufnummern, Position und Sofort-Protokolle — ohne KI (Ctrl+Umschalt+N)">
+    <span class="notfall-knopf-icon" aria-hidden="true">🚨</span><span>Notfall</span>
+  </button>
+
+  <!-- 2026-10-30-1: VPN-Prüfung — immer sichtbar; Klick öffnet Details und Einrichtung in ⚙️ Einstellungen -->
+  <button type="button" class="vpn-kachel grau" id="vpn-kachel" onclick="oeffneVpnEinstellungen()" title="VPN-Prüfung — Details und Einrichtung in ⚙️ Einstellungen">
+    <span class="vpn-kachel-icon" id="vpn-kachel-icon" aria-hidden="true">⏳</span>
+    <span class="vpn-kachel-text"><span class="vpn-kachel-titel" id="vpn-kachel-titel">VPN wird geprüft …</span><span class="vpn-kachel-zeile" id="vpn-kachel-zeile"></span></span>
+  </button>
+
   <div class="nav-section">
+
+    <!-- GRUPPE: NOTFALL -->
+    <div class="nav-group" id="group-notfall">
+      <div class="nav-group-header" onclick="toggleGroup('group-notfall')">
+        <span class="nav-label" style="color:var(--accent3)">🚨 Notfall</span>
+        <span class="nav-group-arrow">▾</span>
+      </div>
+      <div class="nav-group-items">
+        <div class="nav-item" data-module="chat" data-ctx="notfall" onclick="switchModule(this)" style="border-color: rgba(224,122,95,0.2)">
+          <div class="nav-icon" style="background:#27181a">🚨</div>
+          <span class="nav-name">Notfall-Protokoll</span>
+          <span class="wartung-badge" id="fristen-badge"></span>
+          <span class="nav-status" id="nav-status-notfall"></span>
+        </div>
+        <div class="nav-item" data-module="notfallkarte" onclick="switchModule(this)" style="border-color: rgba(224,122,95,0.2)">
+          <div class="nav-icon" style="background:#27181a">🆘</div>
+          <span class="nav-name">Notfall-Karte</span>
+        </div>
+        <div class="nav-item" data-module="reisewarnungen" onclick="switchModule(this)" style="border-color: rgba(224,122,95,0.2)">
+          <div class="nav-icon" style="background:#27181a">🛑</div>
+          <span class="nav-name">Reisewarnungen</span>
+          <span class="wartung-badge" id="reisewarn-badge"></span>
+        </div>
+        <div class="nav-item" data-module="nachrichten" onclick="switchModule(this)" style="border-color: rgba(224,122,95,0.2)" title="Meldungen aus RSS-Feeds, nach Themen — die Zahl zählt neue wichtige Meldungen">
+          <div class="nav-icon" style="background:#1f1c14">📰</div>
+          <span class="nav-name">Nachrichten</span>
+          <span class="wartung-badge" id="nachrichten-badge"></span>
+        </div>
+      </div>
+    </div>
 
     <!-- GRUPPE: OFFLINE -->
     <div class="nav-group" id="group-offline">
@@ -403,31 +716,6 @@
       </div>
     </div>
 
-    <!-- GRUPPE: NOTFALL -->
-    <div class="nav-group" id="group-notfall">
-      <div class="nav-group-header" onclick="toggleGroup('group-notfall')">
-        <span class="nav-label" style="color:var(--accent3)">🚨 Notfall</span>
-        <span class="nav-group-arrow">▾</span>
-      </div>
-      <div class="nav-group-items">
-        <div class="nav-item" data-module="chat" data-ctx="notfall" onclick="switchModule(this)" style="border-color: rgba(224,122,95,0.2)">
-          <div class="nav-icon" style="background:#27181a">🚨</div>
-          <span class="nav-name">Notfall-Protokoll</span>
-          <span class="wartung-badge" id="fristen-badge"></span>
-          <span class="nav-status" id="nav-status-notfall"></span>
-        </div>
-        <div class="nav-item" data-module="notfallkarte" onclick="switchModule(this)" style="border-color: rgba(224,122,95,0.2)">
-          <div class="nav-icon" style="background:#27181a">🆘</div>
-          <span class="nav-name">Notfall-Karte</span>
-        </div>
-        <div class="nav-item" data-module="reisewarnungen" onclick="switchModule(this)" style="border-color: rgba(224,122,95,0.2)">
-          <div class="nav-icon" style="background:#27181a">🛑</div>
-          <span class="nav-name">Reisewarnungen</span>
-          <span class="wartung-badge" id="reisewarn-badge"></span>
-        </div>
-      </div>
-    </div>
-
     <!-- GRUPPE: WERKZEUGE -->
     <div class="nav-group" id="group-tools">
       <div class="nav-group-header" onclick="toggleGroup('group-tools')">
@@ -469,18 +757,6 @@
           <div class="nav-icon" style="background:#1a1a1a">🕐</div>
           <span class="nav-name">Verlauf</span>
         </div>
-        <div class="nav-item" data-module="settings" onclick="switchModule(this)">
-          <div class="nav-icon" style="background:#1a1a1a">⚙️</div>
-          <span class="nav-name">Einstellungen</span>
-        </div>
-        <div class="nav-item" data-module="hilfe" onclick="switchModule(this)">
-          <div class="nav-icon" style="background:#181c1e">📱</div>
-          <span class="nav-name">iPhone-Verbindung</span>
-        </div>
-        <div class="nav-item" id="shutdown" onclick="shutdownApp()" style="border-color: rgba(226,75,74,0.25)">
-          <div class="nav-icon" style="background:#241616">⏻</div>
-          <span class="nav-name">Beenden</span>
-        </div>
       </div>
     </div>
 
@@ -491,7 +767,7 @@
       <span class="dot" id="ollama-dot" style="background:#E24B4A"></span>
       <span id="ollama-status">Ollama nicht verbunden</span>
     </div>
-    <div class="status-row" id="iphone-row" title="iPhone-Modus: WLAN-Zugang zum Assistenten — ein- und ausschalten in ⚙️ Einstellungen" style="cursor:pointer" onclick="oeffneEinstellungen()">
+    <div class="status-row" id="iphone-row" title="iPhone-Modus: WLAN-Zugang zum Assistenten — ein- und ausschalten in ⚙️ Einstellungen" style="cursor:pointer" onclick="oeffneIphoneEinstellungen()">
       <span class="dot" id="iphone-dot" style="background:var(--text3)"></span>
       <span id="iphone-status">iPhone-Modus aus</span>
     </div>
@@ -500,10 +776,49 @@
       <span id="reisewarn-status">Reisewarnung —</span>
     </div>
     <div class="model-badge" id="model-badge">Modell: —</div>
+    <!-- 2026-11-14-2: Einstellungen, iPhone und Beenden sind keine Ziele wie die Module — sie stehen als Symbole im Fuß.
+         Es bleiben dieselben Einträge (nav-item, data-module): switchModule() und die Tastaturbedienung gelten weiter. -->
+    <div class="nav-fuss" role="group" aria-label="App">
+    <div class="nav-item nav-fuss-knopf" title="Einstellungen" aria-label="Einstellungen" data-module="settings" onclick="switchModule(this)">
+          <div class="nav-icon" style="background:#1a1a1a">⚙️</div>
+          <span class="nav-name">Einstellungen</span>
+        </div>
+      <div class="nav-item nav-fuss-knopf" id="nav-iphone" title="iPhone verbinden — QR-Code und Einrichtung" aria-label="iPhone verbinden" onclick="oeffneIphoneEinstellungen()">
+        <div class="nav-icon">📱</div>
+        <span class="nav-name">iPhone</span>
+      </div>
+    </div>
+    <div class="ui-lang-row">
+      <!-- 2026-10-04-3: data-i18n-skip an den Knöpfen (Sprachnamen bleiben), nicht an der Gruppe — deren aria-label wird übersetzt -->
+      <div class="ui-lang" role="group" aria-label="Sprache der Oberfläche">
+        <button data-ui-lang="de" onclick="DARK_I18N.set('de')" title="Deutsch" data-i18n-skip>DE</button>
+        <button data-ui-lang="en" onclick="DARK_I18N.set('en')" title="English" data-i18n-skip>EN</button>
+        <button data-ui-lang="fr" onclick="DARK_I18N.set('fr')" title="Français" data-i18n-skip>FR</button>
+        <button data-ui-lang="es" onclick="DARK_I18N.set('es')" title="Español" data-i18n-skip>ES</button>
+      </div>
+      <a class="ui-help" href="hilfe?lang=de&amp;from=/index.html" onclick="return oeffneHilfe()" target="_blank" rel="noopener" title="Anleitung öffnen (README in der gewählten Sprache)" aria-label="Hilfe">?</a>
+      <div class="nav-item fuss-aus" title="Safari Assistant beenden" aria-label="Safari Assistant beenden" id="shutdown" onclick="shutdownApp()">
+          <div class="nav-icon" style="background:#241616">⏻</div>
+          <span class="nav-name">Beenden</span>
+        </div>
+    </div>
+    <!-- Die Anleitung „iPhone verbinden" bleibt ein Bereich (panel-hilfe); geöffnet wird sie aus ⚙️ Einstellungen → iPhone -->
+    <div class="nav-item" id="nav-hilfe" hidden data-module="hilfe" onclick="switchModule(this)">
+          <div class="nav-icon" style="background:#181c1e">📱</div>
+          <span class="nav-name">iPhone-Verbindung</span>
+        </div>
   </div>
 </nav>
 
 <div class="main">
+  <!-- 2026-10-30-1: rotes Band über allen Bereichen, solange der Mac ohne VPN (oder mit Leck) online ist -->
+  <div class="vpn-band" id="vpn-band" role="alert" style="display:none">
+    <span class="vpn-band-icon" aria-hidden="true">⚠️</span>
+    <span class="vpn-band-inhalt"><span class="vpn-band-titel" id="vpn-band-titel">Kein VPN</span><span id="vpn-band-text"></span><span class="vpn-band-zeile" id="vpn-band-zeile"></span></span>
+    <button type="button" class="vpn-band-btn" onclick="vpnJetztPruefen()">Jetzt prüfen</button>
+    <button type="button" class="vpn-band-btn" onclick="oeffneVpnEinstellungen()">Details</button>
+    <button type="button" class="vpn-band-x" onclick="vpnBandAusblenden()" title="Ausblenden, bis sich der Stand ändert" aria-label="Ausblenden, bis sich der Stand ändert">✕</button>
+  </div>
 
   <!-- CHAT PANEL -->
   <div class="panel active" id="panel-chat">
@@ -555,6 +870,7 @@
           <button class="extra-btn kurz-btn" id="kurz-btn" title="Kurze Antworten — spart Tokens" onclick="toggleKurzModus()" style="display:none">📝 Kurz</button>
           <button class="extra-btn vollkontext-btn" id="vollkontext-btn" title="Gesamten Chat-Verlauf mitsenden (mehr Tokens)" onclick="toggleVollkontext()" style="display:none">📜 Vollkontext</button>
           <select class="extra-btn" id="claude-model-quick" title="Claude-Modell für die Online-Module (Liste: ⚙️ Einstellungen → Claude API → Liste laden)" onchange="setzeClaudeModell(this.value)" style="display:none;font-size:10px;padding:2px 6px"></select>
+          <select class="extra-btn" id="claude-aufwand-quick" title="Aufwand: wie gründlich Claude in den Online-Modulen arbeitet (mehr Aufwand = langsamer und teurer)" onchange="setzeClaudeAufwand(this.value)" style="display:none;font-size:10px;padding:2px 6px"></select>
           <button class="extra-btn kondensier-btn" id="kondensier-btn" title="Chat-Verlauf komprimieren — spart Tokens und Rechenzeit" onclick="condenseChat()" style="display:none">🗜 Komprimieren</button>
           <button class="extra-btn rag-btn active" id="rag-btn" title="Dokumentensuche aktiv — klicken zum Deaktivieren" onclick="toggleRag()">📄 Doku</button>
           <button class="extra-btn wiki-btn" id="wiki-btn" title="Offline-Wikipedia (Kiwix) in Antworten dieses Moduls einbeziehen — pro Modul zuschaltbar" onclick="toggleWikiRag()">📚 Wiki</button>
@@ -651,12 +967,68 @@
     </div>
   </div>
 
+  <div class="panel" id="panel-nachrichten">
+    <div class="panel-header">
+      <div class="panel-title" style="color:var(--accent)">📰 Nachrichten</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div style="font-size:10px;color:var(--text3)">Nach Themen — offline lesbar</div>
+        <button class="toolbar-btn" id="nachrichten-quellen-knopf" onclick="nachrichtenQuellenUmschalten()">Quellen</button>
+        <button class="toolbar-btn" onclick="nachrichtenAktualisieren()">Jetzt holen</button>
+      </div>
+    </div>
+    <div class="panel-body" id="nachrichten-body" style="max-width:860px">
+      <!-- wird von renderNachrichten() bzw. renderNachrichtenQuellen() gefüllt -->
+    </div>
+  </div>
+
   <div class="panel" id="panel-hilfe">
     <div class="panel-header">
-      <div class="panel-title" style="color:var(--accent4)">📱 iPhone-Verbindung einrichten</div>
-      <div style="font-size:10px;color:var(--text3)">Mobile Nutzung von mobile.html im Starlink-WLAN oder per Hotspot</div>
+      <div class="panel-title">📱 iPhone verbinden</div>
+      <div class="panel-sub">Die App am iPhone — im selben WLAN wie der Mac</div>
     </div>
-    <div class="panel-body" style="max-width:720px;font-size:12px;line-height:1.7;color:var(--text2)">
+    <!-- 2026-11-14-2 (Review U6): oben die kurze Fassung in sieben Karten — seit dem 18.10. führt ⚙️ Einstellungen → iPhone
+         in Schritten durch Profil und QR-Code. Die bisherige, ausführliche Anleitung bleibt darunter zum Aufklappen. -->
+    <div class="panel-body anleitung">
+      <div class="anleitung-karte">
+        <div class="anleitung-titel">Einmal einrichten</div>
+        <p>⚙️ Einstellungen → iPhone führt in fünf Schritten durch: Zertifikat erzeugen, Profil per AirDrop aufs iPhone, installieren, Vertrauen einschalten, QR-Code scannen.</p>
+        <p class="anleitung-leise">Der Schritt, der am häufigsten fehlt — am iPhone: Einstellungen → Allgemein → Info → Zertifikatsvertrauenseinstellungen → das Zertifikat des Safari Assistant einschalten.</p>
+        <button class="toolbar-btn primary" onclick="oeffneIphoneEinstellungen()">Zur Einrichtung</button>
+      </div>
+      <div class="anleitung-karte">
+        <div class="anleitung-titel">Im Alltag</div>
+        <p>Am Mac: ⚙️ Einstellungen → iPhone → „QR-Code zeigen“. Am iPhone: das Symbol auf dem Home-Bildschirm antippen.</p>
+        <p class="anleitung-leise">Die Freigabe ist nach jedem Start des Safari Assistant aus und endet nach 12 Stunden ohne Anfrage von selbst.</p>
+      </div>
+      <div class="anleitung-karte">
+        <div class="anleitung-titel">Symbol auf dem Home-Bildschirm</div>
+        <p>Nach dem ersten Scannen in Safari: Teilen-Menü → „Zum Home-Bildschirm“. Der Zugangscode steckt in der gespeicherten Adresse.</p>
+        <p class="anleitung-leise">Die Adresse sieht so aus: <code>https://macbook.local:8765/go/k7x2m9pq4d</code> — der letzte Teil ist der Code. Nach „Zugangscode erneuern“ das Symbol löschen und neu anlegen.</p>
+      </div>
+      <div class="anleitung-karte">
+        <div class="anleitung-titel">Wenn der Mac nicht antwortet</div>
+        <p>Die App startet am iPhone trotzdem: Sofort-Protokolle, Notrufnummern, die eigene Position und — wenn unter „Daten &amp; Sicherung“ freigegeben — die Notfallkarte.</p>
+        <p class="anleitung-leise">KI-Antworten, Karte, Dokumente und Wikipedia brauchen den Mac. Das gilt für den Weg mit Zertifikat (https).</p>
+      </div>
+      <div class="anleitung-karte">
+        <div class="anleitung-titel">Welches Netz?</div>
+        <p>Starlink als Router, der Reiserouter oder der Hotspot eines iPhones — Mac und iPhone müssen im selben WLAN sein. Internet braucht es dafür nicht.</p>
+        <p class="anleitung-leise">Die Adresse nutzt den Namen des Macs (<code>&lt;name&gt;.local</code>) und bleibt beim Wechsel des Netzes gleich. Ein iPhone-Hotspot lässt sich nur mit Mobilfunkempfang einschalten.</p>
+      </div>
+      <div class="anleitung-karte">
+        <div class="anleitung-titel">Klappt nicht?</div>
+        <p>⚙️ Einstellungen → iPhone → „Klappt nicht?“ nennt die häufigsten Ursachen und zeigt, was vom iPhone ankommt.</p>
+        <p class="anleitung-leise">Zur Fehlersuche im Terminal: <code>ipconfig getifaddr en0</code> zeigt die Adresse des Macs im WLAN, <code>lsof -iTCP:8765 -sTCP:LISTEN -n -P</code>, wer auf dem Port lauscht.</p>
+      </div>
+      <div class="anleitung-karte anleitung-warnung">
+        <div class="anleitung-titel">In fremden WLANs</div>
+        <p>In WLANs von Lodges, Campingplätzen oder an der Grenze die Freigabe aus lassen. Ist sie an, antwortet der Mac nur Geräten mit dem Zugangscode — sichtbar ist er im Netz trotzdem.</p>
+      </div>
+      <!-- Die ausführliche Fassung steht wörtlich darunter (Netz-Varianten, Terminal-Befehle, Fehlersuche) —
+           zugeklappt, damit oben nur das Nötige steht. Am Text ist nichts geändert. -->
+      <details class="anleitung-mehr">
+        <summary>Ausführlich: Hintergrund, Netz-Varianten und Fehlersuche</summary>
+        <div class="anleitung-alt">
 
       <div style="background:rgba(58,157,107,0.08);border:1px solid rgba(58,157,107,0.35);border-radius:10px;padding:12px 16px;margin-bottom:14px">
 <div style="font-weight:600;color:#3a9d6b;margin-bottom:6px">🔐 Einmalig: Zertifikat aufs iPhone (seit 2026-09-14)</div>
@@ -685,11 +1057,12 @@
 <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 16px;margin-bottom:14px">
         <div style="font-weight:600;color:var(--text);margin-bottom:6px">So geht es (2026-09-12: ein Knopf statt Terminal)</div>
         <div>1. Safari Assistant.app starten. Beim Start ist der iPhone-Modus <b>immer aus</b>.</div>
-        <div>2. <b>⚙️ Einstellungen → Mobile App → „Einschalten"</b>. Darunter erscheint die fertige Adresse, z. B. <code>https://macbook.local:8765/go/k7x2m9pq4d</code> — der letzte Teil ist der Zugangscode. Daneben steht ein <b>QR-Code</b>: mit der iPhone-Kamera scannen statt abtippen.</div>
+        <div>2. <b>⚙️ Einstellungen → Mobile App</b>. Beim ersten Mal führen fünf Schritte durch Zertifikat und Profil, der QR-Code kommt zuletzt. Hat es einmal geklappt, steht dort gleich <b>„QR-Code zeigen“</b>.</div>
+        <div style="margin-left:14px;color:var(--text3)">Die Adresse sieht so aus: <code>https://macbook.local:8765/go/k7x2m9pq4d</code> — der letzte Teil ist der Zugangscode. Mit der iPhone-Kamera den QR-Code scannen statt abtippen.</div>
         <div>3. Diese Adresse einmal in Safari am iPhone öffnen (gleiches WLAN). Sie leitet auf mobile.html weiter und merkt sich den Code. Kommt hier ein <b>Zertifikatsfehler</b>, fehlt der Schritt aus dem grünen Kasten oben.</div>
         <div>4. Teilen-Menü → „Zum Home-Bildschirm" → künftig per Icon starten. Der Code steckt in der gespeicherten Adresse.</div>
         <div>5. Fertig: Chat, Karte und Dokumente laufen am iPhone durch den Mac. Ollama muss dafür <b>nicht</b> mehr im WLAN freigegeben werden.</div>
-        <div style="margin-top:4px;color:var(--text3)">Ausschalten: derselbe Knopf. Beim Beenden des Assistenten geht der Modus von allein aus; ein Neustart schaltet ihn nie automatisch ein.</div>
+        <div style="margin-top:4px;color:var(--text3)">Ausschalten: „Freigabe beenden“. Beim Beenden des Assistenten geht der Modus von allein aus; ein Neustart schaltet ihn nie automatisch ein.</div>
       </div>
 
       <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 16px;margin-bottom:14px">
@@ -730,6 +1103,8 @@
         <div style="margin-top:4px;color:var(--text3)">Falls Ollama bei dir über einen LaunchAgent startet: dort darf <code>OLLAMA_HOST</code> nicht auf <code>0.0.0.0</code> stehen (Standard ist 127.0.0.1). Prüfen: <code>grep -A1 OLLAMA_HOST ~/Library/LaunchAgents/*ollama*.plist</code> — kein Treffer ist richtig.</div>
       </div>
 
+        </div>
+      </details>
     </div>
   </div>
 
@@ -779,9 +1154,18 @@
   </div>
 
   <!-- SETTINGS PANEL -->
-  <div class="panel" id="panel-settings">
+  <div class="panel" id="panel-settings" data-bereich="allgemein">
+    <!-- 2026-11-14-2: Die Einstellungen waren eine Seite von viereinhalb Bildschirmen. Jetzt fünf Bereiche; gezeigt wird
+         immer nur einer (CSS über data-bereich am Panel), einstellungenBereich() schaltet um. -->
+    <div class="einst-tabs" id="einst-tabs" role="tablist" aria-label="Bereiche der Einstellungen">
+      <button type="button" role="tab" data-bereich="allgemein" class="active" aria-selected="true" onclick="einstellungenBereich('allgemein')">Allgemein</button>
+      <button type="button" role="tab" data-bereich="ki" aria-selected="false" onclick="einstellungenBereich('ki')">KI & Modelle</button>
+      <button type="button" role="tab" data-bereich="iphone" aria-selected="false" onclick="einstellungenBereich('iphone')">iPhone</button>
+      <button type="button" role="tab" data-bereich="netz" aria-selected="false" onclick="einstellungenBereich('netz')">Netz & VPN</button>
+      <button type="button" role="tab" data-bereich="daten" aria-selected="false" onclick="einstellungenBereich('daten')">Daten & Sicherung</button>
+    </div>
     <div class="panel-content">
-      <div class="settings-group">
+      <div class="settings-group" data-bereich="allgemein">
         <div class="settings-group-title">App</div>
         <!-- 2026-09-25-1: „Über"-Block wie ein About-Dialog — Creator-Logo (dark-logo.jpg, Datei neben index.html,
              Server-Allowlist + deploy.sh), Name, Version, Creator. Kartenhintergrund = Hintergrundfarbe des Logos. -->
@@ -812,7 +1196,7 @@
           <span id="app-version-display" style="font-weight:600;color:var(--accent)"></span>
         </div>
       </div>
-      <div class="settings-group">
+      <div class="settings-group" data-bereich="ki">
         <div class="settings-group-title">Verbindung</div>
         <div class="settings-row">
           <span>Ollama URL</span>
@@ -827,17 +1211,58 @@
           <button class="toolbar-btn" onclick="checkOllama()">Testen</button>
         </div>
       </div>
-      <div class="settings-group">
+      <div class="settings-group" data-bereich="netz">
         <div class="settings-group-title">Lokaler Server</div>
         <div id="server-status" style="font-size:11px;color:var(--text2);line-height:1.8">Wird geprüft …</div>
         <div style="margin-top:8px"><button class="btn-small" onclick="pruefeServer()">Neu prüfen</button></div>
       </div>
+      <!-- 2026-10-30-1: VPN-Prüfung — geht der Mac über das eigene VPN ins Internet (IPv4 und IPv6)? -->
+      <div class="settings-group" data-bereich="netz" id="vpn-einstellungen">
+        <div class="settings-group-title">🔒 VPN-Prüfung</div>
+        <div class="vpn-detail grau" id="vpn-detail">
+          <div class="vpn-detail-titel" id="vpn-detail-titel">VPN wird geprüft …</div>
+          <div class="vpn-detail-zeile" id="vpn-detail-zeile"></div>
+          <div class="vpn-detail-zeile" id="vpn-detail-alter" style="opacity:0.85"></div>
+        </div>
+        <div class="settings-row">
+          <span>Prüfung <span style="font-size:10px;color:var(--text3)">Takt — geprüft wird nur, solange die App offen ist</span></span>
+          <span style="display:flex;gap:6px;align-items:center">
+            <select id="vpn-takt" onchange="vpnTaktSetzen(this.value)" aria-label="Takt der VPN-Prüfung" style="font-size:11px;padding:5px 8px">
+              <option value="30">alle 30 s</option>
+              <option value="60">jede Minute</option>
+              <option value="120">alle 2 Min.</option>
+              <option value="300">alle 5 Min.</option>
+              <option value="900">alle 15 Min.</option>
+            </select>
+            <button class="toolbar-btn" id="vpn-schalter" onclick="vpnSchalten()">Ausschalten</button>
+            <button class="toolbar-btn" onclick="vpnJetztPruefen()">Jetzt prüfen</button>
+          </span>
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin:10px 0 2px;font-weight:500">Wege ins Internet (letzte Messung)</div>
+        <div id="vpn-wege" style="font-size:11px;color:var(--text2)">—</div>
+        <div style="font-size:11px;color:var(--text2);margin:12px 0 2px;font-weight:500">Netze deines VPNs</div>
+        <div id="vpn-gemerkt" style="font-size:11px;color:var(--text2)">—</div>
+        <div style="font-size:11px;color:var(--text2);margin:12px 0 2px;font-weight:500">Anbieter-Erkennung — gilt nur für den genannten Anbieter</div>
+        <div id="vpn-anbieter" style="font-size:11px;color:var(--text2)">—</div>
+        <div style="font-size:10px;color:var(--text3);line-height:1.6;margin-top:4px">Ist die Erkennung an, fragt die App für jeden Ausgang beim Anbieter selbst nach, ob die Adresse zu einem seiner VPN-Server gehört (verschlüsselt, getrennt für IPv4 und IPv6). So zählt jeder Server dieses Anbieters als dein VPN, ohne dass du jedes Netz einzeln merken musst.<br>Das gilt nur für den genannten Anbieter. Andere VPNs bleiben „nicht als dein VPN bekannt“, bis du ihr Netz oben merkst. Ist das VPN aus, erfährt der Anbieter bei der Abfrage deine echte Adresse — wie jede Webseite, die du aufrufst.<br>Angenommen wird nur eine Antwort über https mit gültigem Zertifikat, die genau die Adresse nennt, die die App selbst gemessen hat.</div>
+        <div style="background:rgba(126,184,201,0.08);border:1px solid rgba(126,184,201,0.3);border-radius:8px;padding:10px 12px;margin-top:12px;font-size:11px;line-height:1.7;color:var(--text2)">
+          <div style="color:var(--accent4);font-weight:500;margin-bottom:4px">So prüft die App</div>
+          Der Mac fragt über eine verschlüsselte Verbindung, mit welcher Adresse er im Internet erscheint (Cloudflare, ersatzweise ipify), getrennt für IPv4 und IPv6, und bei RIPE NCC (RIPEstat), zu welchem Netz diese Adresse gehört. Grün heißt: Bei der letzten Prüfung lief jeder Weg über ein Netz deines VPNs.<br>
+          <b>Einmal einrichten:</b> VPN am Router einschalten, „Jetzt prüfen“, dann beim Ausgang „Das ist mein VPN“ drücken. Wechselst du auf einen VPN-Server in einem anderen Netz, meldet die App „Kein VPN“, bis du auch dieses Netz merkst. Starlink lässt sich nicht merken — es ist dein Zugang, nicht dein VPN.<br>
+          <b>Grenzen:</b> Gemessen wird am Mac — fürs iPhone gilt das Ergebnis nur, solange es im selben WLAN ist. Zwischen zwei Prüfungen kann das VPN unbemerkt abbrechen; dagegen hilft am Router eine Sperre für Verkehr ohne VPN (Kill-Switch), falls die Firmware sie bietet. Jede Prüfung braucht nur wenige Kilobyte.
+        </div>
+      </div>
 
-      <div class="settings-group">
+      <div class="settings-group" data-bereich="ki">
         <div class="settings-group-title">Claude API (Online-Modul)</div>
         <div class="settings-row">
           <span>Anthropic API Key</span>
           <input class="settings-input" id="anthropic-key" type="password" placeholder="sk-ant-..." onchange="saveSettings()" style="width:200px">
+        </div>
+        <!-- 2026-11-14-4: eigener Key fürs iPhone — geht das iPhone verloren, wird nur dieser gesperrt -->
+        <div class="settings-row" style="align-items:flex-start">
+          <span>Key fürs iPhone (optional)<br><span style="font-size:10px;color:var(--text3);font-weight:400">Leer: das iPhone bekommt den Key dieses Macs. Übergabe: am iPhone ⚙️ → „Vom Mac holen“.</span></span>
+          <input class="settings-input" id="iphone-anthropic-key" type="password" placeholder="sk-ant-..." autocomplete="off" onchange="saveSettings()" style="width:200px">
         </div>
         <div class="settings-row">
           <span>API testen</span>
@@ -851,6 +1276,11 @@
           </span>
         </div>
         <div id="claude-model-hint" style="font-size:10px;color:var(--text3);padding:2px 0 6px;line-height:1.6"></div>
+        <div class="settings-row" style="align-items:flex-start">
+          <span>Aufwand<br><span style="font-size:10px;color:var(--text3);font-weight:400">wie gründlich Claude arbeitet</span></span>
+          <select id="claude-aufwand-select" onchange="setzeClaudeAufwand(this.value)" style="font-size:11px;padding:5px 8px;min-width:240px"></select>
+        </div>
+        <div id="claude-aufwand-hint" style="font-size:10px;color:var(--text3);padding:2px 0 6px;line-height:1.6"></div>
         <div style="font-size:10px;color:var(--text3);padding:6px 0;line-height:1.6">
           API Key unter console.anthropic.com erstellen.<br>
           Mit Key gehen <b>Claude, Sicherheitslage und Wetter</b> ins Netz (Anthropic) — alle anderen Module laufen offline über Ollama. Ohne Key antwortet Wetter offline.
@@ -862,7 +1292,7 @@
           • Ist eine Position gespeichert, geht sie (auf ca. 100 m gerundet) mit Claude-, Sicherheitslage- und Wetter-Anfragen an Anthropic. Position löschen = nichts mitschicken.
         </div>
       </div>
-      <div class="settings-group">
+      <div class="settings-group" data-bereich="ki">
         <div class="settings-group-title" style="display:flex;justify-content:space-between;align-items:center">
           <span>Modell pro Modul</span>
           <button class="toolbar-btn" onclick="resetAllModels()" style="font-size:10px;padding:4px 10px">Alle zurücksetzen</button>
@@ -872,7 +1302,7 @@
         </div>
         <div id="model-assignment-list"></div>
       </div>
-      <div class="settings-group">
+      <div class="settings-group" data-bereich="allgemein">
         <div class="settings-group-title">Reise</div>
         <div class="settings-row">
           <span>Aktuelles Land</span>
@@ -891,7 +1321,7 @@
           </span>
         </div>
       </div>
-      <div class="settings-group">
+      <div class="settings-group" data-bereich="daten">
         <div class="settings-group-title">💾 Backup & Wiederherstellung</div>
         <div style="font-size:10px;color:var(--text3);margin-bottom:10px;line-height:1.6">
           Sichert alle App-Daten (Chats, Verlauf, Notizen, Logbuch, Dokumente) — ohne API-Key und GPS-Position</div>
@@ -905,22 +1335,35 @@
           <input type="file" id="backup-file-input" accept="application/json" style="display:none" onchange="importBackup(event)">
         </div>
         <div id="backup-status" style="font-size:11px;color:var(--text2);padding:4px 0"></div>
+        <!-- 2026-11-14-1 (Review U2/U1): automatische Sicherung auf diesem Mac + Notfallkarte fürs iPhone -->
+        <div class="settings-row">
+          <span>Automatische Sicherung auf diesem Mac<span class="settings-note" id="sicherung-status">Wird geprüft …</span></span>
+          <button class="toolbar-btn" onclick="sicherungJetzt()">Jetzt sichern</button>
+        </div>
+        <div class="settings-row">
+          <span>Aus der automatischen Sicherung wiederherstellen<span class="settings-note">Liegt in ~/.safari-assistant-sicherung — letzter Stand und die letzten sieben Tage, ohne Claude-Key und Position.</span></span>
+          <button class="toolbar-btn" onclick="sicherungWiederherstellenFragen()">Wiederherstellen</button>
+        </div>
+        <div class="settings-row">
+          <label for="nk-iphone">Notfallkarte fürs iPhone bereitstellen<span class="settings-note">Das iPhone holt sie beim nächsten Kontakt und zeigt sie unter 🚨 auch ohne Mac. Nur verschlüsselt und mit Zugangscode, ohne „Schlüssel-Versteck“.</span></label>
+          <input type="checkbox" id="nk-iphone" onchange="notfallkarteIphoneSchalten(this.checked)">
+        </div>
       </div>
-      <div class="settings-group">
+      <div class="settings-group" data-bereich="iphone">
         <div class="settings-group-title">Mobile App</div>
         <div class="settings-row">
-          <span>iPhone-Version öffnen</span>
-          <button class="toolbar-btn" onclick="window.open('mobile.html','_blank','noopener')">Öffnen →</button>
+          <span>iPhone-Version öffnen<span class="settings-note">Zeigt die iPhone-Ansicht hier am Mac — zum Ausprobieren.</span></span>
+          <span style="display:flex;gap:8px"><button class="toolbar-btn" onclick="oeffneIphoneAnleitung()">Anleitung</button><button class="toolbar-btn" onclick="window.open('mobile.html','_blank','noopener')">Öffnen →</button></span>
         </div>
         <div class="settings-row" style="align-items:flex-start">
           <span>📱 iPhone-Modus<br><span style="font-size:10px;color:var(--text3);font-weight:400">WLAN-Zugang für das iPhone — nur solange eingeschaltet</span></span>
-          <button class="toolbar-btn primary" id="iphone-toggle" onclick="iphoneModusSchalten()">Einschalten</button>
+          <button class="toolbar-btn" id="iphone-toggle" onclick="iphoneModusSchalten()" style="display:none">Freigabe beenden</button>
         </div>
         <div id="iphone-modus-status" style="font-size:11px;color:var(--text2);line-height:1.8;padding:4px 0">Wird geprüft …</div>
         <div style="background:rgba(224,122,95,0.08);border:1px solid rgba(224,122,95,0.3);border-radius:8px;padding:10px 12px;margin-top:10px;font-size:11px;line-height:1.7;color:var(--text2)">
           <div style="color:var(--accent3);font-weight:500;margin-bottom:4px">So funktioniert es</div>
           Beim Start ist der Modus <b>immer aus</b>, er geht nur per Knopf an — und beim Beenden des Assistenten automatisch wieder aus. Solange er an ist, erreicht das iPhone im selben WLAN (Starlink, Hotspot) den Assistenten; ohne den Zugangscode in der Adresse antwortet der Server niemandem. Ollama selbst bleibt immer nur am Mac erreichbar — das iPhone spricht es durch den Assistenten.<br>
-          In fremden WLANs (Lodge, Camp, Grenze) den Modus aus lassen oder danach ausschalten. <button class="btn-small" onclick="iphoneCodeErneuern()" style="margin-top:4px">Zugangscode erneuern</button>
+          In fremden WLANs (Lodge, Camp, Grenze) den Modus aus lassen oder danach ausschalten.
         </div>
       </div>
     </div>
@@ -1054,8 +1497,8 @@ CRITICAL AFRICA-SPECIFIC KNOWLEDGE:
   },
   claude: {
     icon: '✦', label: 'Claude — Online KI',
-    model: 'claude-sonnet-4-6',
-    modelLabel: 'Claude Sonnet 4.6',
+    model: 'claude-sonnet-5-5',
+    modelLabel: 'Claude Sonnet 5.5',
     modelReason: 'Anthropic Cloud — nur mit Internet',
     placeholder: 'Frage an Claude stellen (Internet erforderlich)...',
     hint: 'Bereich: Claude Online — Anthropic API',
@@ -1066,7 +1509,7 @@ You have deep knowledge of vehicle mechanics, African wildlife, wilderness and t
   },
   sicherheit: {
     icon: '🌍', label: 'Sicherheitslage — Live',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5-5',
     modelLabel: 'Claude + Web-Search',
     modelReason: 'Live-Recherche aus vertrauenswürdigen Quellen',
     placeholder: 'Land, Region oder konkrete Sicherheitsfrage...',
@@ -1259,7 +1702,7 @@ let pendingImage = null;
 const abortControllers = {};
 let fastMode = false;
 const FAST_MODEL = 'gemma4:e4b';
-const APP_VERSION = 'v2026-10-06-1'; // MUSS mit dem Versionsmarker in Zeile 2 übereinstimmen
+const APP_VERSION = 'v2026-11-14-5'; // MUSS mit dem Versionsmarker in Zeile 2 übereinstimmen
 
 // Kontext-Schutz (BYTEIDENTISCH index + mobile): Dokument-/Wikipedia-Auszüge landen im System-Prompt.
 // Ein PDF aus dem Forum oder ein vandalisierter Wiki-Artikel könnte dort „Ignoriere deine Regeln" sagen.
@@ -1287,7 +1730,8 @@ function neutralisiereMarker(t) {
 // Jetzt wählbar: die Liste kommt live aus der Anthropic-Models-API (GET /v1/models — id, display_name,
 // created_at; neueste zuerst), wird lokal gecacht und funktioniert damit auch offline in der Auswahl.
 // Keine Modell-IDs sind im Code hinterlegt außer dem Standard — was die API nicht kennt, gibt es nicht.
-const CLAUDE_STANDARD_MODELL = 'claude-sonnet-4-6';
+// 2026-11-14-5 (Modell-Check): Sonnet 5.5 statt 4.6 — ein Drittel günstiger, laut Anthropic nicht vor 28.09.2027 abgeschaltet (4.6: frühestens 17.02.2027)
+const CLAUDE_STANDARD_MODELL = 'claude-sonnet-5-5';
 const CLAUDE_MODELLE_KEY = 'safari-claude-modelle';
 function claudeModellStufe(id) {
   const s = String(id || '').toLowerCase();
@@ -1313,12 +1757,101 @@ async function ladeClaudeModelle(apiKey) {
   try { localStorage.setItem(CLAUDE_MODELLE_KEY, JSON.stringify(cache)); } catch (e) {}
   return cache;
 }
+function claudeAufwandAusFaehigkeiten(cap) {
+  // capabilities.effort eines Modells aus der Modell-Liste → Liste der Stufen, die es kann;
+  // [] = das Modell kann keinen Aufwand; null = keine Angabe (unbekannt — die Liste nennt capabilities nicht immer)
+  const e = (cap && typeof cap === 'object') ? cap.effort : null;
+  if (!e || typeof e !== 'object') return null;
+  if (e.supported === false) return [];
+  const stufen = ['low', 'medium', 'high', 'xhigh', 'max'].filter(s => e[s] && e[s].supported === true);
+  return stufen.length ? stufen : null;
+}
 function claudeModelleAusAntwort(j) {
-  // API-Antwort → { liste: [{id, name, seit}], geholt }; unbrauchbare Einträge werden übersprungen
+  // API-Antwort → { liste: [{id, name, seit, aufwand}], geholt }; unbrauchbare Einträge werden übersprungen
   const liste = (j && Array.isArray(j.data) ? j.data : []).filter(m => m && typeof m.id === 'string')
-    .map(m => ({ id: m.id, name: String(m.display_name || m.id), seit: String(m.created_at || '').slice(0, 10) }));
+    .map(m => ({ id: m.id, name: String(m.display_name || m.id), seit: String(m.created_at || '').slice(0, 10), aufwand: claudeAufwandAusFaehigkeiten(m.capabilities) }));
   return { liste, geholt: Date.now() };
 }
+
+// ── CLAUDE-AUFWAND (BYTEIDENTISCH in index.html und mobile.html) ──
+// „Aufwand“ (bei Anthropic: effort) steuert, wie gründlich Claude arbeitet: Nachdenken, Werkzeugaufrufe, Länge der Antwort.
+// Die API nimmt ihn als output_config: { effort } in der Anfrage (2026-11-03-1). Gesendet wird NUR, wenn eine Stufe gewählt
+// ist — „Standard“ heißt: nichts senden, das Modell nutzt seinen eigenen Standard. Welche Stufen ein Modell kann, steht in
+// der Modell-Liste (capabilities.effort). Fehlt die Angabe, gilt „unbekannt“: die App probiert es, und lehnt die API die
+// Stufe ab (HTTP 400 mit „effort“ oder „output_config“ im Text), geht die Anfrage einmal ohne Aufwand erneut raus.
+const CLAUDE_AUFWAND_STUFEN = ['low', 'medium', 'high', 'xhigh', 'max'];
+const CLAUDE_AUFWAND_MAX_TOKENS = 8192;
+const CLAUDE_AUFWAND_ABGELEHNT = new Set();   // „modell|stufe“, von der API abgelehnt — gilt nur bis zum Neuladen
+function claudeAufwandName(stufe) {
+  const i = CLAUDE_AUFWAND_STUFEN.indexOf(stufe);
+  return i < 0 ? 'Standard' : ['Niedrig', 'Mittel', 'Hoch', 'Sehr hoch', 'Maximal'][i];
+}
+function claudeAufwandMoeglich(modellId) {
+  // Stufen laut Modell-Liste; [] = das Modell kann keinen Aufwand; null = unbekannt (keine Liste oder keine Angabe)
+  const c = claudeModelleCache(); const e = c && c.liste.find(m => m.id === modellId);
+  return (e && Array.isArray(e.aufwand)) ? e.aufwand : null;
+}
+function claudeAufwandWirksam(wahl, modellId) {
+  // Die Stufe, die wirklich gesendet wird; '' = nichts senden (Standard, ungültiger Wert, vom Modell nicht gekonnt, von der API abgelehnt)
+  if (!CLAUDE_AUFWAND_STUFEN.includes(wahl)) return '';
+  const m = claudeAufwandMoeglich(modellId);
+  if (m && !m.includes(wahl)) return '';
+  return CLAUDE_AUFWAND_ABGELEHNT.has(modellId + '|' + wahl) ? '' : wahl;
+}
+function claudeAnfrageMitAufwand(body, stufe) {
+  // Kopie der Anfrage mit output_config.effort; das Original bleibt unverändert, damit ein Wiederholen ohne Aufwand möglich ist
+  if (!CLAUDE_AUFWAND_STUFEN.includes(stufe)) return body;
+  const neu = Object.assign({}, body, { output_config: Object.assign({}, body.output_config, { effort: stufe }) });
+  // Bei „Sehr hoch“ und „Maximal“ zählt das Nachdenken auf max_tokens mit — sonst bliebe für die Antwort zu wenig übrig
+  if ((stufe === 'xhigh' || stufe === 'max') && !(neu.max_tokens >= CLAUDE_AUFWAND_MAX_TOKENS)) neu.max_tokens = CLAUDE_AUFWAND_MAX_TOKENS;
+  return neu;
+}
+function claudeAufwandFehlerText(text) { return /effort|output_config/i.test(String(text || '')); }
+function claudeAufwandOptionenHtml(modellId, wahl) {
+  // <option>-Liste für beide Auswahlfelder; nur feste Werte, keine Nutzereingaben
+  const m = claudeAufwandMoeglich(modellId);
+  const stufen = m === null ? CLAUDE_AUFWAND_STUFEN : CLAUDE_AUFWAND_STUFEN.filter(s => m.includes(s));
+  const gewaehlt = CLAUDE_AUFWAND_STUFEN.includes(wahl) ? wahl : '';
+  const opt = (wert, text) => '<option value="' + wert + '"' + (wert === gewaehlt ? ' selected' : '') + '>' + text + '</option>';
+  let html = opt('', 'Aufwand: Standard');
+  for (const s of stufen) html += opt(s, 'Aufwand: ' + claudeAufwandName(s));
+  if (gewaehlt && !stufen.includes(gewaehlt)) html += opt(gewaehlt, 'Aufwand: ' + claudeAufwandName(gewaehlt) + ' — bei diesem Modell nicht verfügbar');
+  return html;
+}
+function claudeAufwandHinweis(modellId, wahl) {
+  // Erklärung zur gewählten Stufe und zum Modell, als Zeilen (feste Texte)
+  const gewaehlt = CLAUDE_AUFWAND_STUFEN.includes(wahl) ? wahl : '';
+  const beschreibung = {
+    '': 'Standard: Die App sendet keinen Aufwand, das Modell nutzt seinen eigenen Standard.',
+    low: 'Niedrig: schnell und sparsam, weniger Nachdenken — für einfache Fragen.',
+    medium: 'Mittel: ausgewogen.',
+    high: 'Hoch: gründlich — laut Anthropic-Dokumentation bei den meisten Modellen ohnehin der Standard.',
+    xhigh: 'Sehr hoch: für schwierige Aufgaben — braucht mehr Tokens, Zeit und Geld.',
+    max: 'Maximal: der gründlichste Modus — am langsamsten und am teuersten.'
+  };
+  const zeilen = [beschreibung[gewaehlt]];
+  const m = claudeAufwandMoeglich(modellId);
+  if (gewaehlt && m && !m.includes(gewaehlt)) zeilen.push('Diese Stufe gibt es laut Modell-Liste bei diesem Modell nicht — es wird nichts gesendet.');
+  else if (gewaehlt && CLAUDE_AUFWAND_ABGELEHNT.has(modellId + '|' + gewaehlt)) zeilen.push('Die API hat diese Stufe für dieses Modell abgelehnt — bis zum Neuladen wird nichts gesendet.');
+  else if (m === null) zeilen.push('Ob dieses Modell einen Aufwand kann, weiß die App noch nicht („Liste laden“ fragt Anthropic). Lehnt die API ihn ab, läuft die Anfrage automatisch ohne.');
+  else if (m.length === 0) zeilen.push('Dieses Modell kann laut Modell-Liste keinen Aufwand — es wird nichts gesendet.');
+  else zeilen.push('Dieses Modell unterstützt den Aufwand laut Modell-Liste.');
+  if (gewaehlt === 'xhigh' || gewaehlt === 'max') zeilen.push('Bei dieser Stufe erlaubt die App Antworten bis ' + CLAUDE_AUFWAND_MAX_TOKENS + ' Tokens, weil das Nachdenken darauf angerechnet wird.');
+  return zeilen;
+}
+function claudeFristSignal(userSignal, ms) {
+  // Wartefrist NUR bis die Antwort beginnt. AbortSignal.timeout() bräche auch den laufenden Antwort-Strom ab
+  // (in Node nachgestellt: nach dem Kopf der Antwort wirft read() weiter TimeoutError) — bei hohem Aufwand dauert eine Antwort länger.
+  const frist = new AbortController();
+  const timer = setTimeout(() => {
+    const fehler = new Error('Zeitüberschreitung: Anthropic hat in ' + Math.round(ms / 1000) + ' s nicht geantwortet — Internet prüfen?');
+    fehler.name = 'TimeoutError';
+    frist.abort(fehler);
+  }, ms);
+  const signal = (typeof AbortSignal.any === 'function') ? AbortSignal.any([userSignal, frist.signal]) : userSignal;
+  return { signal, fertig: () => clearTimeout(timer) };
+}
+// ── ENDE CLAUDE-AUFWAND ──
 
 // ── GRUNDREGELN für alle Offline-Module (BYTEIDENTISCH in index.html und mobile.html) ──
 // Ergebnis des Prompt-Audits 12.09.2026: Unsicherheits-Regel, Antwortlänge, keine erfundenen Zahlen
@@ -1500,6 +2033,201 @@ async function kopiereText(text, okMeldung) {
   } catch (e) { return 'Kopieren nicht möglich — bitte markieren und manuell kopieren'; }
 }
 
+// ── VPN-ANZEIGE (BYTEIDENTISCH in index.html und mobile.html) ──
+// VPN-Prüfung (2026-10-30-1): server.py misst, mit welcher Adresse und über welches Netz der Mac ins Internet geht
+// (IPv4 und IPv6 getrennt), und vergleicht das mit den gemerkten Netzen des eigenen VPNs. Hier nur die Anzeige:
+// Stufe → Farbe, Symbol, Kurztext, Zeile. Netznamen kommen von RIPEstat — fremder Text, darum immer maskiert
+// (vpnEsc) und nie übersetzt (data-i18n-skip). Rot (kein VPN, Leck) soll man sehen, ohne danach zu suchen.
+const VPN_STUFEN = {
+  vpn: { farbe: 'gruen', icon: '🔒', titel: 'VPN aktiv' },
+  kein_vpn: { farbe: 'rot', icon: '⚠️', titel: 'Kein VPN' },
+  leck: { farbe: 'rot', icon: '⚠️', titel: 'VPN-Leck' },
+  einrichten: { farbe: 'gelb', icon: '🔧', titel: 'VPN-Prüfung einrichten' },
+  unklar: { farbe: 'gelb', icon: '❓', titel: 'VPN unklar' },
+  anmeldung: { farbe: 'gelb', icon: '🔑', titel: 'WLAN-Anmeldung' },
+  offline: { farbe: 'grau', icon: '○', titel: 'Offline' },
+  pruefe: { farbe: 'grau', icon: '⏳', titel: 'VPN wird geprüft …' },
+  aus: { farbe: 'grau', icon: '○', titel: 'VPN-Prüfung aus' }
+};
+function vpnEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+function vpnLandName(code) {
+  const c = String(code || '');
+  if (!/^[A-Z]{2}$/.test(c)) return '';
+  try { return new Intl.DisplayNames([(window.DARK_I18N && window.DARK_I18N.lang) || 'de'], { type: 'region' }).of(c) || c; }
+  catch (e) { return c; }
+}
+// Ein Ausgang als HTML: „Netzname · Land" — fremder Text, maskiert und nicht übersetzt.
+// Hat der Anbieter den Ausgang bestätigt (Mullvad-Erkennung, 2026-11-02-1), steht sein Name statt des Netznamens da
+// und „vom Anbieter bestätigt" dahinter — so ist sichtbar, dass diese Bewertung nur für diesen Anbieter gilt.
+function vpnAusgangHtml(a) {
+  if (!a) return '';
+  const teile = [a.anbieter || a.name || (a.asn ? 'AS' + a.asn : ''), vpnLandName(a.land)].filter(Boolean);
+  return teile.length ? '<span data-i18n-skip>' + vpnEsc(teile.join(' · ')) + '</span>'
+    + (a.anbieter ? ' <span>· vom Anbieter bestätigt</span>' : '') : '';
+}
+function vpnAlterText(s) {
+  if (typeof s !== 'number' || !isFinite(s) || s < 0) return '';
+  if (s < 10) return 'gerade eben';
+  if (s < 120) return 'vor ' + Math.round(s) + ' s';
+  if (s < 7200) return 'vor ' + Math.round(s / 60) + ' Min.';
+  return 'vor ' + Math.round(s / 3600) + ' h';
+}
+// Stand vom Server → was die Seite zeigt. geraet: 'mac' oder 'iphone' (eingerichtet wird nur am Mac).
+function vpnAnzeige(st, geraet) {
+  const stufe = (st && Object.prototype.hasOwnProperty.call(VPN_STUFEN, st.stufe)) ? st.stufe : 'pruefe';
+  const s = VPN_STUFEN[stufe];
+  const wege = (st && Array.isArray(st.ausgaenge)) ? st.ausgaenge : [];
+  const ohne = wege.find(a => a.vpn === false) || wege.find(a => a.vpn !== true) || wege[0];
+  const amMac = geraet !== 'iphone';
+  let zeile = '', band = '';
+  if (stufe === 'vpn') zeile = 'Ausgang: ' + vpnAusgangHtml(wege[0]);
+  else if (stufe === 'kein_vpn') {
+    zeile = (ohne && ohne.zugang) ? vpnEsc('Direkt über ' + ohne.zugang + ' — ohne Tunnel')
+      : 'Ausgang: ' + vpnAusgangHtml(ohne) + ' — nicht als dein VPN bekannt';
+    band = 'Online ohne VPN — dein Internetverkehr läuft nicht durch dein VPN.';
+  } else if (stufe === 'leck') {
+    zeile = (st.leck === 'IPv4' ? 'IPv4 läuft am VPN vorbei:' : 'IPv6 läuft am VPN vorbei:') + ' ' + vpnAusgangHtml(ohne);
+    band = 'VPN-Leck — ein Teil deines Internetverkehrs läuft am VPN vorbei.';
+  } else if (stufe === 'einrichten') {
+    zeile = 'Online über ' + vpnAusgangHtml(ohne) + '. <span>' + (amMac
+      ? 'VPN am Router einschalten, dann in ⚙️ Einstellungen → VPN-Prüfung „Das ist mein VPN“ drücken.'
+      : 'Einrichten am Mac: ⚙️ Einstellungen → VPN-Prüfung.') + '</span>';
+  } else if (stufe === 'unklar') {
+    zeile = wege.length ? 'Ein Ausgang ließ sich keinem Netz zuordnen (RIPEstat nicht erreichbar?).'
+      : 'Internet erreichbar, aber die Prüfdienste antworten nicht.';
+  } else if (stufe === 'anmeldung') zeile = 'Das WLAN verlangt eine Anmeldung. Erst im Browser anmelden, dann das VPN am Router einschalten.';
+  else if (stufe === 'offline') zeile = 'Keine Internetverbindung. Ist am Router eine Sperre für Verkehr ohne VPN an, kann auch ein getrenntes VPN die Ursache sein.';
+  else if (stufe === 'pruefe') zeile = (st && st.zuletzt) ? 'Netz gewechselt oder letzte Messung zu alt — wird neu geprüft.' : 'Erste Messung läuft.';
+  else if (stufe === 'aus') zeile = amMac ? 'Einschalten in ⚙️ Einstellungen → VPN-Prüfung.' : 'Einschalten am Mac: ⚙️ Einstellungen → VPN-Prüfung.';
+  // kurz: für die Kachel in der Seitenleiste — dort steht der Stand dauerhaft, die Erklärung gibt es beim Klick
+  let kurz = zeile;
+  if (stufe === 'einrichten' && amMac) kurz = 'Online über ' + vpnAusgangHtml(ohne) + '. <span>Zum Einrichten hier klicken.</span>';
+  else if (stufe === 'anmeldung') kurz = 'Das WLAN verlangt eine Anmeldung.';
+  else if (stufe === 'offline') kurz = 'Keine Internetverbindung.';
+  return { stufe, farbe: s.farbe, icon: s.icon, titel: s.titel, zeile, kurz, band, rot: s.farbe === 'rot' };
+}
+// ── ENDE VPN-ANZEIGE ──
+
+// ── NACHRICHTEN (BYTEIDENTISCH in index.html und mobile.html) ──
+// Meldungen aus RSS-Feeds (2026-10-18-2): server.py holt sie, sobald der Mac online ist, und ordnet sie mit einer
+// festen Stichwortliste Themen und Ländern zu (keine KI). Gespeichert und gezeigt werden nur Titel, ein kurzer
+// Anriss, Quelle, Datum und Link. Feed-Inhalt ist fremder Text: immer maskiert (nachrichtEsc — eine eigene Funktion,
+// weil escHtml auch Markdown formatiert), nie übersetzt (data-i18n-skip), Links nur http(s).
+const NACHRICHTEN_KEY = 'safari-nachrichten';
+const NACHRICHTEN_GESEHEN_KEY = 'safari-nachrichten-gesehen';
+let nachrichtenImSpeicher = null;     // falls localStorage voll ist, gilt wenigstens der letzte Abruf dieser Sitzung
+function nachrichtEsc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function nachrichtenCache() {
+  if (nachrichtenImSpeicher) return nachrichtenImSpeicher;
+  try {
+    const c = JSON.parse(localStorage.getItem(NACHRICHTEN_KEY) || 'null');
+    return (c && Array.isArray(c.eintraege)) ? c : null;
+  } catch (e) { return null; }
+}
+async function ladeNachrichten(serverUrl) {
+  const res = await fetch(serverUrl + '/api/nachrichten', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const j = await res.json();
+  const c = { eintraege: Array.isArray(j.eintraege) ? j.eintraege : [], themen: Array.isArray(j.themen) ? j.themen : [],
+    laender: (j.laender && typeof j.laender === 'object') ? j.laender : {}, status: j.status || {}, hinweis: j.hinweis || '',
+    gespeichert: Date.now() };
+  nachrichtenImSpeicher = c;
+  try { localStorage.setItem(NACHRICHTEN_KEY, JSON.stringify(c)); } catch (e) { /* voll — dann gilt nachrichtenImSpeicher */ }
+  return c;
+}
+function nachrichtenGesehenBis() {
+  try { return Number(localStorage.getItem(NACHRICHTEN_GESEHEN_KEY)) || 0; } catch (e) { return 0; }
+}
+function nachrichtenAlsGesehen() {
+  try { localStorage.setItem(NACHRICHTEN_GESEHEN_KEY, String(Math.floor(Date.now() / 1000))); } catch (e) {}
+}
+function nachrichtHatLand(e, land) { return !land || (Array.isArray(e.laender) && e.laender.includes(land)); }
+// Nach Themen ordnen — die Reihenfolge der Themen kommt vom Server. Jede Meldung steht unter ihrem ersten Thema
+// (weitere zeigt sie als Hinweis); ist ein Thema gewählt, stehen dort alle Meldungen mit diesem Thema. Innerhalb eines
+// Themas: wichtige zuerst, dann das Land, in dem man gerade ist, dann die neuesten.
+function nachrichtenGruppieren(c, opt) {
+  opt = opt || {};
+  const themen = (c && Array.isArray(c.themen)) ? c.themen : [];
+  const liste = ((c && c.eintraege) || []).filter(e => e && e.titel && nachrichtHatLand(e, opt.land)
+    && (!opt.nurWichtig || e.kritisch) && (!opt.thema || (Array.isArray(e.themen) && e.themen.includes(opt.thema))));
+  const rang = e => (e.kritisch ? 2 : 0) + (opt.hier && nachrichtHatLand(e, opt.hier) ? 1 : 0);
+  liste.sort((a, b) => (rang(b) - rang(a)) || ((Number(b.zeit) || 0) - (Number(a.zeit) || 0)));
+  if (opt.thema) {
+    const t = themen.find(x => x.id === opt.thema);
+    return (t && liste.length) ? [{ thema: t, eintraege: liste }] : [];
+  }
+  const gruppen = themen.map(t => ({ thema: t, eintraege: [] }));
+  const nachId = {};
+  gruppen.forEach(g => { nachId[g.thema.id] = g; });
+  liste.forEach(e => { const g = nachId[(e.themen || [])[0]] || nachId.sonstiges; if (g) g.eintraege.push(e); });
+  return gruppen.filter(g => g.eintraege.length);
+}
+// Wie viele Meldungen je Thema (für die Themen-Knöpfe) — mit denselben Filtern, nur ohne das Thema
+function nachrichtenZaehlen(c, opt) {
+  opt = opt || {};
+  const z = {};
+  ((c && c.eintraege) || []).forEach(e => {
+    if (!e || !e.titel || !nachrichtHatLand(e, opt.land) || (opt.nurWichtig && !e.kritisch)) return;
+    (e.themen || []).forEach(t => { z[t] = (z[t] || 0) + 1; });
+  });
+  return z;
+}
+function nachrichtZeitText(sek) {
+  const s = Number(sek) || 0;
+  if (!s) return '';
+  const diff = Date.now() / 1000 - s;
+  if (diff < 3600) return `vor ${Math.max(1, Math.round(diff / 60))} Min.`;
+  if (diff < 48 * 3600) return `vor ${Math.round(diff / 3600)} h`;
+  if (diff < 8 * 86400) return `vor ${Math.round(diff / 86400)} Tagen`;
+  return new Date(s * 1000).toLocaleDateString('de-DE', { day: 'numeric', month: 'short' });
+}
+function nachrichtHtml(e, c, gesehenBis) {
+  const link = /^https?:\/\//i.test(String(e.link || '')) ? String(e.link) : '';
+  const namen = (c && c.laender) || {}, themen = (c && c.themen) || [];
+  const neu = (Number(e.gesehen) || 0) > (Number(gesehenBis) || 0);
+  const weitere = (e.themen || []).slice(1).map(id => themen.find(t => t.id === id)).filter(Boolean);
+  const titel = `<span data-i18n-skip>${nachrichtEsc(e.titel)}</span>`;
+  const marke = (text, farbe) => `<span style="font-size:9px;font-weight:700;color:#111;background:${farbe};border-radius:8px;padding:1px 6px;flex-shrink:0">${text}</span>`;
+  return '<div style="padding:9px 0;border-top:1px solid var(--border2)">'
+    + '<div style="display:flex;gap:6px;align-items:baseline;flex-wrap:wrap;font-size:13px;line-height:1.45">'
+    + (e.kritisch ? marke('Wichtig', '#e0842f') : '') + (neu ? marke('Neu', 'var(--accent)') : '')
+    + (link ? `<a href="${nachrichtEsc(link)}" target="_blank" rel="noopener noreferrer" style="color:var(--text);font-weight:500;text-decoration:none">${titel} <span style="color:var(--accent4)">↗</span></a>`
+      : `<span style="color:var(--text);font-weight:500">${titel}</span>`)
+    + '</div><div style="font-size:10px;color:var(--text3);margin-top:3px;display:flex;gap:4px 8px;flex-wrap:wrap">'
+    + (e.laender || []).map(k => `<span>${nachrichtEsc(namen[k] || k)}</span>`).join('')
+    + `<span data-i18n-skip>${nachrichtEsc(e.quelle_name)}</span>`
+    + (e.zeit ? `<span>${nachrichtEsc(nachrichtZeitText(e.zeit))}</span>` : '')
+    + weitere.map(t => `<span>${nachrichtEsc(t.icon)} ${nachrichtEsc(t.name)}</span>`).join('')
+    + '</div>'
+    + (e.text ? `<div data-i18n-skip style="font-size:11px;color:var(--text2);line-height:1.55;margin-top:4px">${nachrichtEsc(e.text)}</div>` : '')
+    + '</div>';
+}
+// Die Themen untereinander, je Thema die ersten opt.max Meldungen; „Alle … zeigen" ruft die Funktion opt.mehr der Seite.
+function nachrichtenListeHtml(c, gruppen, opt) {
+  opt = opt || {};
+  const max = opt.max || 6, offen = opt.offen || {}, gesehenBis = Number(opt.gesehenBis) || 0;
+  const mehr = /^[A-Za-z]+$/.test(opt.mehr || '') ? opt.mehr : '';
+  return gruppen.map(g => {
+    const id = /^[a-z]+$/.test(g.thema.id || '') ? g.thema.id : '';
+    const neu = g.eintraege.filter(e => (Number(e.gesehen) || 0) > gesehenBis).length;
+    const zeigen = offen[id] ? g.eintraege : g.eintraege.slice(0, max);
+    return '<div style="margin:18px 0 4px;display:flex;align-items:center;gap:8px">'
+      + `<span style="font-size:16px">${nachrichtEsc(g.thema.icon)}</span>`
+      + `<b style="font-size:13px;color:var(--text)">${nachrichtEsc(g.thema.name)}</b>`
+      + `<span style="font-size:10px;color:var(--text3)">${g.eintraege.length}</span>`
+      + (neu ? `<span style="font-size:10px;color:var(--accent)">${neu} neu</span>` : '')
+      + '</div>'
+      + zeigen.map(e => nachrichtHtml(e, c, gesehenBis)).join('')
+      + ((mehr && id && g.eintraege.length > max)
+        ? `<button onclick="${mehr}('${id}')" style="margin-top:6px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:6px 12px;min-height:32px;color:var(--text2);font-size:11px;cursor:pointer">${offen[id] ? 'Weniger zeigen' : `Alle ${g.eintraege.length} zeigen`}</button>` : '');
+  }).join('');
+}
+
 // ── SOFORT-PROTOKOLLE OHNE KI (BYTEIDENTISCH in index.html und mobile.html — Regel wie NOTRUF_LAENDER) ──
 // In einem Notfall wartet niemand 60 Sekunden auf ein kaltes 35B-Modell. Diese Abläufe stehen
 // deshalb als fester Text sofort bereit — offline, ohne Ollama, ohne Netz. Sie folgen den gängigen
@@ -1640,7 +2368,7 @@ const SPEICHER_PRUEFER = {
   'safari-settings': v => { if (!istObj(v)) throw new Error('kein Objekt');
     if (v.ollamaUrl != null && !/^https?:\/\//.test(String(v.ollamaUrl))) delete v.ollamaUrl;
     if (v.moduleModels != null && !istObj(v.moduleModels)) delete v.moduleModels;
-    for (const k of ['anthropicKey', 'manualModel', 'userLocationName', 'claudeModel', 'claudeModelLabel']) if (v[k] != null && typeof v[k] !== 'string') delete v[k];
+    for (const k of ['anthropicKey', 'iphoneAnthropicKey', 'manualModel', 'userLocationName', 'claudeModel', 'claudeModelLabel', 'claudeEffort']) if (v[k] != null && typeof v[k] !== 'string') delete v[k];
     for (const k of ['userLat', 'userLng', 'userLocationTime']) if (v[k] != null && typeof v[k] !== 'number') delete v[k];
     return v; },
   'safari-notes': v => { if (!istArr(v)) throw new Error('keine Liste');
@@ -1671,7 +2399,7 @@ const SPEICHER_PRUEFER = {
     for (const k of Object.keys(v.termine)) { const t = v.termine[k]; if (!istObj(t) || (t.datum != null && !gueltigesDatum(String(t.datum)))) delete v.termine[k]; }
     return v; },
   'safari-wartung': v => { if (!istObj(v) || !istArr(v.custom) || !istObj(v.done)) throw new Error('Struktur');
-    v.km = Number(v.km) || 0; v.kmDatum = strOderLeer(v.kmDatum);
+    v.km = Number(v.km) || 0; v.kmDatum = gueltigesDatum(strOderLeer(v.kmDatum)) ? strOderLeer(v.kmDatum) : '';   // 2026-11-14-1 (Review S1): Datum oder leer — vorher jeder Text
     v.custom = v.custom.filter(istObj).map(c => ({ ...c, id: strOderLeer(c.id), name: strOderLeer(c.name), km: Number(c.km) || 0 }));
     for (const k of Object.keys(v.done)) { const d = v.done[k]; if (!istObj(d)) delete v.done[k]; else { d.km = Number(d.km) || 0; d.datum = strOderLeer(d.datum); } }
     return v; },
@@ -1706,9 +2434,231 @@ function ladeJSON(key, fallback) {
     return fallback;
   }
 }
+// ═══ AUTOMATISCHE SICHERUNG AUF DIESEM MAC (2026-11-14-1, Review U2) ═══
+// Logbuch, Notfallkarte, Fristen, Notizen und Chats lagen nur im Browser-Speicher dieser einen Adresse. Jetzt spiegelt
+// die Seite sie bei jeder Änderung zum eigenen Server (POST /api/sicherung → ~/.safari-assistant-sicherung, nur dieser
+// Mac) — ohne Claude-Key und Position. Ist der Speicher hier leer oder ein anderer als der gesicherte (Ausweichport,
+// gelöschte Website-Daten), fragt die App, statt die Sicherung still zu überschreiben.
+// SICHERUNG_SCHLUESSEL muss dieselbe Liste sein wie im Backup-Export (Test).
+const SICHERUNG_SCHLUESSEL = ['safari-settings', 'safari-live-chats', 'safari-chat-tabs', 'safari-land-override', 'safari-nk-lang', 'safari-antwortsprache', 'safari-ui-sprache', 'safari-notes', 'safari-wissen', 'safari-history', 'safari-pois', 'safari-logbuch', 'safari-hund-verlauf', 'safari-notfallkarte', 'safari-checklisten', 'safari-wartung', 'safari-fristen'];
+const SICHERUNG_KENNUNG = 'safari-sicherung-kennung';
+const sicherungStand = { status: null, gesperrt: true, timer: null, fehler: '', wartet: false };
+function sicherungDaten() {
+  const daten = {};
+  SICHERUNG_SCHLUESSEL.forEach(key => {
+    let val = null;
+    try { val = localStorage.getItem(key); } catch (e) {}
+    if (!val) return;
+    if (key === 'safari-settings') {
+      try { const st = JSON.parse(val); delete st.anthropicKey; delete st.userLat; delete st.userLng; delete st.userLocationTime; delete st.iphoneAnthropicKey; val = JSON.stringify(st); } catch (_) { return; }
+    }
+    daten[key] = val;
+  });
+  return daten;
+}
+// Gibt es in DIESEM Browser-Speicher schon eigene Einträge? (Vorgaben, die die App beim Start selbst anlegt, zählen nicht.)
+function sicherungHatInhalt() {
+  const lies = k => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } };
+  const voll = v => Array.isArray(v) && v.length > 0;
+  const werte = o => (o && typeof o === 'object' ? Object.values(o) : []);
+  if (['safari-notes', 'safari-history', 'safari-wissen', 'safari-logbuch', 'safari-hund-verlauf'].some(k => voll(lies(k)))) return true;
+  const nk = lies('safari-notfallkarte');
+  if (nk && [].concat(...(Array.isArray(nk.personen) ? nk.personen : []).map(p => werte(p && p.fields)), ...['hund', 'versicherung', 'fahrzeug', 'kontakte'].map(k => werte(nk[k]))).some(v => typeof v === 'string' && v.trim())) return true;
+  const w = lies('safari-wartung');
+  if (w && (Number(w.km) > 0 || werte(w.done).length)) return true;
+  const fr = lies('safari-fristen');
+  if (fr && werte(fr.termine).length) return true;
+  return werte(lies('safari-live-chats')).some(voll);
+}
+// 'sichern' = weiter spiegeln · 'fragen' = die Sicherung stammt aus einem anderen (oder dem verlorenen) Speicher
+function sicherungEntscheid(status, kennungHier) {
+  if (!status || !status.vorhanden) return 'sichern';
+  return (kennungHier && status.kennung === kennungHier) ? 'sichern' : 'fragen';
+}
+function sicherungKennungLesen() { try { return localStorage.getItem(SICHERUNG_KENNUNG) || ''; } catch (e) { return ''; } }
+function sicherungNeueKennung() {
+  const a = new Uint8Array(12);
+  crypto.getRandomValues(a);
+  const k = Array.from(a, b => (b % 36).toString(36)).join('');
+  try { localStorage.setItem(SICHERUNG_KENNUNG, k); } catch (e) {}
+  return k;
+}
+function sicherungAnstossen(ms) {
+  if (sicherungStand.gesperrt) return;
+  clearTimeout(sicherungStand.timer);
+  sicherungStand.timer = setTimeout(sicherungSenden, ms == null ? 8000 : ms);
+}
+async function sicherungSenden() {
+  if (sicherungStand.gesperrt) return false;
+  const kennung = sicherungKennungLesen() || sicherungNeueKennung();
+  try {
+    const res = await fetch(getServerUrl() + '/api/sicherung', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ herkunft: location.origin, kennung, daten: sicherungDaten() }) });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.error || ('HTTP ' + res.status));
+    sicherungStand.status = d; sicherungStand.fehler = '';
+  } catch (e) { sicherungStand.fehler = (e && e.message) || 'Fehler'; }
+  sicherungZeigeStatus();
+  return !sicherungStand.fehler;
+}
+async function sicherungStart() {
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}
+  let status = null;
+  try { const res = await fetch(getServerUrl() + '/api/sicherung/status', { cache: 'no-store' }); if (res.ok) status = await res.json(); } catch (e) {}
+  if (!status) { sicherungStand.fehler = 'Der Server kennt die Sicherung nicht (alt oder aus).'; sicherungZeigeStatus(); return; }
+  sicherungStand.status = status;
+  if (sicherungEntscheid(status, sicherungKennungLesen()) === 'fragen') { sicherungStand.wartet = true; sicherungFrage(status); sicherungZeigeStatus(); return; }
+  sicherungStand.gesperrt = false;
+  sicherungAnstossen(1500);
+  sicherungZeigeStatus();
+}
+function sicherungZeit(sek) {
+  return sek ? new Date(sek * 1000).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+}
+function sicherungZeigeStatus() {
+  const el = document.getElementById('sicherung-status');
+  const st = sicherungStand.status;
+  const schalter = document.getElementById('nk-iphone');
+  if (schalter && st) schalter.checked = st.notfallkarte_iphone === true;
+  if (!el) return;
+  let text;
+  if (sicherungStand.wartet) text = 'Wartet auf deine Entscheidung (Hinweis oben).';
+  else if (sicherungStand.fehler) text = 'Nicht gesichert: ' + sicherungStand.fehler;
+  else if (st && st.vorhanden) text = 'Zuletzt gesichert: ' + sicherungZeit(st.zeit) + ' · ' + Math.max(1, Math.round((st.bytes || 0) / 1024)) + ' KB';
+  else text = 'Noch keine Sicherung.';
+  el.textContent = text;
+  el.style.color = sicherungStand.fehler ? 'var(--accent3)' : '';
+}
+// ═══ CLAUDE-KEY AUFS iPHONE ÜBERGEBEN (2026-11-14-4) ═══
+// Das iPhone fragt an (⚙️ → „Vom Mac holen") und zeigt einen vierstelligen Code. Hier erscheint ein Band mit Gerät,
+// Adresse und demselben Code. Erst „Erlauben" schickt den Key an den Server; das iPhone holt ihn dort einmal ab.
+// Übergeben wird der „Key fürs iPhone", sonst der Key dieses Macs. Abgefragt wird alle 3 s (nur am Mac, Loopback).
+const schluesselStand = { id: null, timer: null };
+function schluesselFuersIphone() {
+  const eigen = String(settings.iphoneAnthropicKey || '').trim();
+  return eigen ? { key: eigen, art: 'iphone' } : { key: String(settings.anthropicKey || '').trim(), art: 'mac' };
+}
+function schluesselEnde(key) { return key && key.length > 8 ? '••••' + key.slice(-4) : ''; }
+async function schluesselPruefen() {
+  let a = null;
+  try {
+    const res = await fetch(getServerUrl() + '/api/schluessel/offen', { cache: 'no-store' });
+    if (res.ok) a = (await res.json()).anfrage || null;
+  } catch (e) { a = null; }
+  schluesselBand(a);
+}
+function schluesselBand(a) {
+  let el = document.getElementById('schluessel-frage');
+  if (!a) { if (el) el.remove(); schluesselStand.id = null; return; }
+  const k = schluesselFuersIphone();
+  const was = !k.key ? '<span style="color:var(--accent3)">Am Mac ist noch kein Claude-Key eingetragen — erst unter ⚙️ Einstellungen → KI & Modelle eintragen.</span>'
+    : (k.art === 'iphone' ? 'Übergeben wird der Key fürs iPhone' : 'Übergeben wird der Key dieses Macs') + ' <span data-i18n-skip>' + escHtml(schluesselEnde(k.key)) + '</span>.';
+  const geraet = '<span data-i18n-skip><b>' + escHtml(a.geraet) + '</b> · ' + escHtml(a.ip) + ' · </span><span>noch</span> <span data-i18n-skip>' + Math.max(0, Number(a.rest_s) || 0) + ' s</span>';
+  if (el && schluesselStand.id === a.id) {        // dasselbe Gerät: nur Restzeit und Key-Zeile auffrischen, Knöpfe bleiben
+    const g = el.querySelector('.schluessel-geraet'), w = el.querySelector('.schluessel-was');
+    if (g) g.innerHTML = geraet; if (w) w.innerHTML = was;
+    return;
+  }
+  if (el) el.remove();
+  schluesselStand.id = a.id;
+  el = document.createElement('div');
+  el.id = 'schluessel-frage';
+  el.className = 'hinweis-band';
+  el.setAttribute('role', 'alertdialog');
+  el.innerHTML = '<div class="hinweis-band-text"><b>📲 Claude-Key an ein Gerät übergeben?</b>'
+    + '<span class="schluessel-geraet">' + geraet + '</span>'
+    + '<span>Code auf dem Gerät: <b class="schluessel-code" data-i18n-skip>' + escHtml(a.code) + '</b> — nur erlauben, wenn dort genau dieser Code steht.</span>'
+    + '<span class="schluessel-was">' + was + '</span></div>'
+    + '<button class="toolbar-btn primary" onclick="schluesselAntworten(true)">Erlauben</button>'
+    + '<button class="toolbar-btn" onclick="schluesselAntworten(false)">Ablehnen</button>';
+  const main = document.querySelector('.main');
+  if (main) main.insertBefore(el, main.firstChild); else document.body.appendChild(el);
+}
+async function schluesselAntworten(erlauben) {
+  const id = schluesselStand.id;
+  if (!id) return;
+  const k = schluesselFuersIphone();
+  if (erlauben && !k.key) { showToast('Erst einen Claude-Key eintragen'); oeffneEinstellungen('ki'); return; }
+  try {
+    const res = await fetch(getServerUrl() + '/api/schluessel/antwort', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(erlauben ? { id, erlauben: true, key: k.key } : { id, erlauben: false }) });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.error || ('HTTP ' + res.status));
+    showToast(erlauben ? '✅ Key freigegeben — das Gerät übernimmt ihn jetzt' : 'Abgelehnt');
+  } catch (e) { showToast('⚠️ ' + ((e && e.message) || 'Fehler')); }
+  schluesselBand(null);
+}
+function schluesselStart() {
+  if (schluesselStand.timer) return;
+  schluesselPruefen();
+  schluesselStand.timer = setInterval(schluesselPruefen, 3000);
+}
+function sicherungFrage(status) {
+  let el = document.getElementById('sicherung-frage');
+  if (el) el.remove();
+  el = document.createElement('div');
+  el.id = 'sicherung-frage';
+  el.className = 'hinweis-band';
+  el.setAttribute('role', 'alertdialog');
+  const leer = !sicherungHatInhalt();
+  el.innerHTML = '<div class="hinweis-band-text"><b>' + (leer ? 'Diese Ansicht ist leer — auf diesem Mac liegt eine Sicherung.' : 'Auf diesem Mac liegt eine Sicherung aus einem anderen Browser-Speicher.') + '</b>'
+    + '<span>Stand der Sicherung: <span data-i18n-skip>' + escHtml(sicherungZeit(status.zeit)) + (status.herkunft ? ' · ' + escHtml(status.herkunft) : '') + '</span></span>'
+    + '<span>Der Claude-Key gehört nicht zur Sicherung — nach dem Wiederherstellen einmal neu eintragen.</span></div>'
+    + '<button class="toolbar-btn primary" onclick="sicherungWiederherstellen()">Wiederherstellen</button>'
+    + '<button class="toolbar-btn" onclick="sicherungHierBehalten()">' + (leer ? 'Leer weitermachen' : 'Den Stand hier behalten') + '</button>';
+  // 2026-11-14-2: als Zeile über dem Inhalt statt schwebend — das Band verdeckte Titel und Knöpfe des Bereichs
+  const main = document.querySelector('.main');
+  if (main) main.insertBefore(el, main.firstChild); else document.body.appendChild(el);
+}
+async function sicherungWiederherstellen() {
+  try {
+    const res = await fetch(getServerUrl() + '/api/sicherung', { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const d = await res.json();
+    if (!d || !d.daten) throw new Error('leer');
+    // Dieser Speicher gehört ab jetzt zur Sicherung — nach dem Neuladen wird wieder normal gespiegelt
+    if (d.kennung) { try { localStorage.setItem(SICHERUNG_KENNUNG, d.kennung); } catch (e) {} }
+    backupOhneFrage = true;
+    const datei = new File([JSON.stringify({ version: 2, created: new Date().toISOString(), localStorage: d.daten, nurSpeicher: true })], 'sicherung.json', { type: 'application/json' });
+    await importBackup({ target: { files: [datei], value: '' } });
+    showToast('Sicherung wiederhergestellt — die Seite lädt neu.');
+  } catch (e) {
+    showToast('Wiederherstellen fehlgeschlagen: ' + ((e && e.message) || e));
+  } finally { backupOhneFrage = false; }
+}
+function sicherungHierBehalten() {
+  const el = document.getElementById('sicherung-frage');
+  if (el) el.remove();
+  sicherungNeueKennung();          // der Server hebt den bisherigen Stand auf, wenn die Kennung wechselt
+  sicherungStand.wartet = false;
+  sicherungStand.gesperrt = false;
+  sicherungSenden();
+}
+async function sicherungJetzt() {
+  if (sicherungStand.wartet) { showToast('Erst oben entscheiden: wiederherstellen oder den Stand hier behalten.'); return; }
+  sicherungStand.gesperrt = false;
+  showToast(await sicherungSenden() ? 'Gesichert.' : ('Nicht gesichert: ' + sicherungStand.fehler));
+}
+function sicherungWiederherstellenFragen() {
+  const st = sicherungStand.status;
+  if (!st || !st.vorhanden) { showToast('Es gibt noch keine Sicherung.'); return; }
+  if (confirm('Den Stand der Sicherung vom ' + sicherungZeit(st.zeit) + ' wiederherstellen? Die Daten in dieser Ansicht werden ersetzt (Dokumente bleiben).')) sicherungWiederherstellen();
+}
+async function notfallkarteIphoneSchalten(an) {
+  try {
+    const res = await fetch(getServerUrl() + '/api/sicherung/einstellungen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notfallkarte_iphone: an === true }) });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.error || ('HTTP ' + res.status));
+    sicherungStand.status = d;
+    showToast(an ? 'Notfallkarte wird fürs iPhone bereitgestellt (nur verschlüsselt, mit Zugangscode).' : 'Notfallkarte nicht mehr fürs iPhone — die Kopie dort verschwindet beim nächsten Kontakt.');
+  } catch (e) { showToast('Nicht geändert: ' + ((e && e.message) || e)); }
+  sicherungZeigeStatus();
+}
+
+let backupOhneFrage = false;     // sicherungWiederherstellen() hat schon gefragt (oder der Speicher ist leer)
 let speicherVoll = false;
 function speichere(key, text) {
-  try { localStorage.setItem(key, text); if (speicherVoll) { speicherVoll = false; zeigeSpeicherHinweis(false); } return true; }
+  try { localStorage.setItem(key, text); if (speicherVoll) { speicherVoll = false; zeigeSpeicherHinweis(false); } try { sicherungAnstossen(); } catch (_) {} return true; }
   catch (e) {
     // Speicher voll: Platz schaffen (Verlauf auf 10 Einträge, Live-Chats verwerfen — der RAM-Stand bleibt) und erneut
     try {
@@ -1839,7 +2789,9 @@ async function openWikipedia() {
         alert('📚 Offline-Wikipedia nicht erreichbar.\n\n' + (s.grund || '') + '\n\nManueller Start am Mac:\nkiwix-tools von download.kiwix.org laden, kiwix-serve und ZIM-Dateien nach ~/safari-zim/ legen, Safari Assistant neu starten.');
         return;
       }
-      if (s.proxy) url = location.origin + s.proxy;
+      // 2026-11-14-1 (Review S3): eigener Port = eigene Herkunft — Skripte aus der Wikipedia kommen so nicht an den Speicher der App
+      if (s.proxy && s.wiki_port) url = location.protocol + '//' + location.hostname + ':' + s.wiki_port + s.proxy;
+      else if (s.proxy) url = location.origin + s.proxy;
       else if (location.protocol === 'https:') {
         alert('📚 Die Offline-Wikipedia läuft, lässt sich von hier aus aber nicht öffnen.\n\nDiese Seite ist verschlüsselt, kiwix-serve antwortet nur unverschlüsselt auf Port 8090 — Safari blockiert den Wechsel. Am Mac (http://localhost:8090) geht es weiterhin.\n\nDauerhafte Lösung: eine kiwix-Version mit --urlRootLocation (brew upgrade kiwix-tools); der Assistent reicht sie dann selbst durch.');
         return;
@@ -1889,9 +2841,10 @@ function switchModule(el) {
   if (mod === 'history') renderHistory();
   if (mod === 'wissen') renderWissen();
   if (mod === 'dokumente') { loadDocList().then(renderDocList); }
-  if (mod === 'settings') loadSettings();
+  if (mod === 'settings') { loadSettings(); vpnEinstGezeigt = ''; renderVpnEinstellungen(); }
   if (mod === 'notfallkarte') renderNotfallkarte();
   if (mod === 'reisewarnungen') renderReisewarnungen();
+  if (mod === 'nachrichten') { nachrichtenAnsicht.gesehenBis = null; renderNachrichten(); }   // „neu“ = seit dem letzten Öffnen
   if (mod === 'checklisten') renderChecklisten();
   if (mod === 'logbuch') renderLogbuch();
 }
@@ -1985,6 +2938,46 @@ function sendQuickTo(ctx, text) {
 function uiText(t) { return window.DARK_I18N ? DARK_I18N.t(t) : t; }
 // 2026-10-04-3: Meldungen, die die App selbst in eine Chat-Blase schreibt (Fehler, Abbruch, Platzhalter — nie
 // Modell-Antworten), beim Erzeugen in die Oberflächensprache übersetzen: i18n.js lässt .msg-bubble absichtlich aus.
+// ═══ SOFORT-PROTOKOLL STATT KI (2026-11-14-1, Review U4) — BYTEIDENTISCH in index.html und mobile.html ═══
+// Antwortet die KI nicht, bekam man bisher nur die Fehlermeldung — das passende KI-freie Protokoll lag zwei Klicks
+// entfernt und wurde nicht genannt. Jetzt hängt die App es an die Fehlermeldung an (Stichwörter aus der Frage, deutsch
+// und in den Sprachen der Oberfläche) und nennt die Notrufnummern des aktiven Landes. Kein Treffer in einem der
+// Notfall-Module: Verweis auf 🚨. Kurze Stichwörter stehen mit Leerzeichen, damit sie nur als ganzes Wort greifen.
+const SOFORT_STICHWORTE = {
+  bewusstlos: ['bewusstlos', 'reagiert nicht', 'ohnmacht', 'ohnmächtig', 'atmet nicht', 'kein puls', 'herzstillstand', 'reanim', 'wiederbeleb', 'herzdruck', 'ertrunken', 'ertrink', 'unconscious', 'not breathing', ' cpr ', 'inconscient', 'ne respire', 'no respira'],
+  blutung: ['blutung', 'blutet', 'schnittwunde', 'tourniquet', 'abbinden', 'bleeding', 'hémorragie', 'saigne', 'hemorragia', 'sangra'],
+  schlange: ['schlange', 'kobra', 'mamba', 'puffotter', 'giftbiss', 'snake', 'serpent', 'serpiente', 'cobra'],
+  hitze: ['hitzschlag', 'hitzeerschöpfung', 'hitzekollaps', 'überhitz', 'sonnenstich', 'heat stroke', 'heatstroke', 'heat exhaustion', 'coup de chaleur', 'golpe de calor'],
+  brand: ['fahrzeugbrand', 'auto brennt', 'motor brennt', 'brennt', ' brand ', 'feuer im', 'feuer am', 'verbrennung', 'verbrannt', 'vehicle fire', 'car fire', 'on fire', 'incendie', 'incendio', 'brûlure', 'quemadura'],
+  fieber: ['fieber', 'malaria', 'schüttelfrost', 'fever', 'fièvre', 'fiebre', 'paludisme'],
+  anaphylaxie: ['allerg', 'anaphyla', 'bienenstich', 'wespenstich', 'insektenstich', 'zunge schwillt', 'gesicht schwillt', 'epipen', 'autoinjektor', 'bee sting', 'wasp sting', 'piqûre', 'picadura'],
+  tierbiss: ['tierbiss', 'hundebiss', 'affenbiss', 'gebissen', 'tollwut', 'fledermaus', 'rabies', ' la rage', 'rabia', 'mordedura', 'morsure', 'dog bite', 'animal bite']
+};
+const SOFORT_MODULE = ['notfall', 'medizin', 'hund', 'ueberleben'];
+function sofortPassend(frage) {
+  const t = ' ' + String(frage || '').toLowerCase().replace(/[.,;:!?()„“"'’\n]+/g, ' ').replace(/\s+/g, ' ') + ' ';
+  return NOTFALL_PROTOKOLLE.filter(p => (SOFORT_STICHWORTE[p.id] || []).some(w => t.includes(w))).slice(0, 2);
+}
+function letzteNutzerfrage(msgs) {
+  for (let i = (msgs || []).length - 1; i >= 0; i--) {
+    const m = msgs[i];
+    if (m && m.role === 'user') return typeof m.content === 'string' ? m.content : '';
+  }
+  return '';
+}
+// Text für die Chat-Blase (schon in der Oberflächensprache) — '' heißt: nichts anhängen
+function sofortOhneKi(frage, ctx) {
+  const ui = s => (window.DARK_I18N ? DARK_I18N.t(s) : s);
+  const treffer = sofortPassend(frage);
+  if (!treffer.length) return SOFORT_MODULE.includes(ctx) ? ui('Ohne KI: Die Sofort-Protokolle und die Notrufnummern stehen unter 🚨 Notfall.') : '';
+  let text = treffer.map(p => '**' + ui('Ohne KI — Sofort-Protokoll') + ': ' + p.icon + ' ' + ui(p.titel) + '**\n' + p.schritte.map((st, i) => (i + 1) + '. ' + ui(st)).join('\n')).join('\n\n');
+  let land = null;
+  try { land = aktivesLand(); } catch (e) {}
+  const n = land ? NOTRUF_LAENDER.find(x => x.land.includes(land.name)) : null;
+  if (n) text += '\n\n📞 ' + n.land + ' — ' + ui('Polizei') + ' ' + n.polizei + ' · ' + ui('Rettung') + ' ' + n.medizin;
+  return text;
+}
+
 function uiMulti(t) { return window.DARK_I18N ? DARK_I18N.tMulti(t) : t; }
 // Text einer gespeicherten Nachricht für die Blase: App-Platzhalter übersetzt, Nutzer- und Modelltext unverändert
 const ZUSAMMENFASSUNG_MARKE = '[Zusammenfassung des bisherigen Gesprächs]';
@@ -2087,6 +3080,8 @@ function syncButtons() {
   document.getElementById('vollkontext-btn').style.display = (!isThinking && isClaudeApiCtx) ? 'inline-block' : 'none';
   const cmq = document.getElementById('claude-model-quick');
   if (cmq) { cmq.style.display = (!isThinking && isClaudeApiCtx) ? 'inline-block' : 'none'; if (isClaudeApiCtx && cmq.value !== getClaudeModel()) cmq.innerHTML = claudeModellOptionen(); }
+  const caq = document.getElementById('claude-aufwand-quick');
+  if (caq) { caq.style.display = (!isThinking && isClaudeApiCtx) ? 'inline-block' : 'none'; if (isClaudeApiCtx) caq.innerHTML = claudeAufwandOptionenHtml(getClaudeModel(), settings.claudeEffort); }
   // Komprimieren-Button für ALLE Module (auch offline)
   document.getElementById('kondensier-btn').style.display = !isThinking ? 'inline-block' : 'none';
   // RAG-Button nur zeigen wenn dem aktuellen Modul Dokumente zugeordnet sind
@@ -2315,8 +3310,11 @@ async function sendToOllama(msgs, thisCtx, activeModel, usedFast, controller, si
       } else if (e.httpStatus) {
         addMessage('assistant', uiMulti(`⚠️ Ollama meldet Fehler ${e.httpStatus}${e.ollamaDetail ? ': ' + e.ollamaDetail : ''}.\n\nBei „out of memory": kleineres Modell wählen (⚙️ → Modell) oder andere Programme schließen.`), null, null, thisCtx);
       } else {
-        addMessage('assistant', uiMulti('⚠️ Verbindung zu Ollama fehlgeschlagen. Prüfe ob Ollama läuft:\n\n`ollama serve`\n\nURL: ' + getOllamaUrl()), null, null, thisCtx);
+        addMessage('assistant', uiMulti('⚠️ Die lokale KI antwortet nicht.\n\nMeist hilft: Safari Assistant beenden und neu öffnen. Prüfen: ⚙️ Einstellungen → Verbindung → Testen.\n\nAdresse: ' + getOllamaUrl()), null, null, thisCtx);
       }
+      // 2026-11-14-1 (Review U4): ohne KI das passende Sofort-Protokoll gleich mitliefern
+      const ohneKi = sofortOhneKi(letzteNutzerfrage(msgs), thisCtx);
+      if (ohneKi) addMessage('assistant', ohneKi, null, '📋 ' + uiText('ohne KI'), thisCtx);
       renderStartBanner();
     }
     return false;
@@ -2824,6 +3822,7 @@ function loadSettings() {
   document.getElementById('current-country').value = settings.country || '';
   document.getElementById('travel-day').value = settings.travelDay || '';
   document.getElementById('anthropic-key').value = settings.anthropicKey || '';
+  const ik = document.getElementById('iphone-anthropic-key'); if (ik) ik.value = settings.iphoneAnthropicKey || '';
   updateGpsStatus();
   renderModelAssignments();
   renderClaudeModellAuswahl();
@@ -2854,11 +3853,28 @@ function renderClaudeModellAuswahl() {
       + (c ? `Liste von der Anthropic-API, Stand ${escHtml(new Date(c.geholt).toLocaleDateString('de-DE'))} (${c.liste.length} Modelle) — „Liste laden" holt sie neu (Internet + Key nötig).`
            : 'Noch keine Liste geladen — „Liste laden" fragt die Anthropic-API nach den verfügbaren Modellen (Internet + Key nötig). Bis dahin gilt der Standard oder eine eingetippte ID.');
   }
+  renderClaudeAufwand();
+}
+// Aufwand (effort): Auswahl in den Einstellungen + Schnellwahl im Chat; die Stufen hängen vom Modell ab (2026-11-03-1)
+function renderClaudeAufwand() {
+  const modell = getClaudeModel(), html = claudeAufwandOptionenHtml(modell, settings.claudeEffort);
+  const sel = document.getElementById('claude-aufwand-select'); if (sel) sel.innerHTML = html;
+  const quick = document.getElementById('claude-aufwand-quick'); if (quick) quick.innerHTML = html;
+  const hint = document.getElementById('claude-aufwand-hint');
+  if (hint) hint.innerHTML = claudeAufwandHinweis(modell, settings.claudeEffort).join('<br>');
+}
+function setzeClaudeAufwand(wert) {
+  wert = String(wert || '');
+  if (wert && !CLAUDE_AUFWAND_STUFEN.includes(wert)) return;
+  if (wert) settings.claudeEffort = wert; else delete settings.claudeEffort;
+  speichereJSON('safari-settings', settings);
+  renderClaudeAufwand();
+  showToast('Aufwand: ' + claudeAufwandName(wert));
 }
 function setzeClaudeModell(id) {
   id = String(id || '').trim();
   if (!id) return;
-  if (!/^[a-z0-9][a-z0-9.\-]{2,80}$/i.test(id)) { showToast('Das sieht nicht nach einer Modell-ID aus (z. B. claude-sonnet-4-6)'); renderClaudeModellAuswahl(); return; }
+  if (!/^[a-z0-9][a-z0-9.\-]{2,80}$/i.test(id)) { showToast('Das sieht nicht nach einer Modell-ID aus (z. B. claude-sonnet-5-5)'); renderClaudeModellAuswahl(); return; }
   const c = claudeModelleCache(); const e = c && c.liste.find(m => m.id === id);
   settings.claudeModel = id; settings.claudeModelLabel = e ? e.name : id;
   speichereJSON('safari-settings', settings);
@@ -3025,6 +4041,7 @@ function saveSettings() {
   settings.country = document.getElementById('current-country').value;
   settings.travelDay = document.getElementById('travel-day').value;
   settings.anthropicKey = document.getElementById('anthropic-key').value.trim();
+  const ik = document.getElementById('iphone-anthropic-key'); if (ik) settings.iphoneAnthropicKey = ik.value.trim();
   speichereJSON('safari-settings', settings);
   const activeModel = getModel(currentCtx);
   document.getElementById('model-badge').textContent = 'Modell: ' + activeModel;
@@ -3136,6 +4153,8 @@ async function sendClaudeMessage(text, imageData, msgs, thisCtx, opts) {
 
   // Web-Search-Module nutzen mehr Tokens für Recherche
   const maxTokens = claudeKurzMode ? 400 : (usesWebSearch ? 2048 : 1024);
+  // 2026-11-03-1: gewählter Aufwand (nur wenn gesetzt und das Modell ihn kann — sonst wird nichts gesendet)
+  const aufwandWunsch = claudeAufwandWirksam(settings.claudeEffort, getClaudeModel());
 
   // Web-Search-Tool für Sicherheit und Wetter
   const tools = usesWebSearch ? [{
@@ -3162,18 +4181,34 @@ async function sendClaudeMessage(text, imageData, msgs, thisCtx, opts) {
     };
     if (tools) requestBody.tools = tools;
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify(requestBody),
-      // 2026-09-12 (M9): 25 s bis zur ersten Antwort — WLAN ohne Uplink (Captive Portal, Starlink ohne Himmel) hängt sonst minutenlang
-      signal: (typeof AbortSignal.any === 'function') ? AbortSignal.any([controller.signal, AbortSignal.timeout(25000)]) : controller.signal
-    });
+    // Aufwand (output_config.effort) nur senden, wenn gewählt; lehnt die API ihn ab, läuft die Anfrage einmal ohne (2026-11-03-1)
+    let aufwand = aufwandWunsch;
+    let res;
+    for (let versuch = 0; versuch < 2; versuch++) {
+      // 2026-09-12 (M9): 25 s bis zur ersten Antwort — WLAN ohne Uplink (Captive Portal, Starlink ohne Himmel) hängt sonst minutenlang.
+      // 2026-11-03-1: die Frist gilt nur bis die Antwort beginnt — danach darf der Strom laufen (hoher Aufwand = längeres Nachdenken)
+      const frist = claudeFristSignal(controller.signal, 25000);
+      try {
+        res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': key,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true'
+          },
+          body: JSON.stringify(claudeAnfrageMitAufwand(requestBody, aufwand)),
+          signal: frist.signal
+        });
+      } finally { frist.fertig(); }
+      if (res.ok || res.status !== 400 || !aufwand) break;
+      let fehlerBody = {}; try { fehlerBody = await res.clone().json(); } catch (_) {}
+      if (!claudeAufwandFehlerText(fehlerBody.error && fehlerBody.error.message)) break;
+      CLAUDE_AUFWAND_ABGELEHNT.add(requestBody.model + '|' + aufwand);
+      aufwand = '';
+      showToast('Dieses Modell nimmt den gewählten Aufwand nicht an — die Anfrage läuft ohne');
+      renderClaudeAufwand();
+    }
 
     if (!res.ok) {
       const err = await res.json();
@@ -3407,7 +4442,37 @@ async function condenseChat() {
 // den exakten ollama-pull-Befehlen. Das war der häufigste Erstnutzer-Fehler: Ollama läuft, Modell
 // fehlt, und die App meldete „Ollama läuft nicht".
 let ollamaOnline = false;
-function oeffneEinstellungen() { const n = document.querySelector('.nav-item[data-module="settings"]'); if (n) switchModule(n); }
+function oeffneEinstellungen(bereich) { const n = document.querySelector('.nav-item[data-module="settings"]'); if (n) switchModule(n); if (bereich) einstellungenBereich(bereich); }
+// ═══ OBERFLÄCHE 2026-11-14-2 ═══
+// Einstellungen in fünf Bereichen: gezeigt wird immer nur einer (CSS über data-bereich am Panel).
+const EINST_BEREICHE = ['allgemein', 'ki', 'iphone', 'netz', 'daten'];
+function einstellungenBereich(name) {
+  const panel = document.getElementById('panel-settings');
+  if (!panel) return;
+  if (!EINST_BEREICHE.includes(name)) name = 'allgemein';
+  panel.dataset.bereich = name;
+  panel.querySelectorAll('#einst-tabs button').forEach(b => {
+    const an = b.dataset.bereich === name;
+    b.classList.toggle('active', an);
+    b.setAttribute('aria-selected', an ? 'true' : 'false');
+  });
+  const inhalt = panel.querySelector('.panel-content');
+  if (inhalt) inhalt.scrollTop = 0;
+}
+function oeffneIphoneEinstellungen() { oeffneEinstellungen('iphone'); }
+function oeffneIphoneAnleitung() { const n = document.getElementById('nav-hilfe'); if (n) switchModule(n); }
+// Notfall mit einem Klick (Knopf oben in der Seitenleiste, Ctrl+Umschalt+N): die Notfall-Karte — Notrufnummern,
+// Position und Sofort-Protokolle, alles ohne KI.
+function oeffneNotfall() {
+  const n = document.querySelector('.nav-item[data-module="notfallkarte"]');
+  if (!n) return;
+  switchModule(n);
+  const inhalt = document.getElementById('notfallkarte-body');
+  if (inhalt) inhalt.scrollTop = 0;
+}
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.shiftKey && !e.metaKey && !e.altKey && (e.key === 'N' || e.key === 'n')) { e.preventDefault(); oeffneNotfall(); }
+});
 function benoetigteModelle() {
   const set = new Set([FAST_MODEL]);
   Object.keys(MODULES).forEach(ctx => { const m = getModel(ctx); if (m && !/^claude/i.test(m)) set.add(m); });
@@ -3442,10 +4507,14 @@ function renderStartBanner() {
   const url = getOllamaUrl();
   if (!ollamaOnline) {
     el.style.display = 'block';
-    el.innerHTML = `<div class="start-banner-title">🔴 Ollama nicht erreichbar (${escHtml(url)})</div>
+    // 2026-11-14-2: eine ruhige Zeile statt eines Kastens mit Terminal-Befehlen — die Technik steht zum Aufklappen darunter
+    el.innerHTML = `<details class="start-banner-klapp"><summary><span class="start-banner-title">Die lokale KI läuft nicht</span>
+      <span class="start-banner-kurz">Sofort-Protokolle, Karte, Logbuch und Notizen gehen trotzdem.</span>
+      <span class="start-banner-actions"><button class="btn-small" onclick="event.preventDefault();checkOllama(true)">Erneut prüfen</button></span></summary>
       <div class="start-banner-body">Die Offline-Module brauchen Ollama. Im Terminal starten: <code>ollama serve</code> — oder die Safari Assistant.app benutzen, die startet es mit.
       Noch nicht installiert? <code>brew install ollama</code> bzw. <a href="https://ollama.com" target="_blank" rel="noopener">ollama.com</a>. Diese Meldung verschwindet von selbst, sobald die Verbindung steht.
-      <span class="start-banner-actions"><button class="btn-small" onclick="checkOllama(true)">Erneut prüfen</button> <button class="btn-small" onclick="oeffneEinstellungen()">⚙️ Einstellungen</button></span></div>`;
+      <span class="start-banner-adresse" data-i18n-skip>${escHtml(url)}</span>
+      <span class="start-banner-actions"><button class="btn-small" onclick="oeffneEinstellungen('ki')">⚙️ Einstellungen</button></span></div></details>`;
     return;
   }
   const fehlt = fehlendeModelle();
@@ -3731,9 +4800,12 @@ async function pruefeServer() {
     zeigeIphoneStatus(st);
     const portWarnung = p.port !== 8765
       ? `<div style="margin-top:6px;color:var(--accent3)">⚠️ Abweichender Port — auf 8765 sitzt fremde Software. Lesezeichen und die iPhone-Adresse mit :8765 zeigen ins Leere. Wer 8765 hält: <code>lsof -iTCP:8765 -sTCP:LISTEN -n -P</code></div>` : '';
+    // 2026-11-14-2: stand bisher nur im Log des Servers — alte kiwix-Versionen lauschen im ganzen WLAN, ohne Zugangscode
+    const kiwixWarnung = p.kiwix_offen
+      ? `<div style="margin-top:6px;color:var(--accent3)">⚠️ Die Offline-Wikipedia ist im WLAN ohne Zugangscode lesbar — diese kiwix-Version lässt sich nicht auf diesen Mac beschränken. Abhilfe: kiwix-tools aktualisieren.</div>` : '';
     el.innerHTML = `🟢 Port <b>${p.port}</b> · PID ${p.pid} · läuft seit ${min} Min.<br>`
       + `Bindung ${escHtml(String(p.bind || '?'))} — ${st.an ? 'im WLAN erreichbar (iPhone-Modus)' : 'nur dieser Mac'} · server.py ${escHtml(String(p.version || '?'))}`
-      + iphone + portWarnung;
+      + iphone + portWarnung + kiwixWarnung;
   } catch (e) {
     el.innerHTML = `🔴 Server antwortet nicht (${escHtml(e.message)}).<br>`
       + 'Im Terminal nachsehen, wer den Port hält:<br><code>lsof -iTCP:8765 -sTCP:LISTEN -n -P</code><br>'
@@ -4034,38 +5106,528 @@ async function ladeReisewarnungenStart() {
   if (currentPanel === 'reisewarnungen') renderReisewarnungen();
 }
 
+// ── VPN-PRÜFUNG am Mac (2026-10-30-1): Kachel oben in der Seitenleiste, rotes Band über allen Bereichen, Bereich in
+// ⚙️ Einstellungen. Den Stand holt die Seite alle 10 s vom eigenen Server (kostet nichts) — gemessen wird dort.
+let vpnStand = null;          // letzter Stand vom Server (null = Server antwortet nicht)
+let vpnGezeigt = '';          // was Kachel/Band gerade zeigen — nur bei einer Änderung neu zeichnen
+let vpnBandWeg = '';          // das Band ist für genau diesen Stand ausgeblendet; ein neuer Stand zeigt es wieder
+let vpnEinstGezeigt = '';
+const VPN_TITEL_BASIS = document.title;
+const VPN_FEHLER = { kein_netz: 'nicht vorhanden', zeit: 'keine Antwort (Zeitüberschreitung)',
+  tls: 'Verschlüsselung fehlgeschlagen (Zertifikat?)', verbindung: 'Verbindung abgelehnt', antwort: 'unerwartete Antwort' };
+const VPN_UNBEKANNT = { stufe: 'unbekannt', farbe: 'grau', icon: '○', titel: 'VPN-Stand unbekannt',
+  zeile: 'Der lokale Server antwortet nicht.', kurz: 'Der lokale Server antwortet nicht.', band: '', rot: false };
+async function ladeVpnStatus() {
+  try {
+    const res = await fetch(getServerUrl() + '/api/vpn/status', { cache: 'no-store', signal: AbortSignal.timeout(5000) });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    vpnStand = await res.json();
+  } catch (e) { vpnStand = null; }
+  zeigeVpn();
+}
+function vpnSchluessel(st) {
+  if (!st) return 'unbekannt';
+  return [st.stufe, st.leck, st.zuletzt, (st.ausgaenge || []).map(a => [a.familie, a.asn, a.name, a.land, a.vpn, a.zugang, a.anbieter].join('/')).join('|')].join('#');
+}
+function zeigeVpn() {
+  const kachel = document.getElementById('vpn-kachel');
+  if (!kachel) return;
+  const a = vpnStand ? vpnAnzeige(vpnStand, 'mac') : VPN_UNBEKANNT;
+  const schluessel = vpnSchluessel(vpnStand);
+  if (schluessel !== vpnGezeigt) {
+    vpnGezeigt = schluessel;
+    kachel.className = 'vpn-kachel ' + a.farbe;
+    document.getElementById('vpn-kachel-icon').textContent = a.icon;
+    document.getElementById('vpn-kachel-titel').textContent = a.titel;
+    document.getElementById('vpn-kachel-zeile').innerHTML = a.kurz || a.zeile;
+    const band = document.getElementById('vpn-band');
+    if (a.rot && vpnBandWeg !== schluessel) {
+      document.getElementById('vpn-band-titel').textContent = a.titel;
+      document.getElementById('vpn-band-text').textContent = a.band;
+      document.getElementById('vpn-band-zeile').innerHTML = a.zeile;
+      band.style.display = 'flex';
+    } else band.style.display = 'none';
+    const titel = (window.DARK_I18N && typeof window.DARK_I18N.t === 'function') ? window.DARK_I18N.t(a.titel) : a.titel;
+    document.title = a.rot ? '⚠️ ' + titel + ' · ' + VPN_TITEL_BASIS : VPN_TITEL_BASIS;
+  }
+  if (currentPanel === 'settings') renderVpnEinstellungen();
+}
+function renderVpnEinstellungen() {
+  const box = document.getElementById('vpn-detail');
+  if (!box) return;
+  const st = vpnStand;
+  const a = st ? vpnAnzeige(st, 'mac') : VPN_UNBEKANNT;
+  const alter = document.getElementById('vpn-detail-alter');
+  const geprueft = st && st.geprueft ? 'Geprüft ' + vpnAlterText(st.alter_s) : '';
+  alter.textContent = [geprueft, st && st.laeuft ? 'Messung läuft …' : ''].filter(Boolean).join(' · ');
+  const schluessel = vpnSchluessel(st) + '#' + (st ? [st.aktiv, st.intervall_s, (st.gemerkt || []).map(g => g.asn).join(','),
+    (st.ausgaenge || []).map(w => w.ip).join(','), JSON.stringify(st.fehler || {}), JSON.stringify(st.anbieter || [])].join('/') : '');
+  if (schluessel === vpnEinstGezeigt) return;
+  vpnEinstGezeigt = schluessel;
+  box.className = 'vpn-detail ' + a.farbe;
+  document.getElementById('vpn-detail-titel').textContent = a.icon + ' ' + a.titel;
+  document.getElementById('vpn-detail-zeile').innerHTML = a.zeile;
+  const takt = document.getElementById('vpn-takt');
+  if (st && takt) takt.value = String(st.intervall_s);
+  document.getElementById('vpn-schalter').textContent = (st && st.aktiv === false) ? 'Einschalten' : 'Ausschalten';
+  const wege = (st && st.ausgaenge) || [];
+  const fehler = (st && st.fehler) || {};
+  document.getElementById('vpn-wege').innerHTML = !st ? '—' : ['IPv4', 'IPv6'].map(fam => {
+    const w = wege.find(x => x.familie === fam);
+    if (!w) {
+      const grund = st.geprueft ? (VPN_FEHLER[fehler[fam]] || 'kein Ergebnis') : 'noch nicht gemessen';
+      return '<div class="vpn-weg"><span><b>' + fam + '</b> · ' + grund + '</span></div>';
+    }
+    const marke = w.zugang ? '<span class="vpn-marke nein">Zugang, kein VPN</span>'
+      : w.vpn === true ? '<span class="vpn-marke ja">✓ dein VPN' + (w.anbieter ? '<span data-i18n-skip> · ' + vpnEsc(w.anbieter) + '</span>' : '') + '</span>'
+      : w.vpn === false ? '<span class="vpn-marke nein">nicht dein VPN</span>' : '<span class="vpn-marke">nicht zuzuordnen</span>';
+    const knopf = (/^\d{1,10}$/.test(w.asn || '') && !w.zugang && w.vpn !== true)
+      ? '<button class="btn-small" onclick="vpnMerken(\'' + w.asn + '\')">Das ist mein VPN</button>' : '';
+    const technik = [w.asn ? 'AS' + w.asn : '', w.ip || ''].filter(Boolean).join(' · ');
+    return '<div class="vpn-weg"><span><b>' + fam + '</b> · ' + (vpnAusgangHtml(w) || '—')
+      + (technik ? ' <span data-i18n-skip style="color:var(--text3)">(' + vpnEsc(technik) + ')</span>' : '')
+      + '</span><span style="display:flex;gap:6px;align-items:center;flex-shrink:0">' + marke + knopf + '</span></div>';
+  }).join('');
+  const gem = (st && st.gemerkt) || [];
+  document.getElementById('vpn-gemerkt').innerHTML = !st ? '—' : (gem.length ? gem.map(g =>
+    '<div class="vpn-weg"><span><span data-i18n-skip>' + vpnEsc(['AS' + g.asn, g.name, vpnLandName(g.land)].filter(Boolean).join(' · '))
+    + '</span>' + (g.seit ? ' · gemerkt am ' + new Date(g.seit * 1000).toLocaleDateString('de-DE') : '') + '</span>'
+    + (/^\d{1,10}$/.test(g.asn) ? '<button class="btn-small" onclick="vpnVergessen(\'' + g.asn + '\')">Entfernen</button>' : '') + '</div>').join('')
+    : '<div style="color:var(--text3);line-height:1.6">Noch keins gemerkt. VPN am Router einschalten, „Jetzt prüfen“, dann oben beim Ausgang „Das ist mein VPN“.</div>');
+  // Anbieter-Erkennung (2026-11-02-1): Name des Anbieters kommt aus der festen Liste des Servers, die Kennung wird geprüft
+  const abox = document.getElementById('vpn-anbieter');
+  if (abox) abox.innerHTML = !st ? '—' : ((st.anbieter || []).filter(x => x && /^[a-z]{2,20}$/.test(String(x.id))).map(x =>
+    '<div class="vpn-weg"><span><b data-i18n-skip>' + vpnEsc(x.name) + '</b> · erkennt alle Ausgänge dieses Anbieters</span>'
+    + '<span style="display:flex;gap:6px;align-items:center;flex-shrink:0">'
+    + '<span class="vpn-marke' + (x.an ? ' ja' : '') + '">' + (x.an ? 'eingeschaltet' : 'ausgeschaltet') + '</span>'
+    + '<button class="btn-small" onclick="vpnAnbieterSchalten(\'' + x.id + '\', ' + (x.an ? 'false' : 'true') + ')">' + (x.an ? 'Ausschalten' : 'Einschalten') + '</button>'
+    + '</span></div>').join('') || '—');
+}
+async function vpnPost(pfad, daten) {
+  const res = await fetch(getServerUrl() + pfad, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(daten || {}), signal: AbortSignal.timeout(15000) });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+  return j;
+}
+// Nach „Jetzt prüfen" (oder Einschalten) kurz öfter nachsehen, bis die neue Messung da ist (höchstens ~25 s)
+function vpnNachPruefen(vorher, n) {
+  n = n || 0;
+  setTimeout(async () => {
+    await ladeVpnStatus();
+    if (n < 16 && vpnStand && (vpnStand.laeuft || vpnStand.geprueft === vorher)) vpnNachPruefen(vorher, n + 1);
+  }, 1500);
+}
+async function vpnJetztPruefen() {
+  const vorher = vpnStand ? vpnStand.geprueft : 0;
+  try { vpnStand = await vpnPost('/api/vpn/pruefen', {}); }
+  catch (e) { showToast(e.message); return; }
+  if (vpnStand.aktiv === false) { showToast('Die VPN-Prüfung ist ausgeschaltet.'); zeigeVpn(); return; }
+  showToast('VPN wird geprüft …');
+  zeigeVpn();
+  vpnNachPruefen(vorher);
+}
+async function vpnMerken(asn) {
+  const w = vpnStand && (vpnStand.ausgaenge || []).find(x => x.asn === String(asn));
+  if (!w) return;
+  let text = 'Dieses Netz als dein VPN merken?\n\n' + [w.name || 'AS' + w.asn, 'AS' + w.asn, vpnLandName(w.land)].filter(Boolean).join(' · ')
+    + '\n\nNur bestätigen, wenn das VPN am Router gerade eingeschaltet ist — sonst zeigt die App später ein Netz ohne VPN als „VPN aktiv“.';
+  const hier = (typeof aktivesLand === 'function') ? aktivesLand() : null;
+  if (hier && w.land_app && hier.name === w.land_app) text += '\n\nAchtung: Der Ausgang liegt in dem Land, in dem du gerade bist. Das spricht eher gegen ein VPN.';
+  if (!confirm(text)) return;
+  try { vpnStand = await vpnPost('/api/vpn/merken', { asn: String(asn) }); showToast('Als VPN gemerkt'); }
+  catch (e) { showToast(e.message); }
+  zeigeVpn();
+}
+async function vpnVergessen(asn) {
+  if (!confirm('Dieses Netz nicht mehr als dein VPN zählen?')) return;
+  try { vpnStand = await vpnPost('/api/vpn/vergessen', { asn: String(asn) }); }
+  catch (e) { showToast(e.message); }
+  zeigeVpn();
+}
+async function vpnAnbieterSchalten(id, an) {
+  if (!/^[a-z]{2,20}$/.test(String(id))) return;
+  const eintrag = vpnStand && (vpnStand.anbieter || []).find(x => x && x.id === id);
+  if (!eintrag) return;
+  if (an === true) {
+    const text = 'Anbieter-Erkennung einschalten?\n\n' + eintrag.name
+      + '\n\nDie App fragt dann bei jeder Prüfung diesen Anbieter, ob dein Ausgang einer seiner VPN-Server ist. Das gilt nur für diesen Anbieter. Ist das VPN aus, erfährt der Anbieter dabei deine echte Adresse.';
+    if (!confirm(text)) return;
+  }
+  const vorher = vpnStand ? vpnStand.geprueft : 0;
+  try {
+    vpnStand = await vpnPost('/api/vpn/anbieter', { anbieter: id, an: an === true });
+    showToast(an === true ? 'Anbieter-Erkennung eingeschaltet' : 'Anbieter-Erkennung ausgeschaltet');
+  } catch (e) { showToast(e.message); return; }
+  zeigeVpn();
+  vpnNachPruefen(vorher);
+}
+async function vpnSchalten() {
+  const warAn = !(vpnStand && vpnStand.aktiv === false);
+  try { vpnStand = await vpnPost('/api/vpn/einstellungen', { aktiv: !warAn }); }
+  catch (e) { showToast(e.message); return; }
+  zeigeVpn();
+  if (!warAn) vpnNachPruefen(vpnStand.geprueft);
+}
+async function vpnTaktSetzen(wert) {
+  try { vpnStand = await vpnPost('/api/vpn/einstellungen', { intervall_s: Number(wert) }); }
+  catch (e) { showToast(e.message); }
+  zeigeVpn();
+}
+function vpnBandAusblenden() {
+  vpnBandWeg = vpnGezeigt;
+  document.getElementById('vpn-band').style.display = 'none';
+}
+function oeffneVpnEinstellungen() {
+  oeffneEinstellungen('netz');
+  vpnEinstGezeigt = '';
+  renderVpnEinstellungen();
+  const el = document.getElementById('vpn-einstellungen');
+  if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function vpnStart() {
+  ladeVpnStatus();
+  setInterval(ladeVpnStatus, 10000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') ladeVpnStatus(); });
+}
+
+// ── NACHRICHTEN: Bereich am Mac (2026-10-18-2) ──
+// Meldungen nach Themen (gemeinsamer Teil: Sektion NACHRICHTEN oben), Filter Land / nur wichtige / Thema — und die
+// Verwaltung der Quellen: eingebaute an- und abschalten, eigene hinzufügen, prüfen, entfernen. Abrufen und
+// Verwalten nur hier am Mac (server.py: Mutations-Gate für /api/nachrichten/…); das iPhone zeigt nur an.
+const nachrichtenAnsicht = { land: '', thema: '', nurWichtig: false, offen: {}, quellen: false, gesehenBis: null,
+  quellenDaten: null, probe: null, formular: null };
+const NQ_FELD = 'background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--text);font-size:12px;width:100%;box-sizing:border-box;font-family:inherit';
+const NQ_KLEIN = 'font-size:11px;color:var(--text3);line-height:1.7;margin-top:4px';
+function nachrichtenHier() {
+  const l = (typeof aktivesLand === 'function') ? aktivesLand() : null;
+  const c = nachrichtenCache(), namen = (c && c.laender) || {};
+  return l ? (Object.keys(namen).find(k => namen[k] === l.name) || '') : '';
+}
+function zeigeNachrichtenBadge() {
+  const b = document.getElementById('nachrichten-badge');
+  if (!b) return;
+  const c = nachrichtenCache(), bis = nachrichtenGesehenBis();
+  const n = c ? c.eintraege.filter(e => e.kritisch && (Number(e.gesehen) || 0) > bis).length : 0;
+  b.textContent = n ? String(n) : '';
+  b.style.display = n ? 'inline-block' : 'none';
+}
+function nachrichtenThemenKnopf(id, inhalt, n, aktiv) {
+  return `<button onclick="nachrichtenFilter('thema','${id}')" style="background:${aktiv ? 'var(--accent)' : 'var(--surface2)'};color:${aktiv ? '#111' : 'var(--text2)'};border:1px solid var(--border2);border-radius:14px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit">${inhalt}${n != null ? ` <span style="opacity:.7">${n}</span>` : ''}</button>`;
+}
+function renderNachrichten() {
+  const box = document.getElementById('nachrichten-body');
+  if (!box) return;
+  if (nachrichtenAnsicht.quellen) { renderNachrichtenQuellen(); return; }
+  const c = nachrichtenCache() || { eintraege: [], themen: [], laender: {}, status: {} };
+  const a = nachrichtenAnsicht;
+  if (a.gesehenBis === null) { a.gesehenBis = nachrichtenGesehenBis(); nachrichtenAlsGesehen(); zeigeNachrichtenBadge(); }
+  const st = c.status || {}, namen = c.laender || {}, hier = nachrichtenHier();
+  const gruppen = nachrichtenGruppieren(c, { land: a.land, thema: a.thema, nurWichtig: a.nurWichtig, hier });
+  const zahl = nachrichtenZaehlen(c, { land: a.land, nurWichtig: a.nurWichtig });
+  const kopf = '<div class="settings-group" style="padding:12px">'
+    + `<div style="font-size:12px;color:var(--text);font-weight:600;margin-bottom:4px">Stand: ${nachrichtEsc(reisewarnZeitText(st.geholt))}${st.alter_h != null ? ` (vor ${nachrichtEsc(Number(st.alter_h).toLocaleString('de-DE', { maximumFractionDigits: 1 }))} h)` : ''}</div>`
+    + (st.quellen_aktiv ? `<div style="font-size:11px;color:var(--text2)"><span>${nachrichtEsc(`${st.quellen_ok || 0} von ${st.quellen_aktiv} Quellen erreichbar`)}</span>`
+      + (st.quellen_fehler ? ` · <a onclick="nachrichtenQuellenUmschalten()" style="color:var(--accent3);cursor:pointer;text-decoration:underline">${nachrichtEsc(`${st.quellen_fehler} mit Fehler`)}</a>` : '') + '</div>' : '')
+    + (st.laeuft ? '<div style="font-size:11px;color:var(--accent4);margin-top:4px">Abruf läuft …</div>' : '')
+    + (st.meldung && !st.laeuft ? `<div style="font-size:10px;color:var(--text3);margin-top:4px">${nachrichtEsc(st.meldung)}</div>` : '')
+    + `<div style="font-size:10px;color:var(--text3);margin-top:8px;line-height:1.6"><span>${nachrichtEsc(`Der Assistent holt die Feeds automatisch alle ${st.alle_h || 6} Stunden, sobald der Mac online ist, und behält Meldungen ${st.tage || 30} Tage.`)}</span> `
+    + '<span>Themen und Länder ordnet eine feste Stichwortliste zu, keine KI — eine Meldung kann deshalb auch im falschen Thema landen. Titel und Anriss stammen unverändert von der Quelle; für Entscheidungen den Originalartikel lesen.</span></div>'
+    + '</div>';
+  const laender = Object.keys(namen).filter(k => k !== hier).sort((x, y) => String(namen[x]).localeCompare(String(namen[y]), 'de'));
+  const filter = '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:12px 0 8px">'
+    + `<select onchange="nachrichtenFilter('land', this.value)" style="${NQ_FELD};width:auto;max-width:240px">`
+    + '<option value="">Alle Länder</option>'
+    + (hier ? `<option value="${nachrichtEsc(hier)}" ${a.land === hier ? 'selected' : ''}>📍 ${nachrichtEsc(namen[hier] || hier)}</option>` : '')
+    + laender.map(k => `<option value="${nachrichtEsc(k)}" ${a.land === k ? 'selected' : ''}>${nachrichtEsc(namen[k])}</option>`).join('')
+    + '</select>'
+    + `<label style="font-size:11px;color:var(--text2);display:flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" ${a.nurWichtig ? 'checked' : ''} onchange="nachrichtenFilter('nurWichtig', this.checked)"><span>Nur wichtige</span></label>`
+    + '</div><div style="display:flex;gap:6px;flex-wrap:wrap">'
+    + nachrichtenThemenKnopf('', 'Alle Themen', null, !a.thema)
+    + (c.themen || []).filter(t => zahl[t.id] && /^[a-z]+$/.test(t.id))
+      .map(t => nachrichtenThemenKnopf(t.id, `${nachrichtEsc(t.icon)} <span>${nachrichtEsc(t.name)}</span>`, zahl[t.id], a.thema === t.id)).join('')
+    + '</div>';
+  const leer = !(c.eintraege || []).length
+    ? '<div class="settings-group" style="padding:14px;font-size:12px;color:var(--text3);line-height:1.7">Noch keine Meldungen. Der Assistent holt die Feeds, sobald der Mac online ist — oder jetzt mit „Jetzt holen“.</div>'
+    : (!gruppen.length ? '<div style="padding:14px 0;font-size:12px;color:var(--text3)">Keine Meldungen für diese Auswahl.</div>' : '');
+  box.innerHTML = kopf + filter + leer
+    + nachrichtenListeHtml(c, gruppen, { max: a.thema ? 40 : 6, offen: a.offen, gesehenBis: a.gesehenBis, mehr: 'nachrichtenMehr' });
+}
+function nachrichtenFilter(feld, wert) {
+  const a = nachrichtenAnsicht;
+  if (feld === 'land') a.land = String(wert || '');
+  else if (feld === 'thema') a.thema = (a.thema === wert) ? '' : String(wert || '');
+  else if (feld === 'nurWichtig') a.nurWichtig = !!wert;
+  renderNachrichten();
+}
+function nachrichtenMehr(id) { nachrichtenAnsicht.offen[id] = !nachrichtenAnsicht.offen[id]; renderNachrichten(); }
+async function ladeNachrichtenStart() {
+  try { await ladeNachrichten(getServerUrl()); } catch (e) { /* offline oder Server aus — der gespeicherte Stand gilt */ }
+  zeigeNachrichtenBadge();
+  if (currentPanel === 'nachrichten' && !nachrichtenAnsicht.quellen) renderNachrichten();
+}
+async function nachrichtenPost(pfad, daten, frist) {
+  const res = await fetch(getServerUrl() + pfad, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(daten || {}), signal: AbortSignal.timeout(frist || 15000) });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+  return j;
+}
+async function nachrichtenAktualisieren() {
+  showToast('Nachrichten werden geholt …');
+  try {
+    await nachrichtenPost('/api/nachrichten/aktualisieren', {}, 10000);
+    // Der Abruf läuft im Server weiter (bis zu 50 Quellen) — zwischendurch den neuen Stand holen
+    for (const wartezeit of [5000, 10000, 15000, 20000, 30000, 40000]) {
+      await new Promise(r => setTimeout(r, wartezeit));
+      const c = await ladeNachrichten(getServerUrl()).catch(() => null);
+      zeigeNachrichtenBadge();
+      if (currentPanel === 'nachrichten') { if (nachrichtenAnsicht.quellen) await ladeNachrichtenQuellen(); else renderNachrichten(); }
+      if (c && c.status && !c.status.laeuft) { showToast(c.status.meldung || 'Nachrichten aktualisiert'); return; }
+    }
+    showToast('Abruf läuft noch — die Anzeige aktualisiert sich beim nächsten Öffnen.');
+  } catch (e) { showToast('Nachrichten: ' + e.message); }
+}
+
+// ── Quellen verwalten ──
+const NACHRICHTEN_ARTEN = [['amtlich', 'Amtliche Stellen'], ['zeitung', 'Zeitungen — eine je Land'],
+  ['suche', 'Stichwortsuche bei Google News'], ['eigen', 'Eigene Quellen']];
+async function nachrichtenQuellenUmschalten() {
+  nachrichtFormularMerken();
+  nachrichtenAnsicht.quellen = !nachrichtenAnsicht.quellen;
+  const k = document.getElementById('nachrichten-quellen-knopf');
+  if (k) k.textContent = nachrichtenAnsicht.quellen ? 'Meldungen' : 'Quellen';
+  if (!nachrichtenAnsicht.quellen) { renderNachrichten(); return; }
+  renderNachrichtenQuellen();
+  await ladeNachrichtenQuellen();
+}
+async function ladeNachrichtenQuellen() {
+  try {
+    const res = await fetch(getServerUrl() + '/api/nachrichten/quellen', { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+    const j = await res.json();
+    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    nachrichtenAnsicht.quellenDaten = j;
+  } catch (e) { nachrichtenAnsicht.quellenDaten = { fehler: e.message }; }
+  if (currentPanel === 'nachrichten' && nachrichtenAnsicht.quellen) renderNachrichtenQuellen();
+}
+function nachrichtQuelleStatusHtml(q) {
+  const s = q.status || {};
+  if (!q.aktiv) return '<span style="color:var(--text3)">○ <span>abgeschaltet</span></span>';
+  const wann = s.zeit ? ` <span style="color:var(--text3)">· ${nachrichtEsc(reisewarnZeitText(s.zeit))}</span>` : '';
+  if (s.ok === true) return `<span style="color:#3a9d6b">● <span>${nachrichtEsc(s.unveraendert ? 'unverändert seit dem letzten Abruf' : `${Number(s.anzahl) || 0} passende von ${Number(s.roh) || 0} Meldungen`)}</span></span>${wann}`;
+  if (s.ok === false) return `<span style="color:var(--accent3)">▲ <span>${nachrichtEsc(s.fehler || 'Fehler')}</span></span>${wann}`;
+  return `<span style="color:var(--text3)">○ <span>noch nicht abgerufen</span>${q.geprueft ? '' : ' · <span>Adresse ungeprüft</span>'}</span>`;
+}
+function nachrichtProbeHtml(p) {
+  if (p.laeuft) return '<div style="font-size:11px;color:var(--accent4);margin-top:6px">Wird geprüft …</div>';
+  const r = p.ergebnis || {};
+  if (!r.ok) return `<div style="font-size:11px;color:var(--accent3);margin-top:6px">▲ <span>${nachrichtEsc(r.fehler || 'Fehler')}</span></div>`;
+  return '<div style="font-size:11px;color:var(--text2);margin-top:6px;line-height:1.6;border-left:2px solid var(--border2);padding-left:8px">'
+    + `<div style="color:#3a9d6b">● <span>${nachrichtEsc(`Feed gefunden: ${Number(r.roh) || 0} Meldungen, davon ${Number(r.passend) || 0} passend`)}</span></div>`
+    + (r.titel ? `<div data-i18n-skip>${nachrichtEsc(r.titel)}</div>` : '')
+    + (r.neuester ? `<div><span>Neueste Meldung:</span> <span>${nachrichtEsc(reisewarnZeitText(r.neuester))}</span></div>` : '')
+    + (r.beispiele || []).map(b => `<div>• <span data-i18n-skip>${nachrichtEsc(b.titel)}</span></div>`).join('')
+    + (r.roh && !r.passend ? `<div style="color:var(--accent3)">${p.id
+      ? 'Davon passt gerade keine Meldung (Land, Thema oder Alter).'
+      : 'Keine Meldung passt zu einem Thema. Ohne den Haken bei „Nur Meldungen übernehmen, die zu einem Thema passen“ kämen sie unter „Weitere Meldungen“ — oder ein Thema fest wählen.'}</div>` : '')
+    + '</div>';
+}
+function nachrichtQuelleZeile(q, d) {
+  const namen = d.laender || {}, themen = d.themen || [];
+  const t = themen.find(x => x.id === q.thema);
+  const id = /^[a-z0-9-]+$/.test(q.id || '') ? q.id : '';
+  const probe = (nachrichtenAnsicht.probe && nachrichtenAnsicht.probe.id === id) ? nachrichtProbeHtml(nachrichtenAnsicht.probe) : '';
+  return '<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--border2)">'
+    + `<input type="checkbox" ${q.aktiv ? 'checked' : ''} onchange="nachrichtQuelleSchalten('${id}', this.checked)" aria-label="An oder aus" style="margin-top:3px;flex-shrink:0">`
+    + '<div style="flex:1;min-width:0">'
+    + `<div style="font-size:12px;color:var(--text)"><span data-i18n-skip>${nachrichtEsc(q.name)}</span>`
+    + (q.land ? ` <span style="font-size:10px;color:var(--text3)">· <span>${nachrichtEsc(namen[q.land] || q.land)}</span></span>` : '')
+    + (t ? ` <span style="font-size:10px;color:var(--text3)">· <span>${nachrichtEsc(t.icon + ' ' + t.name)}</span></span>` : '')
+    + (q.sprache && q.sprache !== 'en' ? ` <span data-i18n-skip style="font-size:10px;color:var(--text3)">· ${nachrichtEsc(String(q.sprache).toUpperCase())}</span>` : '')
+    + '</div>'
+    + `<div data-i18n-skip style="font-size:10px;color:var(--text3);word-break:break-all;margin-top:1px">${nachrichtEsc(q.url)}</div>`
+    + `<div style="font-size:10px;margin-top:2px">${nachrichtQuelleStatusHtml(q)}</div>`
+    + probe
+    + '</div><div style="display:flex;gap:6px;flex-shrink:0">'
+    + `<button class="btn-small" onclick="nachrichtQuellePruefen('${id}')">Prüfen</button>`
+    + (q.eigen ? `<button class="btn-small" onclick="nachrichtQuelleLoeschen('${id}')">Entfernen</button>` : '')
+    + '</div></div>';
+}
+function nachrichtFormularMerken() {
+  const el = id => document.getElementById(id);
+  if (!el('nq-url')) return;
+  nachrichtenAnsicht.formular = { name: el('nq-name').value, url: el('nq-url').value, land: el('nq-land').value,
+    thema: el('nq-thema').value, filter: el('nq-filter').checked };
+}
+function nachrichtFormularHtml(d) {
+  const f = nachrichtenAnsicht.formular || { name: '', url: '', land: '', thema: '', filter: true };
+  const namen = d.laender || {}, themen = (d.themen || []).filter(t => t.id !== 'sonstiges');
+  const laender = Object.keys(namen).sort((x, y) => String(namen[x]).localeCompare(String(namen[y]), 'de'));
+  const probe = (nachrichtenAnsicht.probe && nachrichtenAnsicht.probe.id === '') ? nachrichtProbeHtml(nachrichtenAnsicht.probe) : '';
+  return '<div class="settings-group" style="padding:12px">'
+    + '<div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">Eigene Quelle hinzufügen</div>'
+    + '<div style="display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center;font-size:11px;color:var(--text2)">'
+    + `<label for="nq-name">Name</label><input id="nq-name" maxlength="80" value="${nachrichtEsc(f.name)}" placeholder="z. B. Blog einer Overland-Reisenden" style="${NQ_FELD}">`
+    + `<label for="nq-url">Feed-Adresse</label><input id="nq-url" maxlength="600" value="${nachrichtEsc(f.url)}" placeholder="https://…/feed/" style="${NQ_FELD}">`
+    + `<label for="nq-land">Land</label><select id="nq-land" style="${NQ_FELD}"><option value="">Kein bestimmtes Land</option>`
+    + laender.map(k => `<option value="${nachrichtEsc(k)}" ${f.land === k ? 'selected' : ''}>${nachrichtEsc(namen[k])}</option>`).join('') + '</select>'
+    + `<label for="nq-thema">Thema</label><select id="nq-thema" style="${NQ_FELD}"><option value="">Automatisch nach Stichwörtern</option>`
+    + themen.map(t => `<option value="${nachrichtEsc(t.id)}" ${f.thema === t.id ? 'selected' : ''}>${nachrichtEsc(t.icon + ' ' + t.name)}</option>`).join('') + '</select>'
+    + '</div>'
+    + `<label style="display:flex;gap:6px;align-items:center;font-size:11px;color:var(--text2);margin-top:8px;cursor:pointer"><input type="checkbox" id="nq-filter" ${f.filter ? 'checked' : ''}><span>Nur Meldungen übernehmen, die zu einem Thema passen</span></label>`
+    + `<div style="${NQ_KLEIN}">Ohne Haken landet alles, was zu keinem Thema passt, unter „Weitere Meldungen“. Ein fest gewähltes Thema gilt für alle Meldungen der Quelle. Viele Webseiten haben ihren Feed unter /feed/ oder /rss.</div>`
+    + '<div style="display:flex;gap:8px;margin-top:10px">'
+    + `<button class="btn-small" onclick="nachrichtQuellePruefen('')">Prüfen</button>`
+    + '<button class="toolbar-btn primary" onclick="nachrichtQuelleAnlegen()">Hinzufügen</button></div>'
+    + probe
+    + '</div>';
+}
+function renderNachrichtenQuellen() {
+  const box = document.getElementById('nachrichten-body');
+  if (!box) return;
+  nachrichtFormularMerken();
+  const d = nachrichtenAnsicht.quellenDaten;
+  if (!d) { box.innerHTML = '<div style="padding:14px 0;font-size:12px;color:var(--text3)">Quellen werden geladen …</div>'; return; }
+  if (d.fehler) {
+    box.innerHTML = `<div class="settings-group" style="padding:12px;font-size:12px;color:var(--accent3)"><span>Quellen:</span> <span>${nachrichtEsc(d.fehler)}</span></div>`;
+    return;
+  }
+  const qs = Array.isArray(d.quellen) ? d.quellen : [];
+  let html = '<div class="settings-group" style="padding:12px;font-size:11px;color:var(--text2);line-height:1.7">'
+    + '<div>Feeds holt der Mac selbst; das iPhone zeigt die Meldungen nur an. Abgeschaltete Quellen werden nicht mehr geholt, ihre Meldungen verschwinden aus der Liste.</div>'
+    + '<div style="color:var(--text3);margin-top:4px">Adressen im eigenen Netz (localhost, .local, private IP-Adressen) holt der Assistent nicht — auch nicht über eine Weiterleitung. Gespeichert werden nur Titel, ein kurzer Anriss und der Link.</div>'
+    + '</div>'
+    + nachrichtFormularHtml(d);
+  NACHRICHTEN_ARTEN.forEach(([art, titel]) => {
+    const liste = qs.filter(q => q.art === art);
+    if (!liste.length && art !== 'eigen') return;
+    const an = liste.filter(q => q.aktiv).length;
+    html += '<div class="settings-group" style="padding:12px">'
+      + `<div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px"><span>${nachrichtEsc(titel)}</span> <span style="font-size:10px;font-weight:400;color:var(--text3)">${nachrichtEsc(`${an} von ${liste.length} an`)}</span></div>`
+      + (art === 'suche' ? '<div style="font-size:10px;color:var(--text3);margin-bottom:4px">Inoffizielle Suche, von Google nicht dokumentiert, nur für den privaten Gebrauch. Die Links führen über news.google.com.</div>' : '')
+      + (art === 'zeitung' ? '<div style="font-size:10px;color:var(--text3);margin-bottom:4px">Von Zeitungen bleibt nur, was zu einem Thema passt. Wo es keinen erreichbaren Zeitungs-Feed gab, kommt der Länder-Feed von AllAfrica.</div>' : '')
+      + ((art === 'eigen' && !liste.length) ? `<div style="font-size:11px;color:var(--text3)">${nachrichtEsc(`Noch keine — oben hinzufügen (höchstens ${d.max_eigene || 40}).`)}</div>` : '')
+      + liste.map(q => nachrichtQuelleZeile(q, d)).join('')
+      + '</div>';
+  });
+  box.innerHTML = html;
+}
+async function nachrichtQuellePruefen(id) {
+  nachrichtFormularMerken();
+  const f = nachrichtenAnsicht.formular || {};
+  if (!id && !String(f.url || '').trim()) { showToast('Bitte zuerst eine Feed-Adresse eintragen.'); return; }
+  nachrichtenAnsicht.probe = { id: id || '', laeuft: true };
+  renderNachrichtenQuellen();
+  let ergebnis;
+  try { ergebnis = await nachrichtenPost('/api/nachrichten/pruefen', id ? { id } : f, 45000); }
+  catch (e) { ergebnis = { ok: false, fehler: e.message }; }
+  nachrichtenAnsicht.probe = { id: id || '', ergebnis };
+  renderNachrichtenQuellen();
+}
+async function nachrichtQuelleAnlegen() {
+  nachrichtFormularMerken();
+  try {
+    const j = await nachrichtenPost('/api/nachrichten/quelle', nachrichtenAnsicht.formular || {});
+    nachrichtenAnsicht.quellenDaten = j;
+    nachrichtenAnsicht.formular = null;
+    nachrichtenAnsicht.probe = null;
+    renderNachrichtenQuellen();
+    showToast('Quelle hinzugefügt — sie wird gleich abgerufen.');
+    setTimeout(() => { ladeNachrichtenQuellen(); ladeNachrichtenStart(); }, 10000);
+  } catch (e) { showToast('Quelle: ' + e.message); }
+}
+async function nachrichtQuelleLoeschen(id) {
+  if (!confirm('Diese eigene Quelle entfernen? Ihre Meldungen verschwinden aus der Liste.')) return;
+  try {
+    nachrichtenAnsicht.quellenDaten = await nachrichtenPost('/api/nachrichten/quelle/loeschen', { id });
+    renderNachrichtenQuellen();
+    ladeNachrichtenStart();
+  } catch (e) { showToast('Quelle: ' + e.message); }
+}
+async function nachrichtQuelleSchalten(id, aktiv) {
+  try {
+    nachrichtenAnsicht.quellenDaten = await nachrichtenPost('/api/nachrichten/quelle/schalten', { id, aktiv: !!aktiv });
+    renderNachrichtenQuellen();
+    ladeNachrichtenStart();
+  } catch (e) { showToast('Quelle: ' + e.message); ladeNachrichtenQuellen(); }
+}
+
 // ── iPHONE-MODUS (2026-09-12-1) ─────────────────────────────
 // Ein Knopf statt Marker-Datei + Neustart: /api/netz/an öffnet den WLAN-Zugang des Servers zur
 // Laufzeit, /api/netz/aus schließt ihn. Beim Beenden des Assistenten ist er automatisch zu,
 // beim Start nie offen. Die Adresse enthält den Zugangscode — ohne ihn antwortet der Server
 // im WLAN niemandem.
+// ── HANDYZUGANG WIE BEI WINGFOILSCOUT (2026-10-18-1) ──
+// Wunsch vom 18.10.2026. Die Einstellungen führen in der Reihenfolge, in der man es braucht (Vorbild:
+// Wingfoilscout 2.5.1–2.6.0, Reiter „Handy"): erst einrichten — Zertifikat, Profil per AirDrop, am iPhone
+// installieren und vertrauen —, der QR-Code kommt zuletzt. „Ein User, der das zum ersten Mal sieht, klickt
+// intuitiv auf die Erstellung des QR-Codes und wundert sich dann, warum es nicht funktioniert." Hat ein Weg
+// einmal geklappt (server.py zustand_lesen), steht gleich der QR-Code da. Der Weg ohne Zertifikat (http) steht
+// nur unter „Klappt nicht?". Solange freigegeben ist, sagt die Seite, was vom iPhone ankommt
+// (GET /api/netz/stand, alle 2 s, nur solange die Einstellungen zu sehen sind).
 let iphoneModusAn = false;
-function zeigeIphoneStatus(st) {
-  st = st || {};
-  iphoneModusAn = !!st.an;
-  const dot = document.getElementById('iphone-dot'), txt = document.getElementById('iphone-status');
-  if (dot) dot.style.background = st.an ? '#3a9d6b' : 'var(--text3)';
-  if (txt) txt.textContent = st.an ? 'iPhone-Modus AN · ' + (st.ip || '') : 'iPhone-Modus aus';
-  const btn = document.getElementById('iphone-toggle');
-  if (btn) { btn.textContent = st.an ? 'Ausschalten' : 'Einschalten'; btn.classList.toggle('primary', !st.an); }
-  const box = document.getElementById('iphone-modus-status');
-  if (!box) return;
-  if (st.an) {
-    const min = Math.floor((st.seit_s || 0) / 60);
-    box.innerHTML = `<div style="color:#3a9d6b;font-weight:600">🟢 AN seit ${min} Min. · ${st.anfragen || 0} Anfragen aus dem WLAN</div>`
-      + `<div style="margin-top:4px">Am iPhone (gleiches WLAN) einmalig öffnen — danach „Zum Home-Bildschirm":</div>`
-      + `<div style="margin-top:4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><code style="font-size:13px;user-select:all">${escHtml(st.url || '')}</code>`
-      + `<button class="btn-small" data-url="${escAttr(st.url || '')}" onclick="kopiereText(this.dataset.url).then(showToast)">Kopieren</button></div>`
-      + iphoneQrHtml(st.url)
-      + (st.url_ip ? `<div style="margin-top:4px;color:var(--text3)">Falls der Name einmal nicht auflöst, geht auch: <code style="user-select:all">${escHtml(st.url_ip)}</code></div>` : '')
-      + `<div style="margin-top:4px;color:var(--text3)">Die Adresse setzt den Zugangscode <b>${escHtml(st.code || '')}</b> als Cookie am iPhone. Sie enthält den <b>Namen</b> des Macs, nicht seine IP — beim Wechsel zwischen Starlink und iPhone-Hotspot bleibt sie deshalb gleich, und das Home-Bildschirm-Icon funktioniert weiter.</div>`
-      + iphoneTlsHtml(st)
-      + iphoneAutoAusHtml(st);
-  } else {
-    box.innerHTML = `<div style="color:var(--text3)">⚫ Aus — der Server ist nur an diesem Mac erreichbar.</div>`
-      + (st.hinweis ? `<div style="margin-top:4px;color:var(--accent3)">${escHtml(st.hinweis)}</div>` : '')
-      + (st.ip ? `<div style="margin-top:4px;color:var(--text3)">Aktuelle Mac-IP: <b>${escHtml(st.ip)}</b> · Zugangscode: <b>${escHtml(st.code || '')}</b></div>` : '');
-  }
+let iphoneLetzterStand = null;      // letzte Antwort von /api/netz/status
+let iphoneAnsichtWunsch = '';       // '' | 'sicher' | 'schnell' — per Link gewählt (weiteres iPhone, anderer Weg)
+const iphoneLive = { uhr: null, basis: null, geladen: 0, text: '', klasse: '', fehl: 0 };
+const IPH_KARTE = 'background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-top:10px';
+const IPH_KLEIN = 'font-size:11px;color:var(--text3);line-height:1.7;margin-top:4px';
+const IPH_LISTE = 'padding-left:18px;margin:8px 0 0;font-size:11px;color:var(--text2);line-height:1.7';
+const IPH_LINK = 'color:var(--accent4);font-size:11px;text-decoration:underline;cursor:pointer';
+
+// Welche Ansicht: 'fertig' (gleich der QR-Code), 'sicher' (Schritte mit Zertifikat) oder 'schnell' (ohne)
+function iphoneAnsicht(st) {
+  if (iphoneAnsichtWunsch === 'sicher' || iphoneAnsichtWunsch === 'schnell') return iphoneAnsichtWunsch;
+  const g = (st && st.gemerkt) || {}, ca = (st && st.ca) || {};
+  if (g.bewaehrt === 'https' && ca.kennung && g.kennung === ca.kennung) return 'fertig';
+  // http hat geklappt — es sei denn, danach wurde das Profil geladen: dann ist der sichere Weg im Gang
+  if (g.bewaehrt === 'http' && !(ca.kennung && g.profil === ca.kennung && (g.profil_zeit || 0) > (g.zeit || 0))) return 'fertig';
+  return 'sicher';
+}
+function iphoneAnsichtWaehlen(w) {
+  iphoneAnsichtWunsch = w;
+  iphoneLive.basis = null; iphoneLive.text = ''; iphoneLive.klasse = '';
+  zeigeIphoneStatus(iphoneLetzterStand);
+}
+function iphoneWo(art) {
+  const farbe = art === 'mac' ? 'background:rgba(126,184,201,.15);color:var(--accent4)' : 'background:rgba(200,169,90,.15);color:var(--accent)';
+  return `<span data-i18n-skip style="display:inline-block;font-size:9px;font-weight:600;padding:1px 6px;border-radius:4px;margin-right:6px;${farbe}">${art === 'mac' ? 'Mac' : 'iPhone'}</span>`;
+}
+function iphoneSchritt(erledigt, wo, inhalt) {
+  return `<li style="margin:8px 0">${erledigt ? '<span style="color:#3a9d6b">✓ </span>' : ''}${iphoneWo(wo)}${inhalt}</li>`;
+}
+function iphoneDatum(wert) {
+  const d = typeof wert === 'number' ? new Date(wert * 1000) : (wert ? new Date(wert) : null);
+  return d && !isNaN(d) ? d.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+}
+function iphoneArtHtml(art) {
+  return art === 'https'
+    ? '<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:rgba(58,157,107,.15);color:#3a9d6b">🔐 verschlüsselt</span>'
+    : '<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:rgba(224,122,95,.15);color:var(--accent3)">⚠️ unverschlüsselt</span>';
+}
+function iphoneLiveFarbe(klasse) {
+  return klasse === 'gut' ? '#3a9d6b' : klasse === 'achtung' ? 'var(--accent3)' : 'var(--text2)';
+}
+// QR-Code der iPhone-Adresse: mit der Kamera-App scannen statt IP und Code abzutippen (offline erzeugt, Sektion QR-CODE)
+function iphoneQrHtml(url) {
+  if (!url) return '';
+  try {
+    return `<div title="Mit der iPhone-Kamera scannen — die Adresse samt Zugangscode öffnet sich direkt in Safari." style="background:#fff;border-radius:8px;padding:4px;line-height:0;flex:none">${QR.svg(url, 4)}</div>`;
+  } catch (e) { return `<div style="color:var(--text3)">QR-Code nicht erzeugbar (${escHtml(e.message)}) — Adresse bitte abtippen.</div>`; }
+}
+// QR-Code, Adresse, die Rückmeldung vom iPhone und „Freigabe beenden"
+function iphoneQrBlock(st, art, schritte) {
+  const url = st.url || '';
+  return '<div style="margin-top:10px;display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">'
+    + iphoneQrHtml(st.url)
+    + '<div style="flex:1;min-width:220px">'
+    + (schritte || '')
+    + `<div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">${iphoneArtHtml(art)}<code style="font-size:12px;user-select:all;word-break:break-all">${escHtml(url)}</code>`
+    + `<button class="btn-small" data-url="${escAttr(st.url || '')}" onclick="kopiereText(this.dataset.url).then(showToast)">Kopieren</button></div>`
+    + (st.url_ip ? `<div style="${IPH_KLEIN}"><span>Falls der Name einmal nicht auflöst, geht auch:</span> <code style="user-select:all">${escHtml(st.url_ip)}</code></div>` : '')
+    + `<div id="iphone-live" role="status" style="margin-top:8px;font-size:12px;line-height:1.6;color:${iphoneLiveFarbe(iphoneLive.klasse)}">${escHtml(iphoneLive.text || 'Warte auf dein iPhone …')}</div>`
+    + iphoneAutoAusHtml(st)
+    + `<div style="margin-top:8px"><button class="btn-small" onclick="iphoneFreigabeBeenden()">Freigabe beenden</button></div>`
+    + `</div></div>`;
 }
 // Verschlüsselung des iPhone-Zugangs: Safari blockt reine http://-Adressen im HTTPS-Only-Modus, und
 // ohne sicheren Kontext gibt iOS kein GPS frei. Der Server stellt sich dafür ein eigenes Zertifikat
@@ -4073,6 +5635,8 @@ function zeigeIphoneStatus(st) {
 // Zertifikatsfehler — das steht hier ausdrücklich, damit niemand im Dunkeln sucht.
 // 2026-09-27 (Audit H3): Die Stufe der Namensbeschränkung wird aus dem CA-Zertifikat gelesen
 // (server.py tls_ca_merkmale) — vorher zeigte ein Merker im Speicher nach einem Neustart das Falsche.
+// 2026-10-18-1: seit dem Einrichten in Schritten nur noch die Angaben zur Sicherheit (zugeklappt); die
+// Installationsschritte stehen in iphoneSicherHtml. Die CA selbst bleibt, wie sie ist.
 function tlsStufeHtml(info) {
   const ordner = escHtml(info.tls_ordner || '~/.safari-assistant-tls');
   const neu = `Neu erzeugen: Safari Assistant beenden, den Ordner <code>${ordner}</code> in den Papierkorb legen, Safari Assistant starten — danach das neue Profil einmal aufs iPhone (alte vorher dort löschen).`;
@@ -4082,35 +5646,195 @@ function tlsStufeHtml(info) {
   return '';
 }
 function iphoneTlsHtml(st) {
-  const info = (st && st.tls_info) || {};
-  if (!st || !st.tls) {
-    return `<div style="margin-top:8px;background:rgba(224,122,95,0.10);border:1px solid var(--accent3);border-radius:8px;padding:8px 10px;color:var(--text2)">
-      <b style="color:var(--accent3)">⚠️ Unverschlüsselt (http)</b> — ${escHtml((st && (st.tls_grund || (st.tls_info || {}).grund)) || 'Grund unbekannt')}<br>
-      Am iPhone bleibt damit der HTTPS-Only-Modus ein Problem und die Positionsanzeige ohne GPS.
-    </div>`;
-  }
-  const namen = (info.namen || []).concat(info.ips || []).join(', ');
+  const info = (st && st.tls_info) || {}, ca = (st && st.ca) || {};
+  if (!ca.kennung) return '';
   const probe = info.selbsttest
     ? `<div style="margin-top:6px;color:var(--accent3)">⚠️ Die Kette ließ sich am Mac nicht prüfen (${escHtml(info.selbsttest)}). HTTPS läuft, das iPhone könnte das Zertifikat aber ablehnen — dann melde dich, das ist ein Fehler in der Erzeugung.</div>`
     : '';
-  return `<div style="margin-top:8px;background:rgba(58,157,107,0.08);border:1px solid rgba(58,157,107,0.35);border-radius:8px;padding:8px 10px;color:var(--text2)">
-    <b style="color:#3a9d6b">🔐 Verschlüsselt (https)</b> — Zertifikat gültig für ${escHtml(namen)}${info.gueltig_bis ? ', bis ' + escHtml(info.gueltig_bis) : ''}.${probe}
-    ${info.ca_neu ? '<div style="margin-top:6px;color:var(--accent3)">ℹ️ Beim Einschalten wurde eine neue CA erzeugt. War der iPhone-Modus schon eingerichtet: das neue Profil einmal aufs iPhone bringen (Schritte unten) und das alte dort löschen.</div>' : ''}
-    <details style="margin-top:6px">
-      <summary style="cursor:pointer;color:var(--text3)">Einmalig nötig: Zertifikat aufs iPhone bringen</summary>
-      <div style="margin-top:6px;line-height:1.8">
-        Ohne diesen Schritt meldet Safari beim Öffnen der Adresse einen <b>Zertifikatsfehler</b> — das ist dann kein Netzwerkproblem.
-        <div style="margin-top:6px">1. Datei per AirDrop ans iPhone schicken:<br>
-          <code style="user-select:all;font-size:11px">${escHtml(info.ca_datei || '')}</code>
-          <button class="btn-small" style="margin-left:6px" onclick="zeigeZertifikatImFinder()">Im Finder zeigen</button></div>
-        <div>2. Am iPhone: Einstellungen → oben „Profil geladen" → <b>Installieren</b>.</div>
-        <div>3. Danach Einstellungen → Allgemein → Info → <b>Zertifikatsvertrauen</b> → den Eintrag „${escHtml(info.ca_name || 'Safari Assistant lokale CA')}" <b>einschalten</b>. Dieser zweite Schritt wird oft vergessen; ohne ihn bleibt der Fehler.</div>
-        <div style="margin-top:6px;color:var(--text3)">Fingerabdruck der CA (zum Vergleichen am iPhone): <code style="font-size:10px;user-select:all">${escHtml(info.fingerabdruck || '')}</code></div>
-        <div style="margin-top:6px;color:var(--text3)">${tlsStufeHtml(info)} Das Serverzertifikat wird automatisch neu ausgestellt, wenn sich die Netzadresse ändert; am iPhone muss dafür nichts neu installiert werden.</div>
-        <div style="margin-top:6px;color:var(--text3)">Wichtig: Diese CA vertraut dein iPhone wie einer echten Zertifizierungsstelle. Brauchst du den iPhone-Modus nicht mehr, das Profil am iPhone löschen (Einstellungen → Allgemein → VPN und Geräteverwaltung).</div>
-      </div>
-    </details>
-  </div>`;
+  const stufe = tlsStufeHtml({ stufe: ca.stufe || info.stufe, constraints: info.constraints, tls_ordner: info.tls_ordner });
+  return `<details data-iph="sicherheit" style="margin-top:10px;font-size:11px;color:var(--text3);line-height:1.7"><summary style="cursor:pointer">Sicherheit des Zertifikats</summary>`
+    + (info.ca_neu ? '<div style="margin-top:6px;color:var(--accent3)">ℹ️ Beim Einschalten wurde eine neue CA erzeugt. War der iPhone-Modus schon eingerichtet: das neue Profil einmal aufs iPhone bringen (Schritte oben) und das alte dort löschen.</div>' : '')
+    + probe
+    + (stufe ? `<div style="margin-top:6px">${stufe}</div>` : '')
+    + '<div style="margin-top:6px">Das Serverzertifikat wird automatisch neu ausgestellt, wenn sich die Netzadresse ändert; am iPhone muss dafür nichts neu installiert werden.</div>'
+    + `<div style="margin-top:6px"><span>Fingerabdruck der CA (zum Vergleichen am iPhone):</span> <code style="font-size:10px;user-select:all">${escHtml(ca.fingerabdruck || info.fingerabdruck || '')}</code></div>`
+    + '<div style="margin-top:6px">Wichtig: Diese CA vertraut dein iPhone wie einer echten Zertifizierungsstelle. Brauchst du den iPhone-Modus nicht mehr, das Profil am iPhone löschen (Einstellungen → Allgemein → VPN und Geräteverwaltung).</div>'
+    + '</details>';
+}
+// Nach „Profil laden": Schritt 2 als erledigt zeigen (der Server merkt sich den Abruf)
+function iphoneProfilGeladen() { setTimeout(ladeIphoneStatus, 1500); }
+// Der sichere Weg: Zertifikat, Profil, installieren, vertrauen — dann der QR-Code
+function iphoneSicherHtml(st) {
+  const ca = st.ca || {}, g = st.gemerkt || {}, info = st.tls_info || {};
+  const da = !!ca.kennung, geladen = da && g.profil === ca.kennung;
+  const name = ca.name || info.ca_name || 'Safari Assistant lokale CA';
+  const bis = iphoneDatum(ca.gueltig_bis);
+  let lage;
+  if (!da) lage = st.openssl === false
+    ? 'Auf diesem Mac fehlt openssl — ohne openssl lässt sich kein Zertifikat erzeugen. Unter „Klappt nicht?“ steht der Weg ohne Zertifikat.'
+    : 'Noch kein Zertifikat.';
+  else lage = bis ? `Zertifikat „${name}“, gültig bis ${bis}.` : `Zertifikat „${name}“ ist vorhanden.`;
+  let zuletzt;
+  if (st.an && st.weg === 'sicher' && st.tls) zuletzt = iphoneQrBlock(st, 'https', '');
+  else if (da) zuletzt = `<div style="margin-top:6px"><button class="toolbar-btn primary" onclick="iphoneFreigeben('sicher')">QR-Code zeigen</button></div>`;
+  else zuletzt = `<div style="${IPH_KLEIN}">Geht, sobald Schritt 1 erledigt ist.</div>`;
+  return `<div style="${IPH_KARTE}">`
+    + '<div style="font-size:13px;font-weight:600;color:var(--text)"><span>Sicher einrichten</span> <span style="font-size:10px;font-weight:500;color:#3a9d6b;margin-left:6px">empfohlen</span></div>'
+    + '<div style="font-size:11px;color:var(--text2);margin-top:4px;line-height:1.7">Danach öffnet Safari den Safari Assistant am iPhone verschlüsselt (https) und ohne Warnung — mit GPS für die Positionsanzeige. Einmal, etwa zwei Minuten.</div>'
+    + `<ol style="${IPH_LISTE}">`
+    + iphoneSchritt(da, 'mac', `<span>Zertifikat für diesen Mac:</span><div style="${IPH_KLEIN}">${escHtml(lage)}</div>`
+        + (da ? '' : `<div style="margin-top:6px"><button class="btn-small" id="iphone-zert-knopf" onclick="iphoneZertifikatErzeugen()">Zertifikat erzeugen</button></div>`))
+    + iphoneSchritt(geladen, 'mac', '<span>Das Profil laden — der Browser legt es in den Ordner „Downloads“. Dort Rechtsklick auf „Safari Assistant iPhone.mobileconfig“ → Teilen → AirDrop → dein iPhone.</span>'
+        + (da ? `<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"><a class="btn-small" style="text-decoration:none" href="${escAttr(getServerUrl() + '/api/tls/profil')}" download onclick="iphoneProfilGeladen()">Profil laden</a>`
+              + '<button class="btn-small" onclick="zeigeZertifikatImFinder()">Im Finder zeigen</button></div>' : '')
+        + `<div style="${IPH_KLEIN}">Ohne AirDrop: die Datei per Mail an dich selbst schicken und am iPhone den Anhang antippen. Bietet der Mac an, das Profil bei sich zu installieren: nicht nötig — es gehört aufs iPhone. „Im Finder zeigen“ zeigt das Zertifikat selbst, das geht per AirDrop genauso.</div>`)
+    + iphoneSchritt(false, 'iphone', '<span>Installieren: Einstellungen öffnen → ganz oben „Profil geladen“ → Installieren → Code eingeben → Installieren → Fertig.</span>')
+    + iphoneSchritt(false, 'iphone', `<span>${escHtml(`Vertrauen einschalten: Einstellungen → Allgemein → Info → ganz unten „Zertifikatsvertrauenseinstellungen“ → „${name}“ einschalten → Fortfahren.`)}</span>`
+        + `<div style="${IPH_KLEIN}">Dieser Schritt wird oft vergessen — ohne ihn meldet Safari einen Zertifikatsfehler.</div>`)
+    + iphoneSchritt(false, 'mac', '<span>QR-Code zeigen, dann mit der Kamera des iPhones scannen und den Link antippen.</span>' + zuletzt)
+    + '</ol>'
+    + iphoneTlsHtml(st)
+    + '</div>';
+}
+// Ohne Zertifikat (http) — nur ein Ausweg unter „Klappt nicht?", mit dem, was er kostet
+function iphoneSchnellHtml(st) {
+  const zuletzt = (st.an && st.weg === 'schnell')
+    ? iphoneQrBlock(st, 'http', '')
+    : `<div style="margin-top:6px"><button class="toolbar-btn" onclick="iphoneFreigeben('schnell')">QR-Code zeigen</button></div>`;
+  return `<div style="${IPH_KARTE}">`
+    + '<div style="font-size:13px;font-weight:600;color:var(--text)">Ohne Zertifikat einrichten</div>'
+    + `<div style="margin-top:4px;display:flex;gap:10px;flex-wrap:wrap;align-items:center"><span style="font-size:10px;color:var(--accent3)">⚠️ Unverschlüsselt (http)</span><a style="${IPH_LINK}" onclick="iphoneAnsichtWaehlen('sicher')">Verschlüsselt einrichten (empfohlen)</a></div>`
+    + '<div style="font-size:11px;color:var(--text2);margin-top:6px;line-height:1.7">Nur, wenn sich das Profil am iPhone nicht installieren lässt. Ohne Zertifikat geht alles unverschlüsselt durchs WLAN.</div>'
+    + `<ol style="${IPH_LISTE}">`
+    + iphoneSchritt(false, 'iphone', '<span>Einstellungen → Apps → Safari → unter „Datenschutz & Sicherheit“ „Warnung vor unsicherer Verbindung“ ausschalten (englisch „Not Secure Connection Warning“).</span>'
+        + `<div style="${IPH_KLEIN}">Was das kostet: Safari warnt dann bei keiner unverschlüsselten Website mehr, nicht nur beim Safari Assistant. Was dein iPhone und der Mac austauschen, samt Zugangscode, kann im WLAN mitlesen, wer es darauf anlegt — bei WPA2 schon jeder, der das WLAN-Passwort kennt. Und ohne Verschlüsselung gibt iOS kein GPS frei: Die Positionsanzeige am iPhone bleibt leer. Zurückschalten geht jederzeit.</div>`)
+    + iphoneSchritt(false, 'mac', '<span>QR-Code zeigen, dann mit der Kamera des iPhones scannen und den Link antippen.</span>' + zuletzt)
+    + '</ol></div>';
+}
+// Eingerichtet: gleich der QR-Code
+function iphoneFertigHtml(st) {
+  const g = st.gemerkt || {};
+  const art = g.bewaehrt === 'https' ? 'https' : 'http', fuer = art === 'https' ? 'sicher' : 'schnell';
+  const tag = iphoneDatum(g.zeit) || '?';
+  const eingerichtet = art === 'https' ? `Eingerichtet: verschlüsselt (hat am ${tag} geklappt).` : `Eingerichtet: unverschlüsselt (hat am ${tag} geklappt).`;
+  const zustand = st.an
+    ? '<span style="font-size:10px;font-weight:500;padding:1px 7px;border-radius:10px;background:rgba(58,157,107,.15);color:#3a9d6b">freigegeben</span>'
+    : '<span style="font-size:10px;font-weight:500;padding:1px 7px;border-radius:10px;background:var(--surface);color:var(--text3)">nur an diesem Mac</span>';
+  let teil;
+  if (st.an && st.weg === fuer) {
+    teil = iphoneQrBlock(st, art, `<ol style="${IPH_LISTE};margin-top:0">`
+      + iphoneSchritt(false, 'iphone', '<span>Ins selbe WLAN wie der Mac (Starlink oder Hotspot).</span>')
+      + iphoneSchritt(false, 'iphone', '<span>Kamera öffnen, auf den Code richten und den Link antippen.</span>')
+      + iphoneSchritt(false, 'iphone', '<span>In Safari: Teilen → „Zum Home-Bildschirm“ — dann startet der Safari Assistant wie eine App.</span>')
+      + '</ol>');
+  } else {
+    teil = `<div style="margin-top:8px"><button class="toolbar-btn primary" onclick="iphoneFreigeben('${fuer}')">QR-Code zeigen</button></div>`
+      + `<div style="${IPH_KLEIN}">${escHtml(`Nur im eigenen WLAN (Starlink, Hotspot) — nicht in Lodge-, Camp- oder Grenz-WLANs. Die Freigabe endet, wenn du den Safari Assistant beendest, und nach ${st.auto_aus_h || 12} h ohne Anfrage vom iPhone.`)}</div>`;
+  }
+  const wege = `<a style="${IPH_LINK}" onclick="iphoneAnsichtWaehlen('${fuer}')">Weiteres iPhone einrichten</a>`
+    + (art === 'http' ? `<a style="${IPH_LINK}" onclick="iphoneAnsichtWaehlen('sicher')">Verschlüsselt einrichten (empfohlen)</a>` : '');
+  return `<div style="${IPH_KARTE}">`
+    + `<div style="font-size:13px;font-weight:600;color:var(--text);display:flex;gap:8px;align-items:center"><span>Verbinden</span>${zustand}</div>`
+    + `<div style="${IPH_KLEIN}">${escHtml(eingerichtet)}</div>`
+    + teil
+    + `<div style="margin-top:10px;display:flex;gap:14px;flex-wrap:wrap">${wege}</div>`
+    + '</div>';
+}
+// Zugeklappt unten: „Klappt nicht?" und der Zugangscode
+function iphoneHilfeHtml(st) {
+  const punkt = (titel, text) => `<li style="margin:6px 0"><b>${titel}</b> <span>${text}</span></li>`;
+  return `<details data-iph="hilfe" style="${IPH_KARTE}"><summary style="cursor:pointer;font-size:12px;color:var(--text2)">Klappt nicht?</summary>`
+    + `<ul style="${IPH_LISTE};padding-left:16px">`
+    + punkt('„Safari kann die Seite nicht öffnen … HTTPS-Only“:', 'Safari will https — den Weg mit Zertifikat einrichten (oben).')
+    + punkt('„Diese Verbindung ist nicht privat“:', 'Beim Weg mit Zertifikat fehlt das Vertrauen (Schritt 4) — oder die CA ist neu und das neue Profil noch nicht auf dem iPhone.')
+    + punkt('„Zugangscode fehlt oder ist falsch“:', 'Den QR-Code neu scannen. Nach „Zugangscode erneuern“ geht das alte Symbol auf dem Home-Bildschirm nicht mehr — löschen und neu hinzufügen.')
+    + punkt('„Nur verschlüsselt“:', 'Das iPhone hat eine alte http-Adresse geöffnet, etwa über ein altes Symbol auf dem Home-Bildschirm. Den QR-Code neu scannen und das Symbol neu anlegen.')
+    + punkt('„Der Safari Assistant antwortet nicht“:', 'Diesen Hinweis legt das iPhone selbst ab, wenn der Mac nicht antwortet. Ist der Mac wach und der Safari Assistant offen? Ist die Freigabe an?')
+    + punkt('Die Seite lädt nicht:', 'Ist das iPhone im selben WLAN wie der Mac? Ist die Freigabe an? Fragt macOS, ob Python eingehende Verbindungen annehmen darf: „Erlauben“.')
+    + `<li style="margin:6px 0"><b>Das Profil lässt sich nicht installieren:</b> <span>Es geht auch ohne Zertifikat — dann unverschlüsselt, und Safari warnt danach bei keiner unverschlüsselten Website mehr.</span> <a style="${IPH_LINK}" onclick="iphoneAnsichtWaehlen('schnell')">Ohne Zertifikat einrichten</a></li>`
+    + '</ul>'
+    + `<div style="${IPH_KLEIN};margin-top:10px">Der Zugangscode bleibt gleich, auch nach einem Neustart — so geht das Symbol auf dem Home-Bildschirm weiter. Ein neuer sperrt alle bisher verbundenen Geräte aus.</div>`
+    + '<div style="margin-top:6px"><button class="btn-small" onclick="iphoneCodeErneuern()">Zugangscode erneuern</button></div>'
+    + '</details>';
+}
+function zeigeIphoneStatus(st) {
+  st = st || {};
+  iphoneLetzterStand = st;
+  iphoneModusAn = !!st.an;
+  const dot = document.getElementById('iphone-dot'), txt = document.getElementById('iphone-status');
+  if (dot) dot.style.background = st.an ? '#3a9d6b' : 'var(--text3)';
+  if (txt) txt.textContent = st.an ? 'iPhone-Modus AN · ' + (st.ip || '') : 'iPhone-Modus aus';
+  const btn = document.getElementById('iphone-toggle');
+  if (btn) { btn.textContent = 'Freigabe beenden'; btn.style.display = st.an ? '' : 'none'; }
+  const box = document.getElementById('iphone-modus-status');
+  if (!box) return;
+  // Aufgeklappte Abschnitte bleiben beim Neuzeichnen (alle 30 s) aufgeklappt
+  const offen = new Set([...box.querySelectorAll('details[data-iph]')].filter(d => d.open).map(d => d.dataset.iph));
+  const ansicht = iphoneAnsicht(st);
+  box.innerHTML = (st.hinweis ? `<div style="margin:4px 0;color:var(--accent3)">${escHtml(st.hinweis)}</div>` : '')
+    + (st.an
+      ? `<div style="color:#3a9d6b;font-weight:600">🟢 AN seit ${Math.floor((st.seit_s || 0) / 60)} Min. · ${st.anfragen || 0} Anfragen aus dem WLAN</div>`
+      : '<div style="color:var(--text3)">⚫ Aus — der Server ist nur an diesem Mac erreichbar.</div>')
+    + (ansicht === 'fertig' ? iphoneFertigHtml(st) : ansicht === 'schnell' ? iphoneSchnellHtml(st) : iphoneSicherHtml(st))
+    + iphoneHilfeHtml(st);
+  box.querySelectorAll('details[data-iph]').forEach(d => { if (offen.has(d.dataset.iph)) d.open = true; });
+  iphoneLiveStarten();
+}
+// ── Was vom iPhone ankommt (wie Wingfoilscout handy.js) ──
+function iphoneLiveZeigen(text, klasse) {
+  iphoneLive.text = text; iphoneLive.klasse = klasse || '';
+  const el = document.getElementById('iphone-live');
+  if (!el) return;
+  el.textContent = text;
+  el.style.color = iphoneLiveFarbe(iphoneLive.klasse);
+}
+function iphoneLiveAuswerten(j) {
+  if (iphoneLive.basis === null) { iphoneLive.basis = j.jetzt; iphoneLive.geladen = Date.now(); }
+  const art = j.weg === 'schnell' ? 'http' : 'https';
+  if (j.verbunden) {
+    const text = j.verschluesselt ? `✓ Verbunden — verschlüsselt, um ${j.verbunden_um}.` : `✓ Verbunden — unverschlüsselt, um ${j.verbunden_um}.`;
+    // Beim Einrichten geklappt, und zwar auf diesem Weg → gleich die Ansicht „eingerichtet"
+    if (iphoneAnsicht(iphoneLetzterStand || {}) !== 'fertig' && j.verbunden >= iphoneLive.basis - 1 && j.verschluesselt === (art === 'https')) {
+      iphoneAnsichtWunsch = '';
+      iphoneLiveZeigen(text, 'gut');
+      ladeIphoneStatus();
+      return false;          // zeigeIphoneStatus startet die Abfrage neu
+    }
+    iphoneLiveZeigen(text, 'gut');
+  } else if (j.abgebrochen) {
+    iphoneLiveZeigen(`Dein iPhone hat die verschlüsselte Verbindung abgebrochen (${j.abgebrochen_um}) — meist, weil es dem Zertifikat noch nicht vertraut: Ist das Profil installiert und das Vertrauen eingeschaltet?`, 'achtung');
+  } else if (j.ohne_schluessel) {
+    iphoneLiveZeigen(`Ein Gerät kam ohne gültigen Zugangscode (${j.ohne_schluessel_um}) — den QR-Code neu scannen.`, 'achtung');
+  } else if (Date.now() - iphoneLive.geladen > 25000) {
+    iphoneLiveZeigen(art === 'http'
+      ? 'Noch nichts angekommen. Ist am iPhone die „Warnung vor unsicherer Verbindung“ aus? Ist es im selben WLAN wie der Mac? Fragt macOS, ob Python eingehende Verbindungen annehmen darf: „Erlauben“.'
+      : 'Noch nichts angekommen. Ist das iPhone im selben WLAN wie der Mac? Fragt macOS, ob Python eingehende Verbindungen annehmen darf: „Erlauben“.', 'achtung');
+  } else {
+    iphoneLiveZeigen('Warte auf dein iPhone …', '');
+  }
+  return true;
+}
+function iphoneLiveStarten() {
+  if (iphoneLive.uhr || !document.getElementById('iphone-live')) return;
+  const runde = async () => {
+    iphoneLive.uhr = null;
+    const el = document.getElementById('iphone-live');
+    if (!el) { iphoneLive.basis = null; iphoneLive.text = ''; iphoneLive.klasse = ''; return; }
+    if (document.hidden || !el.offsetParent) { iphoneLive.uhr = setTimeout(runde, 2000); return; }
+    try {
+      const res = await fetch(getServerUrl() + '/api/netz/stand', { cache: 'no-store', signal: AbortSignal.timeout(4000) });
+      const j = await res.json();
+      iphoneLive.fehl = 0;
+      if (!j.an) { iphoneLive.basis = null; iphoneLive.text = ''; iphoneLive.klasse = ''; ladeIphoneStatus(); return; }
+      if (iphoneLiveAuswerten(j)) iphoneLive.uhr = setTimeout(runde, 2000);
+    } catch (e) {
+      // Antwortet der Server nicht mehr, gilt auch der QR-Code nicht mehr — dann sagt die Seite das
+      iphoneLive.fehl += 1;
+      if (iphoneLive.fehl >= 2) iphoneLiveZeigen('Der Safari Assistant antwortet nicht — läuft er noch?', 'achtung');
+      iphoneLive.uhr = setTimeout(runde, 5000);
+    }
+  };
+  iphoneLive.uhr = setTimeout(runde, 300);
 }
 async function zeigeZertifikatImFinder() {
   try {
@@ -4119,15 +5843,6 @@ async function zeigeZertifikatImFinder() {
     showToast(res.ok ? 'Im Finder geöffnet — von dort per AirDrop ans iPhone' : (j.error || 'Konnte nicht geöffnet werden'));
   } catch (e) { showToast('Finder: ' + e.message); }
 }
-// QR-Code der iPhone-Adresse: mit der Kamera-App scannen statt IP und Code abzutippen (offline erzeugt, Sektion QR-CODE)
-function iphoneQrHtml(url) {
-  if (!url) return '';
-  try {
-    return `<div style="margin-top:8px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><div style="background:#fff;border-radius:8px;padding:4px;line-height:0">${QR.svg(url, 4)}</div>`
-      + `<div style="color:var(--text3);max-width:260px">Mit der iPhone-Kamera scannen — die Adresse samt Zugangscode öffnet sich direkt in Safari. Danach „Teilen → Zum Home-Bildschirm".</div></div>`;
-  } catch (e) { return `<div style="margin-top:4px;color:var(--text3)">QR-Code nicht erzeugbar (${escHtml(e.message)}) — Adresse bitte abtippen.</div>`; }
-}
-// Automatische Abschaltung: der Server schließt den WLAN-Zugang nach LAN_INAKTIV_H Stunden ohne Anfrage vom iPhone
 function iphoneAutoAusHtml(st) {
   if (!st || !st.an || !st.auto_aus_h) return '';
   const rest = Math.max(0, (st.auto_aus_h * 3600) - (st.inaktiv_s || 0));
@@ -4140,20 +5855,64 @@ async function ladeIphoneStatus() {
     if (res.ok) zeigeIphoneStatus(await res.json());
   } catch (e) { /* Server nicht erreichbar — pruefeServer zeigt das */ }
 }
-async function iphoneModusSchalten() {
-  const btn = document.getElementById('iphone-toggle');
-  if (btn) btn.disabled = true;
+// Freigeben für einen Weg: 'sicher' (https, Standard) oder 'schnell' (http, nur unter „Klappt nicht?")
+async function iphoneFreigeben(weg) {
+  const knoepfe = [...document.querySelectorAll('#iphone-modus-status button')];
+  knoepfe.forEach(b => { b.disabled = true; });
   try {
-    const res = await fetch(getServerUrl() + (iphoneModusAn ? '/api/netz/aus' : '/api/netz/an'), { method: 'POST', signal: AbortSignal.timeout(8000) });
+    // 2026-10-11-1: 30 s statt 8 s — beim Einschalten prüft der Server Zertifikat und Kette und öffnet den Listener.
+    const res = await fetch(getServerUrl() + '/api/netz/an', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ weg: weg === 'schnell' ? 'schnell' : 'sicher' }), signal: AbortSignal.timeout(30000) });
+    const st = await res.json();
+    if (!res.ok) throw new Error(st.error || ('HTTP ' + res.status));
+    iphoneLive.basis = null; iphoneLive.text = ''; iphoneLive.klasse = '';
+    zeigeIphoneStatus(st);
+    if (st.ok === false) showToast('iPhone-Modus konnte nicht eingeschaltet werden: ' + (st.hinweis || 'unbekannter Grund'));
+    else showToast('📱 iPhone-Modus AN — Adresse steht in den Einstellungen');
+    pruefeServer();
+  } catch (e) {
+    // 2026-10-11-1: Zeitüberschreitung heißt nicht „aus" — der Server kann trotzdem eingeschaltet haben
+    // („Fetch is aborted", obwohl der Zugang danach offen war). Deshalb den echten Stand nachladen.
+    if (e && (e.name === 'TimeoutError' || e.name === 'AbortError')) {
+      showToast('iPhone-Modus: Der Server hat nicht rechtzeitig geantwortet — der Stand wird neu geladen.');
+      ladeIphoneStatus();
+    } else {
+      showToast('iPhone-Modus: ' + e.message);
+    }
+  } finally { knoepfe.forEach(b => { b.disabled = false; }); }
+}
+async function iphoneFreigabeBeenden() {
+  try {
+    const res = await fetch(getServerUrl() + '/api/netz/aus', { method: 'POST', signal: AbortSignal.timeout(8000) });
+    const st = await res.json();
+    if (!res.ok) throw new Error(st.error || ('HTTP ' + res.status));
+    iphoneAnsichtWunsch = '';
+    zeigeIphoneStatus(st);
+    showToast('📱 iPhone-Modus AUS');
+    pruefeServer();
+  } catch (e) { showToast('iPhone-Modus: ' + e.message); }
+}
+// Der Knopf neben „📱 iPhone-Modus": an → beenden; aus → der Weg, der zur Ansicht passt
+async function iphoneModusSchalten() {
+  if (iphoneModusAn) return iphoneFreigabeBeenden();
+  const st = iphoneLetzterStand || {}, a = iphoneAnsicht(st);
+  return iphoneFreigeben(a === 'schnell' || (a === 'fertig' && (st.gemerkt || {}).bewaehrt === 'http') ? 'schnell' : 'sicher');
+}
+// Schritt 1: Zertifikat erzeugen bzw. prüfen, ohne schon freizugeben
+async function iphoneZertifikatErzeugen() {
+  const b = document.getElementById('iphone-zert-knopf');
+  if (b) { b.disabled = true; b.textContent = 'Einen Moment …'; }
+  try {
+    const res = await fetch(getServerUrl() + '/api/tls/vorbereiten', { method: 'POST', signal: AbortSignal.timeout(60000) });
     const st = await res.json();
     if (!res.ok) throw new Error(st.error || ('HTTP ' + res.status));
     zeigeIphoneStatus(st);
-    if (st.ok === false) showToast('iPhone-Modus konnte nicht eingeschaltet werden: ' + (st.hinweis || 'unbekannter Grund'));
-    else showToast(st.an ? '📱 iPhone-Modus AN — Adresse steht in den Einstellungen' : '📱 iPhone-Modus AUS');
-    pruefeServer();
+    showToast(st.ok ? '🔐 Zertifikat bereit — weiter mit Schritt 2' : ('Zertifikat: ' + (st.grund || 'unbekannter Grund')));
   } catch (e) {
-    showToast('iPhone-Modus: ' + e.message);
-  } finally { if (btn) btn.disabled = false; }
+    showToast('Zertifikat: ' + e.message);
+    if (b) { b.disabled = false; b.textContent = 'Zertifikat erzeugen'; }
+  }
 }
 async function iphoneCodeErneuern() {
   if (!confirm('Neuen Zugangscode erzeugen? Alle iPhones müssen die Adresse danach einmal neu öffnen.')) return;
@@ -4421,6 +6180,80 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && document.getElementById('save-overlay').style.display === 'flex') confirmSave();
 });
 
+// ═══ BACKUP MIT PASSWORT (2026-11-14-1, Review S8) ═══
+// Die Backup-Datei enthält Notfallkarte (Vorerkrankungen, Medikamente, Police- und Fahrgestellnummern) und alle Chats
+// und wandert auf USB-Sticks und in Cloud-Ordner. Mit Passwort wird sie im Browser verschlüsselt (AES-256-GCM,
+// Schlüssel per PBKDF2-SHA256); ohne Passwort bleibt sie lesbar wie bisher — dann ohne das Feld „Schlüssel-Versteck".
+const BACKUP_KDF_RUNDEN = 310000;
+function b64(bytes) { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s); }
+function b64zu(text) { const s = atob(String(text || '')); const a = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i); return a; }
+async function backupSchluessel(passwort, salz, runden) {
+  const roh = await crypto.subtle.importKey('raw', new TextEncoder().encode(passwort), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: salz, iterations: runden, hash: 'SHA-256' }, roh, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+async function backupVerschluesseln(backup, passwort) {
+  const salz = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await backupSchluessel(passwort, salz, BACKUP_KDF_RUNDEN);
+  const daten = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(JSON.stringify(backup))));
+  return { version: 3, verschluesselt: true, app: 'safari-assistant', kdf: 'PBKDF2-SHA256', runden: BACKUP_KDF_RUNDEN, salz: b64(salz), iv: b64(iv), daten: b64(daten),
+    created: backup.created, hinweis: 'Verschlüsseltes Backup (AES-256-GCM). Ohne das Passwort nicht lesbar.' };
+}
+async function backupEntschluesseln(huelle, passwort) {
+  if (!huelle || huelle.kdf !== 'PBKDF2-SHA256' || !(huelle.runden >= 100000 && huelle.runden <= 5000000)) throw new Error('Unbekanntes Backup-Format');
+  const key = await backupSchluessel(passwort, b64zu(huelle.salz), huelle.runden);
+  let klar;
+  try { klar = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64zu(huelle.iv) }, key, b64zu(huelle.daten)); }
+  catch (e) { throw new Error('Falsches Passwort — oder die Datei ist beschädigt'); }
+  return JSON.parse(new TextDecoder().decode(klar));
+}
+function backupOhneVersteck(backup) {
+  try {
+    const nk = JSON.parse(backup.localStorage['safari-notfallkarte'] || 'null');
+    if (nk && nk.fahrzeug && nk.fahrzeug['Schlüssel-Versteck']) { nk.fahrzeug['Schlüssel-Versteck'] = ''; backup.localStorage['safari-notfallkarte'] = JSON.stringify(nk); }
+  } catch (e) {}
+}
+// Passwort abfragen. modus 'neu': zweimal eingeben, „Ohne Passwort" möglich → '' ; modus 'oeffnen': einmal.
+// Liefert das Passwort, '' (ohne) oder null (abgebrochen).
+function passwortDialog(opt) {
+  const neu = opt && opt.modus === 'neu';
+  return new Promise(fertig => {
+    const alt = document.getElementById('passwort-overlay');
+    if (alt) alt.remove();
+    const ov = document.createElement('div');
+    ov.id = 'passwort-overlay';
+    ov.className = 'dialog-overlay';
+    ov.innerHTML = '<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="passwort-titel">'
+      + '<div class="dialog-titel" id="passwort-titel">' + (neu ? 'Backup mit Passwort schützen?' : 'Dieses Backup ist verschlüsselt') + '</div>'
+      + '<div class="dialog-text">' + (neu
+          ? 'Die Datei enthält Notfallkarte, Logbuch und Chats. Mit Passwort wird sie verschlüsselt (AES-256). Ohne Passwort bleibt sie für jeden lesbar — das Feld „Schlüssel-Versteck“ wird dann nicht mitgeschrieben.'
+          : 'Bitte das Passwort eingeben, mit dem es erstellt wurde.') + '</div>'
+      + '<input type="password" id="passwort-1" class="dialog-feld" autocomplete="' + (neu ? 'new' : 'current') + '-password" placeholder="' + (neu ? 'Passwort (mindestens 8 Zeichen)' : 'Passwort eingeben') + '">'
+      + (neu ? '<input type="password" id="passwort-2" class="dialog-feld" autocomplete="new-password" placeholder="Passwort wiederholen">' : '')
+      + '<div class="dialog-fehler" id="passwort-fehler" role="alert"></div>'
+      + '<div class="dialog-knoepfe">'
+      + '<button class="toolbar-btn" data-wahl="abbruch">Abbrechen</button>'
+      + (neu ? '<button class="toolbar-btn" data-wahl="ohne">Ohne Passwort</button>' : '')
+      + '<button class="toolbar-btn primary" data-wahl="ok">' + (neu ? 'Verschlüsseln' : 'Öffnen') + '</button></div></div>';
+    const ende = wert => { ov.remove(); fertig(wert); };
+    const ok = () => {
+      const p1 = ov.querySelector('#passwort-1').value, p2el = ov.querySelector('#passwort-2'), fehler = ov.querySelector('#passwort-fehler');
+      if (neu && p1.length < 8) { fehler.textContent = 'Mindestens 8 Zeichen.'; return; }
+      if (neu && p2el && p2el.value !== p1) { fehler.textContent = 'Die beiden Eingaben sind verschieden.'; return; }
+      if (!p1) { fehler.textContent = 'Bitte ein Passwort eingeben.'; return; }
+      ende(p1);
+    };
+    ov.addEventListener('click', e => {
+      const wahl = e.target && e.target.dataset ? e.target.dataset.wahl : '';
+      if (wahl === 'abbruch' || e.target === ov) ende(null);
+      else if (wahl === 'ohne') ende('');
+      else if (wahl === 'ok') ok();
+    });
+    ov.addEventListener('keydown', e => { if (e.key === 'Escape') ende(null); else if (e.key === 'Enter') { e.preventDefault(); ok(); } });
+    document.body.appendChild(ov);
+    ov.querySelector('#passwort-1').focus();
+  });
+}
+
 // ═══ BACKUP & WIEDERHERSTELLUNG ═══
 async function exportBackup() {
   const statusEl = document.getElementById('backup-status');
@@ -4438,7 +6271,7 @@ async function exportBackup() {
       if (key === 'safari-settings') {
         // 2026-09-05-1: Anthropic-Key und GPS-Position bleiben draußen — die Backup-Datei wandert auf
         // USB-Sticks und in Cloud-Ordner. Der Key wird nach dem Import einmal neu eingetragen.
-        try { const st = JSON.parse(val); delete st.anthropicKey; delete st.userLat; delete st.userLng; delete st.userLocationTime; val = JSON.stringify(st); } catch(_) {}
+        try { const st = JSON.parse(val); delete st.anthropicKey; delete st.userLat; delete st.userLng; delete st.userLocationTime; delete st.iphoneAnthropicKey; val = JSON.stringify(st); } catch(_) {}
       }
       backup.localStorage[key] = val;
     });
@@ -4459,8 +6292,13 @@ async function exportBackup() {
       req.onerror = () => resolve([]);
     });
 
-    // 3. Als Datei herunterladen
-    const blob = new Blob([JSON.stringify(backup)], { type: 'application/json' });
+    // 3. Als Datei herunterladen — 2026-11-14-1 (Review S8): auf Wunsch mit Passwort verschlüsselt
+    const passwort = await passwortDialog({ modus: 'neu' });
+    if (passwort === null) { statusEl.textContent = 'Abgebrochen — kein Backup erstellt.'; return; }
+    let ausgabe = backup;
+    if (passwort) ausgabe = await backupVerschluesseln(backup, passwort);
+    else backupOhneVersteck(backup);
+    const blob = new Blob([JSON.stringify(ausgabe)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     const dateStr = new Date().toISOString().split('T')[0];
@@ -4470,7 +6308,7 @@ async function exportBackup() {
     URL.revokeObjectURL(url);
 
     const sizeKb = Math.round(blob.size / 1024);
-    statusEl.textContent = `✅ Backup erstellt (${sizeKb > 1024 ? (sizeKb/1024).toFixed(1)+' MB' : sizeKb+' KB'}, ${backup.docs.length} Dokumente, ${backup.chunks.length} Abschnitte)`;
+    statusEl.textContent = `✅ Backup erstellt (${sizeKb > 1024 ? (sizeKb/1024).toFixed(1)+' MB' : sizeKb+' KB'}, ${backup.docs.length} Dokumente, ${backup.chunks.length} Abschnitte)` + (passwort ? ' — verschlüsselt' : ' — ohne Passwort');
   } catch(e) {
     statusEl.textContent = '⚠️ Fehler: ' + e.message;
   }
@@ -4497,13 +6335,19 @@ async function importBackup(event) {
   if (!file) return;
   const statusEl = document.getElementById('backup-status');
 
-  if (!confirm('Backup wiederherstellen? ALLE aktuellen Daten werden durch das Backup ERSETZT. Zur Sicherheit vorher ein aktuelles Backup exportieren!')) return;
+  if (!backupOhneFrage && !confirm('Backup wiederherstellen? ALLE aktuellen Daten werden durch das Backup ERSETZT. Zur Sicherheit vorher ein aktuelles Backup exportieren!')) return;
 
   statusEl.textContent = '⏳ Stelle wieder her...';
   try {
     if (file.size > 50 * 1024 * 1024) throw new Error('Backup-Datei ist größer als 50 MB — das ist kein Backup dieser App');
     const text = await file.text();
-    const backup = JSON.parse(text);
+    let backup = JSON.parse(text);
+    // 2026-11-14-1 (Review S8): verschlüsseltes Backup → Passwort abfragen und im Browser entschlüsseln
+    if (backup && backup.verschluesselt === true) {
+      const passwort = await passwortDialog({ modus: 'oeffnen' });
+      if (passwort === null) { statusEl.textContent = 'Abgebrochen — nichts wiederhergestellt.'; return; }
+      backup = await backupEntschluesseln(backup, passwort);
+    }
     if (!backup.version || !istObj(backup.localStorage)) throw new Error('Ungültiges Backup-Format');
 
     // 1. localStorage wiederherstellen — Re-Audit 2026-09-12 (H1): NUR bekannte Schlüssel, jeder Wert
@@ -4524,12 +6368,14 @@ async function importBackup(event) {
       } catch (e) { uebersprungen.push(key); }
     });
     importLaeuft = true;   // persistLiveChats darf den frischen Stand beim Reload nicht überschreiben (M2)
+    sicherungStand.gesperrt = true;   // 2026-11-14-1: bis zum Neuladen nichts spiegeln (halber Stand)
 
-    // 2. IndexedDB wiederherstellen (erst leeren, dann füllen)
+    // 2. IndexedDB wiederherstellen (erst leeren, dann füllen) — nicht bei der automatischen Sicherung (nurSpeicher):
+    //    die enthält keine Dokumente, vorhandene bleiben dann stehen (2026-11-14-1)
     const backupDocs = backupDocsSauber(backup.docs);
     const backupChunks = backupChunksSauber(backup.chunks, new Set(backupDocs.map(d => d.id)));
     if (!docDB) await openDocDB();
-    await new Promise((resolve, reject) => {
+    if (backup.nurSpeicher !== true) await new Promise((resolve, reject) => {
       const tx = docDB.transaction(['docs', 'chunks'], 'readwrite');
       tx.objectStore('docs').clear();
       tx.objectStore('chunks').clear();
@@ -4985,7 +6831,7 @@ function sonnenBlockDesktop() {
 // 🚗 Fällige Fahrzeug-Prüfungen für die Notfallkarte — NUR fällige/überfällige (nicht-fällige bleiben aus)
 function wartungBlockDesktop() {
   const faellig = wartungItems().filter(i => wartungStatus(i).state === 'faellig');
-  const kopf = `<div style="font-size:11px;font-weight:600;color:var(--text)">🚗 Fahrzeug-Prüfungen <span style="font-size:9px;color:var(--text3);font-weight:400">km-Stand ${wartung.km.toLocaleString('de-DE')} · ${wartung.kmDatum}</span></div>`;
+  const kopf = `<div style="font-size:11px;font-weight:600;color:var(--text)">🚗 Fahrzeug-Prüfungen <span style="font-size:9px;color:var(--text3);font-weight:400">km-Stand ${wartung.km.toLocaleString('de-DE')} · ${escHtml(wartung.kmDatum)}</span></div>`;
   if (!faellig.length) {
     return `<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 16px;margin-bottom:16px">${kopf}<div style="font-size:11px;color:#3a9d6b;margin-top:6px">🟢 Keine fälligen Prüfungen.</div></div>`;
   }
@@ -5858,6 +7704,11 @@ function navTastatur() {
   try { await checkOllama(true); } catch (e) { console.warn('Ollama-Check:', e); }
   ladeIphoneStatus();
   ladeReisewarnungenStart();   // amtliche Warnungen: gespeicherter Stand + Abgleich mit dem Server
+  ladeNachrichtenStart();      // Nachrichten aus RSS-Feeds (2026-10-18-2): gespeicherter Stand + Abgleich
+  vpnStart();                  // VPN-Prüfung (2026-10-30-1): Stand alle 10 s vom eigenen Server — gemessen wird dort
+  sicherungStart();            // automatische Sicherung auf diesem Mac (2026-11-14-1, Review U2)
+  schluesselStart();           // Claude-Key ans iPhone: wartet ein Gerät auf Bestätigung? (2026-11-14-4)
+  setInterval(ladeNachrichtenStart, 10 * 60 * 1000);
   // Dokumente laden (für RAG-Button-Sichtbarkeit)
   try { await loadDocList(); syncButtons(); } catch(e) { console.warn('Doc-DB init:', e); }
   syncRagToServer(); // iPhone-RAG: Chunks zum Server spiegeln (fire-and-forget)

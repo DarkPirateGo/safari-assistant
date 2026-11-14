@@ -102,6 +102,22 @@ try:
     if tage != 1:
         f.append('Serverzertifikat läuft länger als 825 Tage — iOS akzeptiert das nicht')
 
+    # 4a. (2026-10-11-1) Kein Rückwärts-DNS beim Binden: http.server fragt sonst socket.getfqdn() für die
+    # WLAN-Adresse — am Mac kann das Sekunden dauern, und „iPhone-Modus an" lief in die 8-s-Frist der Seite.
+    echt_fqdn = m.socket.getfqdn
+    def kein_fqdn(*a, **k):
+        raise AssertionError('getfqdn')
+    m.socket.getfqdn = kein_fqdn
+    try:
+        probe_srv = m.SafariServer(('127.0.0.1', 0), m.SafariHandler)
+        if probe_srv.server_name != '127.0.0.1':
+            f.append('server_name nach dem Binden: %r' % probe_srv.server_name)
+        probe_srv.server_close()
+    except AssertionError:
+        f.append('SafariServer fragt beim Binden Rückwärts-DNS (socket.getfqdn) — kann am Mac Sekunden dauern')
+    finally:
+        m.socket.getfqdn = echt_fqdn
+
     # 4. Echter Handshake gegen den echten Handler
     m.SERVER_INFO.update({'port': 0, 'bind': '127.0.0.1', 'lan': False, 'basis': str(m.BASE_DIR), 'offen': False})
     srv = m.SafariServer(('127.0.0.1', 0), m.SafariHandler, ssl_kontext=ctx)
@@ -158,6 +174,142 @@ try:
     except OSError:
         pass
     srv.shutdown(); srv.server_close()
+
+    # 4b. (2026-10-18-1) Handyzugang wie Wingfoilscout: ein Port, zwei Protokolle; im Weg „sicher" wird http
+    # abgelehnt, bevor Code oder Cookie gelesen werden; Secure-Cookie über https (altes zieht um); Meldungen
+    # an den Mac ohne Code; gemerkter Weg nur auf dem Weg der Freigabe; Zustandsdatei nur mit bekannten
+    # Feldern; das Profil enthält genau das CA-Zertifikat und keinen Schlüssel.
+    import plistlib, time as _t
+    m.TOKEN_DATEI = tmp / 'zugang'
+    m._TOKEN_CACHE['wert'] = ''
+    m.ZUSTAND_DATEI = tmp / 'iphone.json'
+    m._ZUSTAND_CACHE['wert'] = None
+    code = m.zugangs_token()
+
+    class AusDemWlan(m.SafariHandler):
+        def client_ip(self):
+            return '192.168.1.50'
+    lan_alt = dict(m.LAN_STATE)
+    srv2 = m.SafariServer(('127.0.0.1', 0), AusDemWlan, ssl_kontext=ctx, lan=True)
+    port2 = srv2.server_address[1]
+    threading.Thread(target=srv2.serve_forever, kwargs={'poll_interval': 0.2}, daemon=True).start()
+
+    def lesen(s0):
+        d = b''
+        while True:
+            t = s0.recv(8192)
+            if not t:
+                break
+            d += t
+        return d.decode('utf-8', 'replace')
+
+    def roh_http(pfad, kopf=''):
+        s0 = socket.create_connection(('127.0.0.1', port2), timeout=6)
+        try:
+            s0.sendall(f'GET {pfad} HTTP/1.0\r\nHost: {name}:{port2}\r\n{kopf}\r\n'.encode())
+            return lesen(s0)
+        finally:
+            s0.close()
+
+    def roh_https(pfad, kopf=''):
+        r = socket.create_connection(('127.0.0.1', port2), timeout=6)
+        with cctx.wrap_socket(r, server_hostname=name) as s0:
+            s0.sendall(f'GET {pfad} HTTP/1.0\r\nHost: {name}:{port2}\r\n{kopf}\r\n'.encode())
+            return lesen(s0)
+
+    def kopf_von(a):
+        return a.split('\r\n\r\n', 1)[0]
+
+    def status(a):
+        return (a.splitlines() or [''])[0]
+    try:
+        m.LAN_STATE.update({'an': True, 'weg': 'sicher', 'tls': True, 'ip': '192.168.1.50', 'seit': _t.time()})
+        m.handy_meldung_zuruecksetzen()
+        a = roh_http('/api/ping', 'Accept: text/html\r\n')
+        if ' 403 ' not in status(a) or 'Nur verschlüsselt' not in a:
+            f.append('4b: http im Weg „sicher" nicht mit „Nur verschlüsselt" abgelehnt: ' + status(a))
+        a = roh_http('/i18n.js?t=' + code)
+        if ' 403 ' not in status(a):
+            f.append('4b: http mit gültigem Code im Weg „sicher" angenommen: ' + status(a))
+        if 'Set-Cookie' in kopf_von(a) or code in a:
+            f.append('4b: die Ablehnung über http setzt ein Cookie oder nennt den Code')
+        if m.handy_meldung()['verbunden'] or m.handy_meldung()['ohne_schluessel']:
+            f.append('4b: abgelehnte http-Anfrage wurde als Verbindung/Code-Versuch gezählt (Code wurde gelesen?)')
+        a = roh_https('/i18n.js?t=' + code)
+        k = kopf_von(a)
+        if ' 200 ' not in status(a):
+            f.append('4b: https mit Code liefert kein 200: ' + status(a))
+        if ('Set-Cookie: safari_zugang_https=' + code) not in k or '; Secure' not in k:
+            f.append('4b: über https kein Secure-Cookie safari_zugang_https')
+        hm = m.handy_meldung()
+        if not hm['verbunden'] or not hm['verschluesselt']:
+            f.append('4b: Meldung „verbunden, verschlüsselt" fehlt: %r' % hm)
+        if code in json.dumps(hm):
+            f.append('4b: /api/netz/stand enthält den Zugangscode')
+        g = m.zustand_lesen()
+        if g.get('bewaehrt') != 'https' or not m.ca_kennung() or g.get('kennung') != m.ca_kennung():
+            f.append('4b: gemerkter Weg nach https: %r' % g)
+        if (m.ZUSTAND_DATEI.stat().st_mode & 0o777) != 0o600:
+            f.append('4b: Zustandsdatei nicht 0600')
+        a = roh_https('/i18n.js', 'Cookie: safari_zugang=' + code + '\r\n')
+        k = kopf_von(a)
+        if ' 200 ' not in status(a) or ('safari_zugang_https=' + code) not in k or 'safari_zugang=; Path=/; Max-Age=0' not in k:
+            f.append('4b: der Code aus dem alten Cookie zieht nicht ins Secure-Cookie um')
+        a = roh_https('/i18n.js?t=falsch12345')
+        if ' 403 ' not in status(a):
+            f.append('4b: falscher Code über https nicht abgelehnt: ' + status(a))
+        if not m.handy_meldung()['ohne_schluessel']:
+            f.append('4b: Anfrage ohne gültigen Code wird nicht gemeldet')
+        # Ein Gerät, das der CA (noch) nicht vertraut, bricht den Handshake ab → Meldung „abgebrochen"
+        try:
+            r = socket.create_connection(('127.0.0.1', port2), timeout=6)
+            ssl.create_default_context().wrap_socket(r, server_hostname=name).close()
+        except (ssl.SSLError, OSError):
+            pass
+        for _ in range(40):
+            if m.handy_meldung()['abgebrochen']:
+                break
+            _t.sleep(0.1)
+        if not m.handy_meldung()['abgebrochen']:
+            f.append('4b: abgebrochener TLS-Handshake wird nicht gemeldet')
+        # Weg „schnell": http mit Code geht, Cookie ohne Secure, gemerkt wird http
+        m.LAN_STATE.update({'weg': 'schnell'})
+        a = roh_http('/i18n.js?t=' + code)
+        k = kopf_von(a)
+        if ' 200 ' not in status(a):
+            f.append('4b: Weg „schnell": http mit Code abgelehnt: ' + status(a))
+        if ('Set-Cookie: safari_zugang=' + code) not in k or 'Secure' in k:
+            f.append('4b: Weg „schnell": Cookie fehlt oder trägt Secure')
+        if m.zustand_lesen().get('bewaehrt') != 'http':
+            f.append('4b: Weg „schnell" wird nicht gemerkt')
+        roh_https('/i18n.js?t=' + code)
+        if m.zustand_lesen().get('bewaehrt') != 'http':
+            f.append('4b: eine https-Anfrage im Weg „schnell" stellt den gemerkten Weg um')
+        # Freigabe aus: nichts geht mehr, auch nicht über https
+        m.LAN_STATE.update({'an': False})
+        if ' 403 ' not in status(roh_https('/i18n.js?t=' + code)):
+            f.append('4b: bei ausgeschaltetem iPhone-Modus antwortet der WLAN-Listener')
+        # Zustandsdatei: nur bekannte Felder werden übernommen
+        m.ZUSTAND_DATEI.write_text(json.dumps({'bewaehrt': 'x', 'kennung': '../../etc', 'zeit': True, 'profil': 'abcdef0123456789'}))
+        m._ZUSTAND_CACHE['wert'] = None
+        if m.zustand_lesen() != {'profil': 'abcdef0123456789'}:
+            f.append('4b: zustand_lesen übernimmt Unbekanntes: %r' % m.zustand_lesen())
+        # Das Profil
+        roh = m.iphone_profil()
+        nl = plistlib.loads(roh)['PayloadContent'][0]
+        if nl.get('PayloadType') != 'com.apple.security.root' or nl.get('PayloadContent') != ssl.PEM_cert_to_DER_cert(m.TLS_CA_CRT.read_text()):
+            f.append('4b: das Profil enthält nicht genau das CA-Zertifikat')
+        if b'PRIVATE KEY' in roh or m.TLS_CA_KEY.read_bytes()[:40] in roh:
+            f.append('4b: das Profil enthält einen Schlüssel')
+        if roh != m.iphone_profil():
+            f.append('4b: zweimal geladen ergibt nicht dasselbe Profil (UUIDs)')
+    except Exception as e:
+        f.append('4b: %s: %s' % (e.__class__.__name__, e))
+    finally:
+        srv2.shutdown()
+        srv2.server_close()
+        m.LAN_STATE.clear()
+        m.LAN_STATE.update(lan_alt)
 
     # 5. Namensbeschränkung greift: fremder Name immer abgelehnt, fremde IP bei Stufe 'voll'
     cfg = tmp / 'test.cnf'

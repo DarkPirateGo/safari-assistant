@@ -185,6 +185,351 @@ try:
         st, _, _ = anfrage('OPTIONS', '/server.py', ziel=port_wlan)
         if st != 403:
             f.append('OPTIONS aus dem WLAN ohne Code → %s statt 403' % st)
+
+    # 8. Review 13.11.2026, S2: Der Ollama-Durchgriff und die Dokumentensuche nehmen nichts von fremden Webseiten an.
+    #    Vorher lief POST /api/ollama/api/chat mit „Origin: https://evil.example" bis zu Ollama durch.
+    import json as _json
+    gesehen = []
+    echt_proxy, echt_basis = m.SafariHandler._proxy_ollama, m.OLLAMA_BASE
+    m.OLLAMA_BASE = 'http://127.0.0.1:1'      # falls doch etwas durchkäme: nie ein echtes Ollama
+
+    def proxy_attrappe(self, methode, ziel, body):
+        gesehen.append((methode, ziel, body))
+        self._json({'attrappe': True})
+    m.SafariHandler._proxy_ollama = proxy_attrappe
+
+    def post(pfad, kopf, daten, ziel=None):
+        k = http.client.HTTPConnection('127.0.0.1', ziel or port, timeout=6)
+        roh = _json.dumps(daten).encode('utf-8')
+        kk = {'Content-Length': str(len(roh))}
+        kk.update(kopf or {})
+        k.request('POST', pfad, body=roh, headers=kk)
+        r = k.getresponse()
+        r.read()
+        k.close()
+        return r.status
+    chat = {'model': 'x', 'messages': [{'role': 'user', 'content': 'hi'}], 'keep_alive': -1, 'options': {'num_ctx': 10 ** 7}}
+    eigen = 'http://localhost:%d' % port
+    for kopf, soll, was in [({'Origin': 'https://evil.example', 'Content-Type': 'text/plain'}, 403, 'fremder Origin'),
+                            ({'Origin': 'null'}, 403, 'Origin null'),
+                            ({'Origin': 'http://localhost:%d' % (port + 1)}, 403, 'anderer lokaler Port'),
+                            ({'Sec-Fetch-Site': 'cross-site'}, 403, 'Sec-Fetch-Site cross-site ohne Origin'),
+                            ({'Origin': eigen, 'Sec-Fetch-Site': 'same-origin'}, 200, 'eigene Seite'),
+                            ({}, 200, 'ohne Browser-Kopfzeilen (curl)')]:
+        vorher = len(gesehen)
+        st = post('/api/ollama/api/chat', kopf, chat)
+        if st != soll or (soll == 403) != (len(gesehen) == vorher):
+            f.append('S2: Ollama-Durchgriff, %s → %s, durchgereicht: %s' % (was, st, len(gesehen) > vorher))
+    if gesehen:
+        d = _json.loads(gesehen[-1][2].decode('utf-8'))
+        if 'keep_alive' in d or (d.get('options') or {}).get('num_ctx') != 32768:
+            f.append('S2: Deckel gelten nicht für Anfragen vom Mac selbst: %r' % d)
+    else:
+        f.append('S2: die eigene Seite kommt nicht mehr durch')
+    vorher = len(gesehen)
+    st, _, _ = anfrage('GET', '/api/ollama/api/tags', {'Origin': 'https://evil.example'})
+    if st != 403 or len(gesehen) != vorher:
+        f.append('S2: /api/ollama/api/tags von fremder Seite → %s' % st)
+    st, _, _ = anfrage('GET', '/api/ollama/api/tags', {'Origin': eigen})
+    if st != 200:
+        f.append('S2: /api/ollama/api/tags von der eigenen Seite → %s' % st)
+    if post('/api/rag/search', {'Origin': 'https://evil.example'}, {'query': 'x', 'module': 'y'}) != 403:
+        f.append('S2: /api/rag/search nimmt eine fremde Seite an')
+    if post('/api/rag/search', {'Origin': eigen}, {'query': 'x', 'module': 'y'}) != 200:
+        f.append('S2: /api/rag/search lehnt die eigene Seite ab')
+    # iPhone (WLAN, mit Code): eigene Seite ja, fremde Seite nein
+    m.LAN_STATE['an'] = True
+    wlan_eigen = dict(mit_code, Origin='http://127.0.0.1:%d' % port_wlan)
+    if post('/api/ollama/api/chat', wlan_eigen, chat, ziel=port_wlan) != 200:
+        f.append('S2: das iPhone kommt mit Code und eigener Seite nicht mehr an den Durchgriff')
+    if post('/api/ollama/api/chat', dict(mit_code, Origin='https://evil.example'), chat, ziel=port_wlan) != 403:
+        f.append('S2: fremde Seite mit gültigem Cookie kommt aus dem WLAN durch')
+    m.SafariHandler._proxy_ollama, m.OLLAMA_BASE = echt_proxy, echt_basis
+
+    # 9. Review 13.11.2026, S3: Die Wikipedia hat einen eigenen Port (eigene Herkunft im Browser). Der App-Port
+    #    leitet /wiki nur um; der Wikipedia-Port liefert nichts außer /wiki; von dort gibt es weder CORS noch Mutationen.
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    class KiwixAttrappe(BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = b'<html><script>window.wiki=1</script>kiwix-attrappe ' + self.path.encode('ascii', 'replace') + b'</html>'
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *a):
+            pass
+    kiwix = HTTPServer(('127.0.0.1', 0), KiwixAttrappe)
+    threading.Thread(target=kiwix.serve_forever, kwargs={'poll_interval': 0.2}, daemon=True).start()
+    alt_kiwix = (m.KIWIX_PORT, m.KIWIX_ROOT, dict(m.WIKI_STATE))
+    m.KIWIX_PORT, m.KIWIX_ROOT = kiwix.server_address[1], '/wiki'
+    wport = 0
+    try:
+        wport = m.wiki_server_oeffnen(port)
+        if not wport or wport == port or not (port + m.WIKI_PORT_ABSTAND <= wport < port + m.WIKI_PORT_ABSTAND + 10):
+            f.append('S3: kein eigener Wikipedia-Port (%r)' % wport)
+        else:
+            if not getattr(m.WIKI_STATE['server'], 'nur_wiki', False):
+                f.append('S3: der Wikipedia-Listener ist nicht auf /wiki beschränkt')
+            st, hdr, body = anfrage('GET', '/wiki/content/buch/A?x=1')
+            if st != 302 or hdr.get('location') != 'http://127.0.0.1:%d/wiki/content/buch/A?x=1' % wport or b'kiwix-attrappe' in body:
+                f.append('S3: App-Port leitet /wiki nicht um: %s %r' % (st, hdr.get('location')))
+            st, hdr, _ = anfrage('GET', '/wiki/', {'Host': 'localhost:%d' % port})
+            if st != 302 or hdr.get('location') != 'http://localhost:%d/wiki/' % wport:
+                f.append('S3: Umleitung behält den Namen aus der Adresse nicht: %r' % hdr.get('location'))
+            st, _, body = anfrage('GET', '/wiki/content/buch/A?x=1', ziel=wport)
+            if st != 200 or b'kiwix-attrappe /wiki/content/buch/A?x=1' not in body:
+                f.append('S3: Wikipedia-Port reicht nicht durch (%s)' % st)
+            for pfad in ('/', '/index.html', '/mobile.html', '/api/ping', '/api/docs/list', '/api/kiwix/status', '/i18n.js',
+                         '/vendor/leaflet.js', '/hilfe', '/sw.js', '/api/ollama/api/tags', '/wikix', '/server.py'):
+                st, _, body = anfrage('GET', pfad, ziel=wport)
+                if st != 404:
+                    f.append('S3: Wikipedia-Port liefert %s → %s' % (pfad, st))
+            for methode, pfad in (('POST', '/api/netz/an'), ('POST', '/api/rag/search'), ('POST', '/wiki/'),
+                                  ('DELETE', '/api/docs/delete?module=a&file=b.txt'), ('OPTIONS', '/api/ping')):
+                st, _, _ = anfrage(methode, pfad, {'Content-Length': '0'}, ziel=wport)
+                if st != 404:
+                    f.append('S3: Wikipedia-Port nimmt %s %s an (%s)' % (methode, pfad, st))
+            st, _, _ = anfrage('GET', '/wiki/', {'Host': 'evil.example'}, ziel=wport)
+            if st != 421:
+                f.append('S3: Wikipedia-Port ohne Host-Prüfung (%s)' % st)
+            st, _, body = anfrage('GET', '/wiki/../server.py', ziel=wport)
+            if st == 200 and b'kiwix-attrappe' not in body:
+                f.append('S3: Wikipedia-Port liefert Dateien')
+            # Von der Wikipedia-Herkunft aus: kein CORS auf der App, keine Mutation, kein Durchgriff
+            wiki_origin = 'http://127.0.0.1:%d' % wport
+            _, hdr, _ = anfrage('GET', '/api/docs/list', {'Origin': wiki_origin})
+            if 'access-control-allow-origin' in hdr:
+                f.append('S3: die Wikipedia-Herkunft bekommt CORS-Freigabe auf der App')
+            st, _, _ = anfrage('POST', '/api/netz/aus', {'Origin': wiki_origin})
+            if st != 403:
+                f.append('S3: Mutation von der Wikipedia-Herkunft → %s statt 403' % st)
+            if post('/api/rag/search', {'Origin': wiki_origin}, {'query': 'x', 'module': 'y'}) != 403:
+                f.append('S3: Dokumentensuche von der Wikipedia-Herkunft möglich')
+            # Status nennt den Port (Mac). iPhone: nur wenn dort der zweite Listener offen ist — sonst wie bisher durchreichen.
+            st, _, body = anfrage('GET', '/api/kiwix/status')
+            d = _json.loads(body.decode('utf-8'))
+            if d.get('wiki_port') != wport or d.get('proxy') != '/wiki/' or 'offen_im_netz' not in d:
+                f.append('S3: /api/kiwix/status ohne Wikipedia-Port: %r' % d)
+            m.WIKI_STATE['lan'] = None
+            st, _, body = anfrage('GET', '/api/kiwix/status', mit_code, ziel=port_wlan)
+            if _json.loads(body.decode('utf-8')).get('wiki_port') != 0:
+                f.append('S3: iPhone bekommt einen Wikipedia-Port genannt, der im WLAN nicht offen ist')
+            st, _, body = anfrage('GET', '/wiki/A', mit_code, ziel=port_wlan)
+            if st != 200 or b'kiwix-attrappe' not in body:
+                f.append('S3: ohne zweiten WLAN-Listener fällt die Wikipedia am iPhone aus (%s)' % st)
+            alt_ip = m.LAN_STATE.get('ip')
+            m.WIKI_STATE['lan'], m.LAN_STATE['ip'] = object(), '192.168.178.23'
+            st, hdr, _ = anfrage('GET', '/wiki/A', dict(mit_code, Host='192.168.178.23:%d' % port_wlan), ziel=port_wlan)
+            m.WIKI_STATE['lan'], m.LAN_STATE['ip'] = None, alt_ip
+            if st != 302 or hdr.get('location') != 'http://192.168.178.23:%d/wiki/A' % wport:
+                f.append('S3: iPhone wird nicht auf den Wikipedia-Port geleitet (%s %r)' % (st, hdr.get('location')))
+            st, _, _ = anfrage('GET', '/wiki/A', ziel=port_wlan)
+            if st != 403:
+                f.append('S3: Wikipedia aus dem WLAN ohne Zugangscode → %s' % st)
+    finally:
+        ws = m.WIKI_STATE.get('server')
+        if ws is not None and ws is not alt_kiwix[2].get('server'):
+            try:
+                ws.shutdown(); ws.server_close()
+            except Exception:
+                pass
+        m.KIWIX_PORT, m.KIWIX_ROOT = alt_kiwix[0], alt_kiwix[1]
+        m.WIKI_STATE.clear(); m.WIKI_STATE.update(alt_kiwix[2])
+        try:
+            kiwix.shutdown(); kiwix.server_close()
+        except Exception:
+            pass
+
+    # 10. Review 13.11.2026, U2/U1: Sicherung der Browser-Daten auf die Platte — nur vom Mac, nur aus der eigenen Seite,
+    #     ohne Claude-Key und Position; Notfallkarte fürs iPhone nur auf Wunsch, mit Code und nur verschlüsselt.
+    import os as _os, stat as _stat
+    import re as _re_k
+    alt_dir = m.SICHERUNG_DIR
+    m.SICHERUNG_DIR = tmp / 'sicherung'
+    try:
+        def post_roh(pfad, kopf, daten, ziel=None):
+            k = http.client.HTTPConnection('127.0.0.1', ziel or port, timeout=6)
+            roh = _json.dumps(daten).encode('utf-8')
+            kk = {'Content-Length': str(len(roh))}
+            kk.update(kopf or {})
+            k.request('POST', pfad, body=roh, headers=kk)
+            r = k.getresponse()
+            body = r.read()
+            k.close()
+            return r.status, body
+        karte = {'personen': [{'label': 'Person 1', 'fields': {'Blutgruppe': '0+'}}], 'fahrzeug': {'Kennzeichen': 'X', 'Schlüssel-Versteck': 'hinten links'}}
+        stand = {'herkunft': eigen, 'kennung': 'abc123', 'daten': {
+            'safari-settings': _json.dumps({'anthropicKey': 'sk-ant-geheim', 'userLat': -22.5, 'userLng': 17.1, 'ollamaUrl': 'http://localhost:11434'}),
+            'safari-notfallkarte': _json.dumps(karte), 'safari-logbuch': '[]',
+            'evil': 'x', '__proto__': 'x', 'safari-zahl': 5, 'safari-' + 'x' * 60: 'zu lang'}}
+        st, _ = anfrage('GET', '/api/sicherung/status')[0], None
+        if _json.loads(anfrage('GET', '/api/sicherung/status')[2].decode('utf-8')).get('vorhanden') is not False:
+            f.append('U2: Status meldet eine Sicherung, bevor es eine gibt')
+        if anfrage('GET', '/api/sicherung')[0] != 404:
+            f.append('U2: GET /api/sicherung ohne Sicherung nicht 404')
+        for kopf, was in [({'Origin': 'https://evil.example'}, 'fremde Seite'), ({'Origin': 'http://localhost:%d' % (port + 1)}, 'anderer Port')]:
+            if post_roh('/api/sicherung', kopf, stand)[0] != 403 or (m.SICHERUNG_DIR / 'daten.json').exists():
+                f.append('U2: Sicherung von %s angenommen' % was)
+        if post_roh('/api/sicherung', dict(mit_code, Origin='http://127.0.0.1:%d' % port_wlan), stand, ziel=port_wlan)[0] != 403:
+            f.append('U2: Sicherung aus dem WLAN angenommen')
+        st, body = post_roh('/api/sicherung', {'Origin': eigen}, stand)
+        datei = m.SICHERUNG_DIR / 'daten.json'
+        if st != 200 or not datei.exists():
+            f.append('U2: Sicherung von der eigenen Seite → %s' % st)
+        else:
+            text = datei.read_text(encoding='utf-8')
+            d = _json.loads(text)
+            if 'sk-ant-geheim' in text or 'userLat' in text or '-22.5' in text:
+                f.append('U2: Claude-Key oder Position stehen in der Sicherung')
+            if sorted(d['daten']) != ['safari-logbuch', 'safari-notfallkarte', 'safari-settings'] or d.get('kennung') != 'abc123':
+                f.append('U2: unerwartete Schlüssel in der Sicherung: %r' % sorted(d['daten']))
+            if _stat.S_IMODE(datei.stat().st_mode) != 0o600 or _stat.S_IMODE(m.SICHERUNG_DIR.stat().st_mode) != 0o700:
+                f.append('U2: Rechte der Sicherung nicht 0600/0700')
+            sta = _json.loads(anfrage('GET', '/api/sicherung/status')[2].decode('utf-8'))
+            if not sta.get('vorhanden') or sta.get('eintraege') != 3 or sta.get('kennung') != 'abc123' or 'ordner' in sta:
+                f.append('U2: Status falsch: %r' % sta)
+            st, _, body = anfrage('GET', '/api/sicherung')
+            if st != 200 or _json.loads(body.decode('utf-8')).get('daten', {}).get('safari-logbuch') != '[]':
+                f.append('U2: GET /api/sicherung liefert die Daten nicht')
+            if anfrage('GET', '/api/sicherung', {'Origin': 'https://evil.example'})[0] != 403:
+                f.append('U2: fremde Seite darf die Sicherung abrufen')
+            _, hdr, _ = anfrage('GET', '/api/sicherung', {'Origin': 'http://localhost:%d' % (port + 1)})
+            if 'access-control-allow-origin' in hdr:
+                f.append('U2: CORS-Freigabe der Sicherung für einen anderen Port')
+            for pfad in ('/api/sicherung', '/api/sicherung/status'):
+                if anfrage('GET', pfad, mit_code, ziel=port_wlan)[0] != 403:
+                    f.append('U2: %s aus dem WLAN abrufbar' % pfad)
+            # Vortag aufheben; starkes Schrumpfen aufheben
+            gestern = time.time() - 86400
+            _os.utime(str(datei), (gestern, gestern))
+            post_roh('/api/sicherung', {'Origin': eigen}, stand)
+            tag = 'tag-%s.json' % time.strftime('%Y-%m-%d', time.localtime(gestern))
+            if not (m.SICHERUNG_DIR / tag).exists():
+                f.append('U2: der Stand des Vortags wird nicht aufgehoben')
+            gross = dict(stand, daten=dict(stand['daten'], **{'safari-history': 'x' * 80000}))
+            post_roh('/api/sicherung', {'Origin': eigen}, gross)
+            post_roh('/api/sicherung', {'Origin': eigen}, stand)
+            if not list(m.SICHERUNG_DIR.glob('vor-schrumpfen-*.json')):
+                f.append('U2: ein plötzlich viel kleinerer Stand überschreibt die Sicherung ohne Kopie')
+            # Ein anderer Browser-Speicher (andere Kennung) überschreibt nie ohne Kopie des bisherigen Stands
+            post_roh('/api/sicherung', {'Origin': eigen}, dict(stand, kennung='anderer99'))
+            if not list(m.SICHERUNG_DIR.glob('vor-wechsel-*.json')):
+                f.append('U2: Wechsel des Browser-Speichers überschreibt die Sicherung ohne Kopie')
+            m._SICHERUNG_LETZTE['kennung'] = None          # wie nach einem Neustart des Servers: Kennung aus der Datei
+            post_roh('/api/sicherung', {'Origin': eigen}, dict(stand, kennung='anderer99'))
+            if len(list(m.SICHERUNG_DIR.glob('vor-wechsel-*.json'))) != 1:
+                f.append('U2: gleiche Kennung nach Neustart legt eine Wechsel-Kopie an')
+            if post_roh('/api/sicherung', {'Origin': eigen}, {'daten': {'evil': 'x'}})[0] != 400:
+                f.append('U2: leere/ungültige Sicherung wird angenommen')
+            # Notfallkarte fürs iPhone: erst nach dem Schalter, aus dem WLAN nie über http
+            if _json.loads(anfrage('GET', '/api/notfallkarte')[2].decode('utf-8')) != {'freigegeben': False}:
+                f.append('U1: Notfallkarte ohne Freigabe abrufbar')
+            if post_roh('/api/sicherung/einstellungen', dict(mit_code), {'notfallkarte_iphone': True}, ziel=port_wlan)[0] != 403:
+                f.append('U1: der Schalter lässt sich aus dem WLAN umlegen')
+            for wert in ('ja', 1, None):
+                post_roh('/api/sicherung/einstellungen', {'Origin': eigen}, {'notfallkarte_iphone': wert})
+                if m.sicherung_einstellungen()['notfallkarte_iphone']:
+                    f.append('U1: Schalter geht mit %r an (nur echtes true)' % (wert,))
+            st, _ = post_roh('/api/sicherung/einstellungen', {'Origin': eigen}, {'notfallkarte_iphone': True})
+            d = _json.loads(anfrage('GET', '/api/notfallkarte')[2].decode('utf-8'))
+            ohne = {'personen': karte['personen'], 'fahrzeug': {'Kennzeichen': 'X'}}
+            if st != 200 or d.get('freigegeben') is not True or d.get('karte') != ohne or 'hinten links' in _json.dumps(d, ensure_ascii=False):
+                f.append('U1: Notfallkarte nach Freigabe nicht abrufbar oder mit Schlüssel-Versteck: %r' % d)
+            if anfrage('GET', '/api/notfallkarte', ziel=port_wlan)[0] != 403:
+                f.append('U1: Notfallkarte aus dem WLAN ohne Zugangscode')
+            d = _json.loads(anfrage('GET', '/api/notfallkarte', mit_code, ziel=port_wlan)[2].decode('utf-8'))
+            if d != {'freigegeben': False, 'grund': 'nur_https'}:
+                f.append('U1: Notfallkarte geht über http ins WLAN: %r' % d)
+            if anfrage('GET', '/api/notfallkarte', {'Origin': 'https://evil.example'})[0] != 403:
+                f.append('U1: fremde Seite darf die Notfallkarte abrufen')
+    finally:
+        m.SICHERUNG_DIR = alt_dir
+
+    # 11. 2026-11-14-4: Claude-Key vom Mac aufs iPhone — anfragen darf das Gerät, erlauben nur der Mac aus der eigenen
+    #     Seite; aus dem WLAN nur über https; der Key geht genau einmal und nur an die anfragende Adresse.
+    def post_k(pfad, kopf=None, daten=None, ziel=None):
+        k = http.client.HTTPConnection('127.0.0.1', ziel or port, timeout=6)
+        roh = _json.dumps(daten).encode('utf-8') if daten is not None else b''
+        kk = {'Content-Length': str(len(roh))}
+        if daten is not None:
+            kk['Content-Type'] = 'application/json'
+        kk.update(kopf or {})
+        k.request('POST', pfad, body=roh, headers=kk)
+        r = k.getresponse(); body = r.read(); k.close()
+        return r.status, (_json.loads(body.decode('utf-8')) if body else {})
+    def get_k(pfad, kopf=None, ziel=None):
+        st, _, body = anfrage('GET', pfad, kopf, ziel=ziel)
+        return st, (_json.loads(body.decode('utf-8')) if body else {})
+    KEY = 'sk-ant-api03-' + 'T' * 30
+    ua = {'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15'}
+    st, a = post_k('/api/schluessel/anfrage', dict(ua, Origin=eigen))
+    if st != 200 or not _re_k.match(r'^\d{4}$', str(a.get('code'))) or len(str(a.get('id', ''))) < 30:
+        f.append('K: Anfrage vom Mac: %s %r' % (st, a))
+    st, o = get_k('/api/schluessel/offen')
+    oa = o.get('anfrage') or {}
+    if st != 200 or oa.get('code') != a.get('code') or oa.get('geraet') != 'iPhone · iOS 18.1' or 'key' in oa or oa.get('id') != a.get('id'):
+        f.append('K: offene Anfrage am Mac falsch: %s %r' % (st, o))
+    if get_k('/api/schluessel/offen', ziel=port_wlan)[0] != 403 or get_k('/api/schluessel/offen', mit_code, ziel=port_wlan)[0] != 403:
+        f.append('K: offene Anfrage (mit Code) aus dem WLAN lesbar')
+    if get_k('/api/schluessel/offen', {'Origin': 'https://evil.example'})[0] != 403:
+        f.append('K: fremde Seite liest die offene Anfrage')
+    # Antworten: nur Mac, nur eigene Seite, nur gültiger Key
+    if post_k('/api/schluessel/antwort', {'Origin': 'https://evil.example'}, {'id': a['id'], 'erlauben': True, 'key': KEY})[0] != 403:
+        f.append('K: fremde Seite darf erlauben')
+    if post_k('/api/schluessel/antwort', mit_code, {'id': a['id'], 'erlauben': True, 'key': KEY}, ziel=port_wlan)[0] != 403:
+        f.append('K: WLAN-Gerät darf sich selbst erlauben')
+    if post_k('/api/schluessel/antwort', {'Origin': eigen}, {'id': a['id'], 'erlauben': True, 'key': 'kein-key'})[0] != 400:
+        f.append('K: ungültiger Key angenommen')
+    if post_k('/api/schluessel/antwort', {'Origin': eigen}, {'id': 'falsch', 'erlauben': True, 'key': KEY})[0] != 400:
+        f.append('K: falsche Kennung angenommen')
+    if get_k('/api/schluessel/anfrage?id=' + a['id'])[1].get('status') != 'wartet':
+        f.append('K: Stand vor dem Erlauben nicht „wartet"')
+    if m.schluessel_abholen(a['id'], '192.168.178.23').get('status') != 'unbekannt':
+        f.append('K: andere Adresse sieht die Anfrage')
+    st, r = post_k('/api/schluessel/antwort', {'Origin': eigen}, {'id': a['id'], 'erlauben': True, 'key': KEY})
+    if st != 200 or r.get('status') != 'erlaubt':
+        f.append('K: Erlauben vom Mac: %s %r' % (st, r))
+    if m.schluessel_abholen(a['id'], '192.168.178.23').get('status') != 'unbekannt':
+        f.append('K: andere Adresse holt den erlaubten Key')
+    st, h, body = anfrage('GET', '/api/schluessel/anfrage?id=' + a['id'])
+    d = _json.loads(body.decode('utf-8'))
+    if st != 200 or d != {'status': 'erlaubt', 'key': KEY} or 'no-store' not in h.get('cache-control', ''):
+        f.append('K: Abholen: %s %r %r' % (st, d, h.get('cache-control')))
+    if get_k('/api/schluessel/anfrage?id=' + a['id'])[1].get('status') != 'unbekannt' or m._SCHLUESSEL['anfrage'] is not None:
+        f.append('K: Key ein zweites Mal abholbar oder nicht vergessen')
+    # Ablehnen, Ersetzen, Ablaufen
+    a1 = post_k('/api/schluessel/anfrage')[1]; a2 = post_k('/api/schluessel/anfrage')[1]
+    if m.schluessel_abholen(a1['id'], '127.0.0.1').get('status') != 'unbekannt':
+        f.append('K: ersetzte Anfrage lebt weiter')
+    post_k('/api/schluessel/antwort', {'Origin': eigen}, {'id': a2['id'], 'erlauben': False})
+    if get_k('/api/schluessel/anfrage?id=' + a2['id'])[1] != {'status': 'abgelehnt'}:
+        f.append('K: Ablehnen kommt nicht an')
+    a3 = post_k('/api/schluessel/anfrage')[1]
+    m._SCHLUESSEL['anfrage']['zeit'] -= m.SCHLUESSEL_FRIST_S + 1
+    if get_k('/api/schluessel/offen')[1].get('anfrage') is not None:
+        f.append('K: abgelaufene Anfrage wird am Mac noch gezeigt')
+    a4 = post_k('/api/schluessel/anfrage')[1]
+    post_k('/api/schluessel/antwort', {'Origin': eigen}, {'id': a4['id'], 'erlauben': True, 'key': KEY})
+    m._SCHLUESSEL['anfrage']['zeit'] -= m.SCHLUESSEL_FRIST_S + 1
+    if get_k('/api/schluessel/anfrage?id=' + a4['id'])[1] != {'status': 'abgelaufen'} or m._SCHLUESSEL['anfrage'] is not None:
+        f.append('K: erlaubter, aber abgelaufener Key ist noch abholbar')
+    # WLAN über http: weder anfragen noch abholen
+    st, d = post_k('/api/schluessel/anfrage', mit_code, ziel=port_wlan)
+    if st != 403 or 'https' not in str(d.get('error', '')):
+        f.append('K: Anfrage aus dem WLAN über http: %s %r' % (st, d))
+    if get_k('/api/schluessel/anfrage?id=x', mit_code, ziel=port_wlan)[0] != 403:
+        f.append('K: Abholen aus dem WLAN über http')
+    if post_k('/api/schluessel/anfrage', {'Origin': 'https://evil.example'})[0] != 403:
+        f.append('K: fremde Seite stößt eine Anfrage an')
+    for ua_, soll in (('Mozilla/5.0 (iPad; CPU OS 17_2 like Mac OS X)', 'iPad · iPadOS 17.2'), ('', 'unbekanntes Gerät'), ('<script>', 'unbekanntes Gerät')):
+        if m.geraet_aus_ua(ua_) != soll:
+            f.append('K: Gerät aus %r → %r' % (ua_, m.geraet_aus_ua(ua_)))
+    # nie auf die Platte: weder Sicherung noch irgendeine Datei im Arbeitsordner kennt den Key
+    if 'iphoneAnthropicKey' not in m._SICHERUNG_GEHEIM:
+        f.append('K: Key fürs iPhone ginge in die Sicherung')
 except Exception as e:
     f.append('Ausnahme: %s: %s' % (e.__class__.__name__, e))
 finally:

@@ -2,6 +2,52 @@
 
 All notable changes to Safari Assistant are documented here. Each page also carries an internal version marker on line 2 (`vYYYY-MM-DD-N`).
 
+## 2026.11 (November 2026)
+
+The second release, about five weeks after the first. It brings a redesigned interface, emergency features on the iPhone that work without the Mac, an automatic backup of your data on the Mac, a VPN check, news by topic, and a round of security fixes from an internal review.
+
+### New
+
+- **Redesigned interface.** Mac: system font instead of monospace, no text smaller than 12 px, a calmer sidebar, a red **Emergency** button at the top (Ctrl+Shift+N), Settings split into five tabs (General · AI & models · iPhone · Network & VPN · Data & backup), and the "local AI is not running" notice reduced to one line. iPhone: a header with Settings · current area · Emergency; tapping the area opens a sheet with all areas and tools; the answer language sits behind a 🌐 button.
+- **SOS on the iPhone.** 🚨 → **Send position**: gets a fresh GPS fix and puts it under your own prepared text (decimal degrees, accuracy, time, Google Maps link, Plus Code), then opens Messages (iMessage or SMS, chosen by the iPhone per contact) or WhatsApp. You set recipients and text once; they are stored only on the iPhone. You still tap **Send** yourself.
+- **Emergency content on the iPhone without the Mac.** After the iPhone has been connected once over HTTPS, the page starts even when the Mac is asleep, closed or not sharing: instant protocols, emergency numbers and your position work; AI answers do not. Optionally, a copy of the Emergency Card can be kept on the iPhone (off by default; HTTPS only; never includes the key-hiding-place field).
+- **Automatic backup on the Mac.** Logbook, Emergency Card, deadlines, notes, chats and settings are mirrored a few seconds after each change to `~/.safari-assistant-sicherung/` (owner-only permissions), with daily copies. If the browser storage is empty or different (another port, `127.0.0.1` instead of `localhost`, deleted website data), a banner offers to restore. Not included: uploaded documents and the iPhone's own data — keep using the backup file for those. The Claude key is never included.
+- **Backup file with a password.** Export can encrypt the file (AES-256-GCM, key derived with PBKDF2-SHA256, 310,000 rounds, all in the browser). A forgotten password cannot be recovered.
+- **Claude key from the Mac to the iPhone.** iPhone ⚙️ → **Get from Mac** shows a four-digit code; the Mac shows the device, its address and the same code and asks you to allow it. The key is held only in memory for at most two minutes and can be picked up once. Optional: a separate key just for the iPhone.
+- **VPN check.** Shows clearly whether the Mac is online with or without a VPN, measured from outside for IPv4 and IPv6 separately (so a leak past the tunnel shows). Works with a VPN on the travel router. Remember your VPN's network once; optional confirmation for Mullvad exits. Red banner on the Mac and a bar on the iPhone when there is no VPN. **Goes online:** while a page of the app is open, about once a minute (adjustable): www.cloudflare.com (fallback api.ipify.org / api6.ipify.org) to see your public address, stat.ripe.net to look up the network of that address, and captive.apple.com to detect a Wi-Fi login page; am.i.mullvad.net only if you switch on the Mullvad confirmation. Switch the check off in Settings → Network & VPN.
+- **News by topic.** Items from RSS feeds sorted into nine topics (security, borders, fuel, cash, health, natural events, roads & ferries, parks, other) and by country, by a fixed keyword list: official sources (GDACS, CDC, UK FCDO), one newspaper per country and a keyword search. Add your own feeds. Readable offline, also on the iPhone.
+- **iPhone pairing in steps.** Certificate → profile by AirDrop → install → trust → QR code. Choose the secure route (HTTPS only) or the quick one; the Mac shows what arrives from the iPhone while you set it up.
+- **When the local AI does not answer**, the matching instant protocol and the country's emergency numbers are shown in Medicine, Emergency, Dog and Survival.
+- **Claude:** choose the effort level for the online modules. The default model is now `claude-sonnet-5-5` (the previous default, `claude-sonnet-4-6`, may be retired from February 2027). A model you selected yourself stays selected.
+
+### Security fixes
+
+- A crafted backup file could run script in the app through one unescaped field shown on the Emergency Card. Fixed, and the field is now validated as a date.
+- Other websites open in the Mac's browser could make the local server start Ollama runs (no data could be read). The Ollama and document-search routes now reject cross-site requests, and the option limits apply to every request.
+- The offline Wikipedia now runs on its own port (its own browser origin), so content from ZIM files cannot reach the app's storage. The app warns if your `kiwix-serve` cannot be limited to the Mac.
+- The CDN fallback of the map libraries is pinned with Subresource Integrity.
+- News fetching connects to exactly the address that was checked (no second DNS lookup), so a feed cannot redirect the Mac into the local network.
+- Two attribute values on the iPhone page are now fully escaped.
+
+### Fixes
+
+- iPhone mode: "Fetch is aborted" when switching on (a slow reverse DNS lookup while binding); the server log is written line by line again.
+- iPhone access keeps working while a VPN client runs on the Mac.
+- Claude answers were cut off after 25 s in total; the time limit now applies only until the answer starts.
+- iPhone: the Settings sheet was taller than the screen and could not be scrolled.
+
+### Upgrading
+
+Run `./deploy.sh`, then **quit and reopen Safari Assistant** — the old server keeps running until the app restarts, and new features answer "not found" until then. Reload the page (Cmd+Option+R). On the iPhone, open the app once over HTTPS so it can work without the Mac later.
+
+### Known limitations
+
+- Tested on one Mac (Apple Silicon, 36 GB) and one iPhone; the screenshots and most UI checks were done in Chrome, not Safari.
+- SOS with several SMS recipients uses an iOS link format that Apple does not document; test it once with your own number.
+- The VPN check, news and automatic backup are new; their first real runs happen on your Mac.
+- The English, French and Spanish first-aid protocols are still translations, not yet reviewed by first-aid professionals.
+- Everything in "Known limitations" of 2026.10 below still applies.
+
 ## 2026.10 — first public release (October 2026)
 
 Safari Assistant is an offline AI field assistant for overland travel in southern and eastern Africa, created by DARK. It runs on a Mac with Apple Silicon and opens in your browser; an iPhone can join over your own Wi-Fi. This is the first public release.

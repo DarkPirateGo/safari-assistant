@@ -1,6 +1,6 @@
 {
   "_hinweis": "Feature-Manifest für Safari Assistant. Jedes Feature wird durch Marker-Strings abgesichert, die in der Datei vorhanden sein MÜSSEN. test-app.js prüft alle Einträge automatisch (Sektion 22). Bei JEDEM neuen Feature hier einen Eintrag ergänzen — dann kann es nie wieder unbemerkt verschwinden.",
-  "_version": "2026-10-06-1",
+  "_version": "2026-11-14-5",
   "features": [
     {
       "file": "index.html",
@@ -1354,7 +1354,7 @@
       "name": "2026-09-13-1: Claude-Modellwahl für die Online-Module — Liste live aus der Anthropic-Models-API (GET /v1/models), lokal gecacht; Auswahl in den Einstellungen (Dropdown + manuelle ID + Liste laden) und Schnellwahl im Chat; alle drei Anthropic-Aufrufe nutzen getClaudeModel()",
       "contains": [
         "// ── CLAUDE-MODELLWAHL (BYTEIDENTISCH in index.html und mobile.html) ──",
-        "const CLAUDE_STANDARD_MODELL = 'claude-sonnet-4-6';",
+        "const CLAUDE_STANDARD_MODELL = 'claude-sonnet-5-5';",
         "https://api.anthropic.com/v1/models?limit=100",
         "function claudeModelleAusAntwort(j)",
         "function getClaudeModel() { return settings.claudeModel || CLAUDE_STANDARD_MODELL; }",
@@ -1469,9 +1469,9 @@
         "extendedKeyUsage = serverAuth",
         "nameConstraints = critical,permitted;DNS:.local",
         "TLS_SRV_TAGE = 820",
-        "def __init__(self, adresse, handler, ssl_kontext=None):",
-        "srv = SafariServer((ip, port), SafariHandler, ssl_kontext=ctx)",
-        "sicher = '; Secure' if isinstance(self.connection, ssl.SSLSocket) else ''"
+        "def __init__(self, adresse, handler, ssl_kontext=None, lan=False):",
+        "srv = SafariServer((ip, port), SafariHandler, ssl_kontext=ctx, lan=True)",
+        "name, sicher = (COOKIE_HTTPS, '; Secure') if verschl else (COOKIE_HTTP, '')"
       ]
     },
     {
@@ -1479,7 +1479,7 @@
       "name": "2026-09-14-1: Adresse fürs iPhone über den Bonjour-Namen statt der IP (überlebt Starlink ↔ Hotspot), IP-Variante nur wenn das Zertifikat sie deckt",
       "contains": [
         "url_name = f'{schema}://{name}:{port}/go/{token}' if name else ''",
-        "ip_gedeckt = (not st['tls']) or (ip and ip in (TLS_STATE.get('ips') or []))",
+        "ip_gedeckt = (schema == 'http') or (ip and ip in (TLS_STATE.get('ips') or []))",
         "'tls': st['tls'], 'tls_grund': st['tls_grund'], 'tls_info': tls_status()"
       ]
     },
@@ -2366,6 +2366,913 @@
         "namen = [n for n in [name, 'localhost'] if n and tls_name_erlaubt(n)]",
         "_re.search(r'unsupported[^|]*constraint', probe, _re.I)",
         "b = bonjour_name()      # 2026-10-06-1"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-10-11-1 iPhone-Modus: Listener ohne Rückwärts-DNS (server_bind ohne getfqdn), Dauer im Log, Log zeilenweise",
+      "contains": [
+        "def server_bind(self):",
+        "self.server_name = host",
+        "t_tls = time.monotonic() - t0",
+        "_strom.reconfigure(line_buffering=True)"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-10-11-1 iPhone-Modus schalten: 30 s Frist, bei Zeitüberschreitung echten Stand nachladen statt „Fetch is aborted\"",
+      "contains": [
+        "signal: AbortSignal.timeout(30000) });",
+        "if (e && (e.name === 'TimeoutError' || e.name === 'AbortError')) {"
+      ]
+    },
+    {
+      "file": "i18n/en.js",
+      "name": "2026-10-11-1 Meldung bei Zeitüberschreitung im iPhone-Modus übersetzt",
+      "contains": [
+        "\"Der Server hat nicht rechtzeitig geantwortet — der Stand wird neu geladen.\": "
+      ]
+    },
+    {
+      "file": "i18n/fr.js",
+      "name": "2026-10-11-1 Meldung bei Zeitüberschreitung im iPhone-Modus übersetzt",
+      "contains": [
+        "\"Der Server hat nicht rechtzeitig geantwortet — der Stand wird neu geladen.\": "
+      ]
+    },
+    {
+      "file": "i18n/es.js",
+      "name": "2026-10-11-1 Meldung bei Zeitüberschreitung im iPhone-Modus übersetzt",
+      "contains": [
+        "\"Der Server hat nicht rechtzeitig geantwortet — der Stand wird neu geladen.\": "
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-10-18-1 Handyzugang wie Wingfoilscout: Weg sicher/schnell, ein Port für http und https (erstes Byte), http im Weg „sicher\" abgelehnt bevor Code/Cookie gelesen werden, Secure-Cookie über https",
+      "contains": [
+        "WEGE = ('sicher', 'schnell')",
+        "COOKIE_HTTPS = 'safari_zugang_https'",
+        "erstes = request.recv(1, socket.MSG_PEEK)",
+        "def _nur_verschluesselt(self):",
+        "if LAN_STATE.get('weg') == 'sicher' and not verschluesselt:",
+        "def lan_an(weg=None):"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-10-18-1 Handyzugang: was vom iPhone ankommt (/api/netz/stand), gemerkter Weg (~/.safari-assistant-iphone.json), Profil per AirDrop (/api/tls/profil), Zertifikat vorab (/api/tls/vorbereiten)",
+      "contains": [
+        "def handy_meldung():",
+        "def zustand_lesen():",
+        "def handy_bewaehrt(verschluesselt):",
+        "def iphone_profil():",
+        "if path == '/api/netz/stand':",
+        "if path == '/api/tls/profil':",
+        "if path == '/api/tls/vorbereiten':"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-10-18-1 Service Worker fürs iPhone: Hinweis statt leerer Seite, wenn der Mac nicht antwortet (vier Sprachen)",
+      "contains": [
+        "SW_JS = \"\"\"",
+        "HINWEIS_HTML = \"\"\"",
+        "if path == '/sw.js':",
+        "if path == '/api/netz/hinweis':"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-10-18-1 Einstellungen → Mobile App in Schritten wie bei Wingfoilscout (QR-Code zuletzt, „Klappt nicht?\", live was vom iPhone ankommt)",
+      "contains": [
+        "function iphoneAnsicht(st)",
+        "function iphoneSicherHtml(st)",
+        "function iphoneSchnellHtml(st)",
+        "function iphoneFertigHtml(st)",
+        "function iphoneHilfeHtml(st)",
+        "function iphoneLiveStarten()",
+        "async function iphoneFreigeben(weg)"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-10-18-1 Service Worker nur über https und nie am Mac angemeldet",
+      "contains": [
+        "navigator.serviceWorker.register('/sw.js', { scope: '/' })"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-10-18-2 Nachrichten aus RSS-Feeds: Abruf nur öffentlicher Adressen (auch nach Weiterleitung), Größendeckel auch entpackt, keine Entity-Deklarationen, RSS 2.0 / RDF / Atom",
+      "contains": [
+        "def feed_url_pruefen(url):",
+        "def feed_host_oeffentlich(host):",
+        "class _FeedWeiterleitung(urllib.request.HTTPRedirectHandler):",
+        "def _feed_entpacken(daten, kodierung):",
+        "if _re.search(rb'<!ENTITY', daten, _re.I):",
+        "def feed_holen(url, etag='', geaendert='', timeout=FEED_TIMEOUT):",
+        "def feed_parsen(daten):"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-10-18-2 Nachrichten: Themen, Länder und „wichtig“ per Stichwortliste (EN/DE/PT/FR, keine KI), 50 eingebaute Quellen, eigene Quellen in ~/.safari-assistant-feeds.json, Wache alle 6 h",
+      "contains": [
+        "THEMEN = [",
+        "def themen_zuordnen(text):",
+        "def laender_erkennen(text):",
+        "KRITISCH_RE = _wortmuster([",
+        "def _standardquellen():",
+        "FEEDS_DATEI = Path.home() / '.safari-assistant-feeds.json'",
+        "NACHRICHTEN_DATEI = Path.home() / '.safari-assistant-nachrichten.json'",
+        "def eigene_quelle_anlegen(d):",
+        "def quelle_schalten(qid, aktiv):",
+        "def nachrichten_aktualisieren(nur=None):",
+        "def starte_nachrichten_wache():",
+        "    starte_nachrichten_wache()\n"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-10-18-2 Nachrichten: lesen auch vom iPhone, Quellenliste nur am Mac, Abruf und Verwalten im Mutations-Gate",
+      "contains": [
+        "if path == '/api/nachrichten':",
+        "if path == '/api/nachrichten/quellen':",
+        "if path.startswith('/api/nachrichten/'):",
+        "if path == '/api/nachrichten/aktualisieren':",
+        "def _json_body_klein(self, limit=16 * 1024):"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-10-18-2 Bereich 📰 Nachrichten nach Themen (Notfall-Gruppe): Filter Land / nur wichtige / Thema, Quellen an- und abschalten, eigene Quelle prüfen und hinzufügen",
+      "contains": [
+        "data-module=\"nachrichten\"",
+        "id=\"panel-nachrichten\"",
+        "function renderNachrichten() {",
+        "function renderNachrichtenQuellen() {",
+        "async function nachrichtQuellePruefen(id) {",
+        "async function nachrichtQuelleAnlegen() {",
+        "async function nachrichtQuelleSchalten(id, aktiv) {",
+        "Eigene Quelle hinzufügen",
+        "if (mod === 'nachrichten')"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-10-18-2 Nachrichten: gemeinsamer Anzeige-Block (BYTEIDENTISCH mit mobile.html), Feed-Text immer maskiert",
+      "contains": [
+        "// ── NACHRICHTEN (BYTEIDENTISCH in index.html und mobile.html) ──",
+        "function nachrichtEsc(s) {",
+        "function nachrichtenGruppieren(c, opt) {",
+        "function nachrichtenListeHtml(c, gruppen, opt) {"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-10-18-2 📰 Nachrichten am iPhone (nur lesen, offline aus dem Speicher, Zahl der neuen wichtigen Meldungen am Knopf)",
+      "contains": [
+        "id=\"nachrichten-overlay\"",
+        "onclick=\"openNachrichten()\"",
+        "function renderNachrichtenMobil() {",
+        "// ── NACHRICHTEN (BYTEIDENTISCH in index.html und mobile.html) ──",
+        "id=\"m-nachrichten-badge\"",
+        "function zeigeNachrichtenBadgeMobil() {"
+      ]
+    },
+    {
+      "file": "i18n/en.js",
+      "name": "2026-10-18-2 Nachrichten übersetzt (en)",
+      "contains": [
+        "\"Grenzen & Einreise\": ",
+        "\"Eigene Quelle hinzufügen\": ",
+        "\"Abruf abgeschlossen: {0} Quellen erreicht, {1} mit Fehler, {2} neue Meldungen.\": "
+      ]
+    },
+    {
+      "file": "i18n/fr.js",
+      "name": "2026-10-18-2 Nachrichten übersetzt (fr)",
+      "contains": [
+        "\"Grenzen & Einreise\": ",
+        "\"Eigene Quelle hinzufügen\": ",
+        "\"Abruf abgeschlossen: {0} Quellen erreicht, {1} mit Fehler, {2} neue Meldungen.\": "
+      ]
+    },
+    {
+      "file": "i18n/es.js",
+      "name": "2026-10-18-2 Nachrichten übersetzt (es)",
+      "contains": [
+        "\"Grenzen & Einreise\": ",
+        "\"Eigene Quelle hinzufügen\": ",
+        "\"Abruf abgeschlossen: {0} Quellen erreicht, {1} mit Fehler, {2} neue Meldungen.\": "
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-10-30-1 VPN-Prüfung: Ausgang je Weg (IPv4/IPv6) über https mit Zertifikatsprüfung (Cloudflare, ersatzweise ipify), Netz über RIPEstat, grün nur wenn jeder Weg im gemerkten VPN-Netz liegt, Starlink nie VPN, Datei ~/.safari-assistant-vpn.json ohne Adressen, Wache nur bei Bedarf",
+      "contains": [
+        "VPN_DATEI = Path.home() / '.safari-assistant-vpn.json'",
+        "class _VpnVerbindung(http.client.HTTPSConnection):",
+        "def vpn_bewerten(ausgaenge, gemerkt, captive=None, anbieter=()):",
+        "def vpn_messen():",
+        "def vpn_status(fuer_mac=True, nachfrage=True):",
+        "def vpn_merken(asn):",
+        "def starte_vpn_wache():",
+        "VPN_ZUGANGSNETZE = {'14593': 'Starlink'}",
+        "def vpn_anmeldung_noetig(timeout=5.0):"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-10-30-1 VPN-Prüfung: Stand auch vom iPhone (ohne Adressen), prüfen/merken/vergessen/einstellen nur vom Mac (Mutations-Gate), Wache beim Start",
+      "contains": [
+        "if path == '/api/vpn/status':",
+        "if path.startswith('/api/vpn/'):",
+        "if path == '/api/vpn/pruefen':",
+        "if path in ('/api/vpn/merken', '/api/vpn/vergessen', '/api/vpn/einstellungen', '/api/vpn/anbieter'):",
+        "    starte_vpn_wache()\n    if lan:"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-10-30-1 VPN-Prüfung am Mac: Kachel oben in der Seitenleiste, rotes Band über allen Bereichen, Fenstertitel ⚠️, Bereich 🔒 VPN-Prüfung in ⚙️ Einstellungen (merken, vergessen, Takt, an/aus)",
+      "contains": [
+        "id=\"vpn-kachel\"",
+        "id=\"vpn-band\"",
+        "id=\"vpn-einstellungen\"",
+        "function zeigeVpn() {",
+        "function renderVpnEinstellungen() {",
+        "async function vpnMerken(asn) {",
+        "function vpnBandAusblenden() {",
+        "function vpnStart() {",
+        "  vpnStart();"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-10-30-1 VPN-Anzeige: gemeinsamer Block (BYTEIDENTISCH mit mobile.html), Netznamen immer maskiert",
+      "contains": [
+        "// ── VPN-ANZEIGE (BYTEIDENTISCH in index.html und mobile.html) ──",
+        "function vpnEsc(s) {",
+        "function vpnAnzeige(st, geraet) {",
+        "// ── ENDE VPN-ANZEIGE ──"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-10-30-1 VPN-Stand am iPhone: Leiste unter der Modulleiste (rot groß ohne VPN), nur lesen, alle 15 s vom Mac",
+      "contains": [
+        "id=\"vpn-leiste\"",
+        "async function ladeVpnMobil() {",
+        "function zeigeVpnMobil() {",
+        "function vpnLeisteUmschalten() {",
+        "// ── VPN-ANZEIGE (BYTEIDENTISCH in index.html und mobile.html) ──"
+      ]
+    },
+    {
+      "file": "test-vpn.py",
+      "name": "2026-10-30-1 ausgeführter Test der VPN-Prüfung (Bewertung, Frische, Datei, Merken, echte https-Messung, Anmeldeseite, RIPEstat, Routen, Wache)",
+      "contains": [
+        "def messung(ausgaenge, alter=0, captive=None, fehler=None):",
+        "# 5. Echte https-Messung gegen einen lokalen TLS-Server",
+        "# 9. Lesen darf das iPhone",
+        "# 10. Wache: misst nur bei Bedarf"
+      ]
+    },
+    {
+      "file": "i18n/en.js",
+      "name": "2026-10-30-1 VPN-Prüfung übersetzt (en)",
+      "contains": [
+        "\"VPN aktiv\": ",
+        "\"Das ist mein VPN\": ",
+        "\"Online ohne VPN — dein Internetverkehr läuft nicht durch dein VPN.\": "
+      ]
+    },
+    {
+      "file": "i18n/fr.js",
+      "name": "2026-10-30-1 VPN-Prüfung übersetzt (fr)",
+      "contains": [
+        "\"VPN aktiv\": ",
+        "\"Das ist mein VPN\": ",
+        "\"Online ohne VPN — dein Internetverkehr läuft nicht durch dein VPN.\": "
+      ]
+    },
+    {
+      "file": "i18n/es.js",
+      "name": "2026-10-30-1 VPN-Prüfung übersetzt (es)",
+      "contains": [
+        "\"VPN aktiv\": ",
+        "\"Das ist mein VPN\": ",
+        "\"Online ohne VPN — dein Internetverkehr läuft nicht durch dein VPN.\": "
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-11-02-1 Mullvad-Erkennung: fragt Mullvad selbst, ob der Ausgang einer seiner Server ist (https mit Zertifikatsprüfung, je Familie, nur bei mullvad_exit_ip true UND derselben Adresse), nur auf Wunsch, nur für Mullvad; Schalter /api/vpn/anbieter nur am Mac",
+      "contains": [
+        "VPN_ANBIETER = {'mullvad': {'name': 'Mullvad', 'feld': 'mullvad_exit_ip', 'pfad': '/json',",
+        "def vpn_anbieter_pruefen(name, ip, familie):",
+        "d.get(a['feld']) is True and _vpn_adresse(d.get('ip'), familie) == ip",
+        "def vpn_anbieter_einstellen(name, an):",
+        "raise ValueError('Unbekannter Anbieter.')",
+        "elif a.get('anbieter') in VPN_ANBIETER and a.get('anbieter') in anbieter:",
+        "vpn_anbieter_einstellen(d.get('anbieter'), d.get('an') is True)"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-11-02-1 Anbieter-Erkennung am Mac: Block in ⚙️ Einstellungen → 🔒 VPN-Prüfung (gilt nur für den genannten Anbieter), Ausgang mit Anbietername und „vom Anbieter bestätigt\"",
+      "contains": [
+        "id=\"vpn-anbieter\"",
+        "Anbieter-Erkennung — gilt nur für den genannten Anbieter",
+        "async function vpnAnbieterSchalten(id, an) {",
+        "vpnPost('/api/vpn/anbieter'",
+        "const teile = [a.anbieter || a.name || (a.asn ? 'AS' + a.asn : ''), vpnLandName(a.land)].filter(Boolean);"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-11-02-1 Anbieter-Erkennung am iPhone: Leiste nennt bei bestätigtem Ausgang den Anbieter (nur lesen)",
+      "contains": [
+        "const w0 = (st.ausgaenge && st.ausgaenge[0]) || {};",
+        "[w0.anbieter, vpnLandName(w0.land)].filter(Boolean).join(' · ')",
+        "const teile = [a.anbieter || a.name || (a.asn ? 'AS' + a.asn : ''), vpnLandName(a.land)].filter(Boolean);"
+      ]
+    },
+    {
+      "file": "test-vpn.py",
+      "name": "2026-11-02-1 ausgeführter Test der Anbieter-Erkennung (Bewertung, echte https-Abfrage gegen lokalen TLS-Server, Datei, Routen nur am Mac)",
+      "contains": [
+        "# 8b. Anbieter-Erkennung (2026-11-02-1)",
+        "'/mv/text'",
+        "def anb(pfad, ip='9.9.9.9', fam=socket.AF_INET):",
+        "fremde Webseite darf die Anbieter-Erkennung abschalten"
+      ]
+    },
+    {
+      "file": "i18n/en.js",
+      "name": "2026-11-02-1 Anbieter-Erkennung übersetzt (en)",
+      "contains": [
+        "\"Anbieter-Erkennung — gilt nur für den genannten Anbieter\": ",
+        "\"vom Anbieter bestätigt\": ",
+        "\"Unbekannter Anbieter.\": "
+      ]
+    },
+    {
+      "file": "i18n/fr.js",
+      "name": "2026-11-02-1 Anbieter-Erkennung übersetzt (fr)",
+      "contains": [
+        "\"Anbieter-Erkennung — gilt nur für den genannten Anbieter\": ",
+        "\"vom Anbieter bestätigt\": ",
+        "\"Unbekannter Anbieter.\": "
+      ]
+    },
+    {
+      "file": "i18n/es.js",
+      "name": "2026-11-02-1 Anbieter-Erkennung übersetzt (es)",
+      "contains": [
+        "\"Anbieter-Erkennung — gilt nur für den genannten Anbieter\": ",
+        "\"vom Anbieter bestätigt\": ",
+        "\"Unbekannter Anbieter.\": "
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-11-02-2 iPhone-Zugang bei laufendem VPN am Mac: lan_ip() nimmt die Adresse des WLANs (Standardroute per netstat, ersatzweise aktives en*), wenn die Route durch einen Tunnel (utun, wg, tun …) läuft; die VPN-Wache achtet weiter auf die Adresse der Route",
+      "contains": [
+        "def lan_ip_route():",
+        "TUNNEL_SCHNITTSTELLEN = _re.compile(",
+        "def _lan_ip_ohne_tunnel(route_ip):",
+        "def _standardroute_schnittstellen(text):",
+        "                ip = lan_ip_route()\n                if netz is not None and ip != netz:"
+      ]
+    },
+    {
+      "file": "test-vpn.py",
+      "name": "2026-11-02-2 ausgeführter Test: lan_ip() bei VPN am Mac (macOS-ifconfig/netstat-Beispiele, Zwischenspeicher, unklare Fälle bleiben beim Alten, Wache beachtet die Route)",
+      "contains": [
+        "# 9b. iPhone-Zugang bei laufendem VPN am Mac (2026-11-02-2)",
+        "VPN am Mac, Standardroute en0",
+        "m._lan_ip_ohne_tunnel = lambda route: '192.168.1.99'"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-11-03-1 Claude-Aufwand (effort) am Mac: Auswahl in ⚙️ Einstellungen und in der Chat-Leiste; gesendet wird output_config.effort nur bei gewählter Stufe; lehnt die API ab, einmal ohne wiederholen",
+      "contains": [
+        "id=\"claude-aufwand-select\"",
+        "id=\"claude-aufwand-quick\"",
+        "function setzeClaudeAufwand(wert) {",
+        "function renderClaudeAufwand() {",
+        "body: JSON.stringify(claudeAnfrageMitAufwand(requestBody, aufwand)),",
+        "CLAUDE_AUFWAND_ABGELEHNT.add(requestBody.model + '|' + aufwand);"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-11-03-1 Claude-Aufwand (effort) am iPhone: Auswahl im Setup-Blatt, dieselbe Anfrage-Logik wie am Mac",
+      "contains": [
+        "id=\"m-claude-aufwand\"",
+        "function setzeClaudeAufwandMobil(wert) {",
+        "function renderClaudeAufwandMobil() {",
+        "body: JSON.stringify(claudeAnfrageMitAufwand(body, aufwand)),",
+        "CLAUDE_AUFWAND_ABGELEHNT.add(body.model + '|' + aufwand);"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-11-03-1 gemeinsamer Aufwand-Block (Stufen laut Modell-Liste, wirksame Stufe, Anfrage-Kopie mit output_config) + Wartefrist nur bis die Antwort beginnt (AbortSignal.timeout hätte den Strom nach 25 s abgebrochen)",
+      "contains": [
+        "// ── CLAUDE-AUFWAND (BYTEIDENTISCH in index.html und mobile.html) ──",
+        "const CLAUDE_AUFWAND_STUFEN = ['low', 'medium', 'high', 'xhigh', 'max'];",
+        "function claudeAufwandWirksam(wahl, modellId) {",
+        "function claudeAufwandAusFaehigkeiten(cap) {",
+        "function claudeFristSignal(userSignal, ms) {",
+        "claudeFristSignal(controller.signal, 25000)",
+        "} finally { frist.fertig(); }"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-11-03-1 gemeinsamer Aufwand-Block (Stufen laut Modell-Liste, wirksame Stufe, Anfrage-Kopie mit output_config) + Wartefrist nur bis die Antwort beginnt (AbortSignal.timeout hätte den Strom nach 25 s abgebrochen)",
+      "contains": [
+        "// ── CLAUDE-AUFWAND (BYTEIDENTISCH in index.html und mobile.html) ──",
+        "const CLAUDE_AUFWAND_STUFEN = ['low', 'medium', 'high', 'xhigh', 'max'];",
+        "function claudeAufwandWirksam(wahl, modellId) {",
+        "function claudeAufwandAusFaehigkeiten(cap) {",
+        "function claudeFristSignal(userSignal, ms) {",
+        "claudeFristSignal(controller.signal, 25000)",
+        "} finally { frist.fertig(); }"
+      ]
+    },
+    {
+      "file": "test-app.js",
+      "name": "2026-11-03-1 Tests Abschnitt 71: Aufwand (Logik, Optionen, Wartefrist, echter Anfrage-Code aus index + mobile in einem Node-Prozess, Oberfläche, Übersetzungen)",
+      "contains": [
+        "=== 71. CLAUDE-AUFWAND (effort) für die Online-Module (2026-11-03-1) ===",
+        "const SCHLEIFE = ",
+        "function lade71(extra) {"
+      ]
+    },
+    {
+      "file": "i18n/en.js",
+      "name": "2026-11-03-1 Claude-Aufwand übersetzt (en)",
+      "contains": [
+        "\"Claude-Aufwand (Online-Module)\": ",
+        "\"Zeitüberschreitung: Anthropic hat in {0} s nicht geantwortet — Internet prüfen?\": ",
+        "\"Dieses Modell nimmt den gewählten Aufwand nicht an — die Anfrage läuft ohne\": "
+      ]
+    },
+    {
+      "file": "i18n/fr.js",
+      "name": "2026-11-03-1 Claude-Aufwand übersetzt (fr)",
+      "contains": [
+        "\"Claude-Aufwand (Online-Module)\": ",
+        "\"Zeitüberschreitung: Anthropic hat in {0} s nicht geantwortet — Internet prüfen?\": ",
+        "\"Dieses Modell nimmt den gewählten Aufwand nicht an — die Anfrage läuft ohne\": "
+      ]
+    },
+    {
+      "file": "i18n/es.js",
+      "name": "2026-11-03-1 Claude-Aufwand übersetzt (es)",
+      "contains": [
+        "\"Claude-Aufwand (Online-Module)\": ",
+        "\"Zeitüberschreitung: Anthropic hat in {0} s nicht geantwortet — Internet prüfen?\": ",
+        "\"Dieses Modell nimmt den gewählten Aufwand nicht an — die Anfrage läuft ohne\": "
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-11-14-1 Review S1: kmDatum maskiert, Prüfer lässt nur ein Datum durch (gespeichertes XSS über ein manipuliertes Backup)",
+      "contains": [
+        "km-Stand ${wartung.km.toLocaleString('de-DE')} · ${escHtml(wartung.kmDatum)}",
+        "v.kmDatum = gueltigesDatum(strOderLeer(v.kmDatum)) ? strOderLeer(v.kmDatum) : '';"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-11-14-1 Review U2: automatische Sicherung der Browser-Daten auf diesem Mac — fragen statt überschreiben, Wiederherstellen",
+      "contains": [
+        "const SICHERUNG_SCHLUESSEL = [",
+        "function sicherungEntscheid(status, kennungHier)",
+        "async function sicherungStart()",
+        "function sicherungFrage(status)",
+        "try { sicherungAnstossen(); } catch (_) {}",
+        "sicherungStart();",
+        "id=\"sicherung-status\"",
+        "if (backup.nurSpeicher !== true) await new Promise"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-11-14-1 Review S8: Backup mit Passwort (AES-256-GCM, PBKDF2), ohne Passwort ohne Schlüssel-Versteck",
+      "contains": [
+        "const BACKUP_KDF_RUNDEN = 310000;",
+        "async function backupVerschluesseln(backup, passwort)",
+        "async function backupEntschluesseln(huelle, passwort)",
+        "function passwortDialog(opt)",
+        "const passwort = await passwortDialog({ modus: 'neu' });",
+        "function backupOhneVersteck(backup)"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-11-14-1 Review U4: Sofort-Protokoll statt KI, wenn Ollama nicht antwortet (Mac)",
+      "contains": [
+        "const SOFORT_STICHWORTE = {",
+        "function sofortOhneKi(frage, ctx)",
+        "const ohneKi = sofortOhneKi(letzteNutzerfrage(msgs), thisCtx);",
+        "⚠️ Die lokale KI antwortet nicht."
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-11-14-1 Review S3/U1: Wikipedia auf eigenem Port; Schalter „Notfallkarte fürs iPhone bereitstellen“",
+      "contains": [
+        "if (s.proxy && s.wiki_port) url = location.protocol + '//' + location.hostname + ':' + s.wiki_port + s.proxy;",
+        "id=\"nk-iphone\"",
+        "async function notfallkarteIphoneSchalten(an)"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-11-14-1 Review U1: Band „Keine Verbindung zum Mac“ + Notfallkarte vom Mac unter 🚨 (auch ohne Mac)",
+      "contains": [
+        "id=\"mac-aus\"",
+        "function notfallkarteBlockMobil()",
+        "async function ladeNotfallkarteMobil()",
+        "html += notfallkarteBlockMobil();",
+        "band.style.display = (!macAntwortet || zugangProblem) ? '' : 'none';"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-11-14-1 Review U4/S3/S7: Sofort-Protokoll statt KI (iPhone), Wikipedia auf eigenem Port, Attribute maskiert",
+      "contains": [
+        "const SOFORT_STICHWORTE = {",
+        "if (ohneKi) appendMsgEl('assistant', ohneKi,",
+        "if (s.proxy && s.wiki_port) url = location.protocol + '//' + location.hostname + ':' + s.wiki_port + s.proxy;",
+        "<option value=\"${nachrichtEsc(m.id)}\"",
+        "<option value=\"${nachrichtEsc(m)}\">"
+      ]
+    },
+    {
+      "file": "pois.html",
+      "name": "2026-11-14-1 Review S5: CDN-Rückfall nur mit Prüfsumme (integrity aus deploy.sh)",
+      "contains": [
+        "integrity=\"sha256-",
+        "cdn.integrity = 'sha256-",
+        "cdn.crossOrigin = 'anonymous';"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-11-14-1 Review S2: Ollama-Durchgriff und Dokumentensuche nehmen nichts von fremden Webseiten an; Deckel für jede Anfrage",
+      "contains": [
+        "def fremde_seite(self):",
+        "def _fremde_seite_abweisen(self):",
+        "            erlaubt = ollama_optionen_begrenzen(erlaubt)"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-11-14-1 Review S3: Wikipedia auf eigenem Port (eigene Herkunft), App-Port leitet um, zweiter Listener im WLAN",
+      "contains": [
+        "def wiki_server_oeffnen(hauptport, adresse='127.0.0.1'):",
+        "WIKI_STATE = {'server': None, 'port': 0, 'lan': None}",
+        "def _wiki_umleiten(self, path, query):",
+        "_wiki_lan_oeffnen(ip, ctx)",
+        "KIWIX_NUR_LOKAL = bool(nur_lokal)"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-11-14-1 Review S6: Feed-Abruf verbindet nur mit den geprüften Adressen (kein DNS-Rebinding)",
+      "contains": [
+        "def _feed_socket(host, port, timeout):",
+        "def feed_adresse_erlaubt(adresse):",
+        "_FEED_OPENER = urllib.request.build_opener(_FeedWeiterleitung, _FeedHTTP, _FeedHTTPS)"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-11-14-1 Review U2/U1: Sicherung der Browser-Daten (0600, ohne Key/Position, Kopie bei Speicherwechsel), Notfallkarte fürs iPhone nur auf Wunsch und nur über https",
+      "contains": [
+        "def sicherung_schreiben(obj):",
+        "def sicherung_pruefen(d):",
+        "if path == '/api/sicherung' or path.startswith('/api/sicherung/'):",
+        "def notfallkarte_fuers_iphone():",
+        "karte['fahrzeug'].pop('Schlüssel-Versteck', None)",
+        "self._json({'freigegeben': False, 'grund': 'nur_https'})"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-11-14-1 Review U1: Service Worker hält die iPhone-Seite ohne Mac bereit (feste Hülle, Weiterleitungen und /api unberührt)",
+      "contains": [
+        "var HUELLE_DATEIEN = [SEITE, '/i18n.js', '/i18n/en.js', '/i18n/fr.js', '/i18n/es.js', '/icon.png', '/dark-logo.jpg'];",
+        "if (antwort.type === 'opaqueredirect') return antwort;",
+        "function huelleHolen() {"
+      ]
+    },
+    {
+      "file": "test-sicherheit.py",
+      "name": "2026-11-14-1 ausgeführte Tests: fremde Seiten (S2), Wikipedia-Port (S3), Sicherung und Notfallkarte (U2/U1)",
+      "contains": [
+        "# 8. Review 13.11.2026, S2:",
+        "# 9. Review 13.11.2026, S3:",
+        "# 10. Review 13.11.2026, U2/U1:"
+      ]
+    },
+    {
+      "file": "test-nachrichten.py",
+      "name": "2026-11-14-1 ausgeführter Test: DNS-Rebinding beim Feed-Abruf (S6)",
+      "contains": [
+        "# 5a. 2026-11-14-1 (Review S6): DNS-Rebinding.",
+        "m.feed_adresse_erlaubt = lambda a: True"
+      ]
+    },
+    {
+      "file": "i18n/en.js",
+      "name": "2026-11-14-1 Review-Texte übersetzt (en): Sicherung, Passwort, Band am iPhone, Sofort-Protokoll statt KI",
+      "contains": [
+        "\"Automatische Sicherung auf diesem Mac\": ",
+        "\"Backup mit Passwort schützen?\": ",
+        "\"Keine Verbindung zum Mac\": ",
+        "\"Ohne KI — Sofort-Protokoll\": ",
+        "\"⚠️ Die lokale KI antwortet nicht.\": "
+      ]
+    },
+    {
+      "file": "i18n/fr.js",
+      "name": "2026-11-14-1 Review-Texte übersetzt (fr): Sicherung, Passwort, Band am iPhone, Sofort-Protokoll statt KI",
+      "contains": [
+        "\"Automatische Sicherung auf diesem Mac\": ",
+        "\"Backup mit Passwort schützen?\": ",
+        "\"Keine Verbindung zum Mac\": ",
+        "\"Ohne KI — Sofort-Protokoll\": ",
+        "\"⚠️ Die lokale KI antwortet nicht.\": "
+      ]
+    },
+    {
+      "file": "i18n/es.js",
+      "name": "2026-11-14-1 Review-Texte übersetzt (es): Sicherung, Passwort, Band am iPhone, Sofort-Protokoll statt KI",
+      "contains": [
+        "\"Automatische Sicherung auf diesem Mac\": ",
+        "\"Backup mit Passwort schützen?\": ",
+        "\"Keine Verbindung zum Mac\": ",
+        "\"Ohne KI — Sofort-Protokoll\": ",
+        "\"⚠️ Die lokale KI antwortet nicht.\": "
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-11-14-2 Zweite Stilebene am Mac: Systemschrift, nichts unter 12 px, ruhige Seitenleiste",
+      "contains": [
+        "<style id=\"oberflaeche-2\">",
+        "--mono: var(--sans);",
+        "[style*=\"font-size:10px\"]",
+        "{ font-size: 12px !important; }"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-11-14-2 Notfall-Knopf oben in der Seitenleiste (Ctrl+Umschalt+N), Notfall-Gruppe zuerst",
+      "contains": [
+        "id=\"notfall-knopf\" onclick=\"oeffneNotfall()\"",
+        "function oeffneNotfall() {",
+        "const n = document.querySelector('.nav-item[data-module=\"notfallkarte\"]');",
+        ".notfall-knopf {"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-11-14-2 Seitenleiste: Einstellungen und iPhone im Fuß, Beenden klein in der Sprachzeile",
+      "contains": [
+        "<div class=\"nav-fuss\" role=\"group\" aria-label=\"App\">",
+        "id=\"nav-iphone\"",
+        "class=\"nav-item fuss-aus\"",
+        "#shutdown.fuss-aus {"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-11-14-2 Einstellungen in fünf Bereichen (Allgemein, KI & Modelle, iPhone, Netz & VPN, Daten & Sicherung)",
+      "contains": [
+        "<div class=\"panel\" id=\"panel-settings\" data-bereich=\"allgemein\">",
+        "<div class=\"einst-tabs\" id=\"einst-tabs\" role=\"tablist\"",
+        "const EINST_BEREICHE = ['allgemein', 'ki', 'iphone', 'netz', 'daten'];",
+        "function einstellungenBereich(name) {",
+        "#panel-settings .settings-group[data-bereich] { display: none;"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-11-14-2 Anleitung „iPhone verbinden“: sieben kurze Karten, ausführliche Fassung zum Aufklappen",
+      "contains": [
+        "<div class=\"panel-title\">📱 iPhone verbinden</div>",
+        "<div class=\"anleitung-titel\">Einmal einrichten</div>",
+        "<details class=\"anleitung-mehr\">",
+        "function oeffneIphoneAnleitung() {"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-11-14-2 Start-Hinweis als ruhige Zeile; Sicherungs-Band im Seitenfluss; kiwix-Warnung im Serverstatus",
+      "contains": [
+        "<details class=\"start-banner-klapp\"><summary><span class=\"start-banner-title\">Die lokale KI läuft nicht</span>",
+        "if (main) main.insertBefore(el, main.firstChild); else document.body.appendChild(el);",
+        "const kiwixWarnung = p.kiwix_offen"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-11-14-2 Eingabefelder ohne eigene Klasse dunkel (Logbuch, Checklisten)",
+      "contains": [
+        ":where(.main) :where(input:not([type=\"checkbox\"])",
+        "color-scheme: dark;"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-11-14-2 iPhone-Kopf: Einstellungen · Bereich · Notfall; Bereiche und Werkzeuge als Blatt",
+      "contains": [
+        "<header class=\"kopf\" id=\"kopf\">",
+        "<div id=\"modul-overlay\" class=\"modul-overlay\" style=\"display:none\"",
+        "function modulBlatt(auf) {",
+        "function kopfTitelZeigen() {",
+        "function modulBlattEinrichten() {",
+        ".modul-blatt .mod-btn:not([data-ctx])::after { content: attr(aria-label);"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-11-14-2 iPhone: Antwortsprache als Knopf in der Statuszeile, Leiste klappt auf",
+      "contains": [
+        "<button class=\"lang-knopf\" id=\"lang-knopf\" onclick=\"sprachLeiste()\"",
+        "function sprachLeiste(auf) {",
+        "function sprachKnopfZeigen() {",
+        ".lang-bar:not(.offen) { display: none; }"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-11-14-2 iPhone: zweite Stilebene, Einstellungs-Blatt rollt, Botschaftsnummern antippbar",
+      "contains": [
+        "<style id=\"oberflaeche-2\">",
+        "#setup-overlay > div { max-height: 92dvh; overflow-y: auto;",
+        "#notruf-gps-box strong > a[href^=\"tel:\"] { display: inline-block; padding: 12px 2px;"
+      ]
+    },
+    {
+      "file": "i18n/en.js",
+      "name": "2026-11-14-2 Texte der neuen Oberfläche übersetzt (en): Reiter, Notfall-Knopf, Start-Hinweis, Anleitung, Blatt am iPhone",
+      "contains": [
+        "\"KI & Modelle\": ",
+        "\"Die lokale KI läuft nicht\": ",
+        "\"Einmal einrichten\": ",
+        "\"Wenn der Mac nicht antwortet\": ",
+        "\"Bereich wählen\": "
+      ]
+    },
+    {
+      "file": "i18n/fr.js",
+      "name": "2026-11-14-2 Texte der neuen Oberfläche übersetzt (fr): Reiter, Notfall-Knopf, Start-Hinweis, Anleitung, Blatt am iPhone",
+      "contains": [
+        "\"KI & Modelle\": ",
+        "\"Die lokale KI läuft nicht\": ",
+        "\"Einmal einrichten\": ",
+        "\"Wenn der Mac nicht antwortet\": ",
+        "\"Bereich wählen\": "
+      ]
+    },
+    {
+      "file": "i18n/es.js",
+      "name": "2026-11-14-2 Texte der neuen Oberfläche übersetzt (es): Reiter, Notfall-Knopf, Start-Hinweis, Anleitung, Blatt am iPhone",
+      "contains": [
+        "\"KI & Modelle\": ",
+        "\"Die lokale KI läuft nicht\": ",
+        "\"Einmal einrichten\": ",
+        "\"Wenn der Mac nicht antwortet\": ",
+        "\"Bereich wählen\": "
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-11-14-3 SOS am iPhone: Position + eigene Nachricht per iMessage/SMS und WhatsApp, oben im Notfall-Blatt",
+      "contains": [
+        "html = sosBlockMobil() + html;",
+        "function sosNummer(roh) {",
+        "function sosSmsUrl(nummern, text) {",
+        "function sosWaUrl(nummer, text) {",
+        "function sosNachricht(text, lat, lng, genau, zeit, frisch) {",
+        "sosWarten = setTimeout(sosLetzte, 12000);",
+        ".sos-knopf {"
+      ]
+    },
+    {
+      "file": "i18n/en.js",
+      "name": "2026-11-14-3 SOS-Texte übersetzt (en)",
+      "contains": [
+        "\"Position senden\": ",
+        "\"SOS-Nachricht einrichten\": ",
+        "\"🆘 Notfall — ich brauche Hilfe. Hier ist meine Position:\": "
+      ]
+    },
+    {
+      "file": "i18n/fr.js",
+      "name": "2026-11-14-3 SOS-Texte übersetzt (fr)",
+      "contains": [
+        "\"Position senden\": ",
+        "\"SOS-Nachricht einrichten\": ",
+        "\"🆘 Notfall — ich brauche Hilfe. Hier ist meine Position:\": "
+      ]
+    },
+    {
+      "file": "i18n/es.js",
+      "name": "2026-11-14-3 SOS-Texte übersetzt (es)",
+      "contains": [
+        "\"Position senden\": ",
+        "\"SOS-Nachricht einrichten\": ",
+        "\"🆘 Notfall — ich brauche Hilfe. Hier ist meine Position:\": "
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-11-14-4 Claude-Key vom Mac aufs iPhone: Anfrage mit Code, Bestätigung am Mac, einmal abholbar, nur https/Loopback, nur im Arbeitsspeicher",
+      "contains": [
+        "SCHLUESSEL_FRIST_S = 120",
+        "def schluessel_anfrage_neu(ip, ua):",
+        "def schluessel_abholen(anfrage_id, ip):",
+        "def geraet_aus_ua(ua):",
+        "if path == '/api/schluessel/antwort':",
+        "def _json_privat(self, data):",
+        "'iphoneAnthropicKey', 'userLat'"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-11-14-4 Mac: Band „Claude-Key an ein Gerät übergeben?“ mit Gerät, Adresse, Code; Feld „Key fürs iPhone“",
+      "contains": [
+        "function schluesselBand(a) {",
+        "async function schluesselAntworten(erlauben) {",
+        "schluesselStart();           // Claude-Key ans iPhone",
+        "id=\"iphone-anthropic-key\"",
+        "delete st.userLocationTime; delete st.iphoneAnthropicKey;"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-11-14-4 iPhone: „Vom Mac holen“ mit großem Code, übernimmt den Key nach Bestätigung am Mac",
+      "contains": [
+        "<button id=\"m-key-holen\" onclick=\"keyVomMacHolen()\"",
+        "async function keyVomMacHolen() {",
+        "async function keyHolenPruefen() {",
+        "/^sk-ant-[A-Za-z0-9_-]{20,200}$/.test(d.key)"
+      ]
+    },
+    {
+      "file": "i18n/en.js",
+      "name": "2026-11-14-4 Texte der Key-Übergabe übersetzt (en)",
+      "contains": [
+        "\"📲 Claude-Key an ein Gerät übergeben?\": ",
+        "\"📲 Vom Mac holen\": ",
+        "\"Key fürs iPhone (optional)\": "
+      ]
+    },
+    {
+      "file": "i18n/fr.js",
+      "name": "2026-11-14-4 Texte der Key-Übergabe übersetzt (fr)",
+      "contains": [
+        "\"📲 Claude-Key an ein Gerät übergeben?\": ",
+        "\"📲 Vom Mac holen\": ",
+        "\"Key fürs iPhone (optional)\": "
+      ]
+    },
+    {
+      "file": "i18n/es.js",
+      "name": "2026-11-14-4 Texte der Key-Übergabe übersetzt (es)",
+      "contains": [
+        "\"📲 Claude-Key an ein Gerät übergeben?\": ",
+        "\"📲 Vom Mac holen\": ",
+        "\"Key fürs iPhone (optional)\": "
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-11-14-5 Modell-Check: Claude-Standard Sonnet 5.5 (Mac)",
+      "contains": [
+        "const CLAUDE_STANDARD_MODELL = 'claude-sonnet-5-5';",
+        "modelLabel: 'Claude Sonnet 5.5',"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-11-14-5 Modell-Check: Claude-Standard Sonnet 5.5 (iPhone)",
+      "contains": [
+        "const CLAUDE_STANDARD_MODELL = 'claude-sonnet-5-5';",
+        "modelLabel: 'Claude Sonnet 5.5',"
       ]
     }
   ]

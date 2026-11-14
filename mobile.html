@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Safari Assistant mobile.html v2026-10-05-2 -->
+<!-- Safari Assistant mobile.html v2026-11-14-5 -->
 <html lang="de">
 <head>
 <meta charset="UTF-8">
@@ -96,11 +96,145 @@
   #status-hint { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text3); padding: 3px 14px; background: var(--surface); flex-shrink: 0; }
   #conn-dot { font-size: 9px; color: var(--text3); flex-shrink: 0; transition: color 0.3s; }
   code { background: var(--surface2); padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: var(--mono); }
+  /* 2026-10-30-1: VPN-Stand vom Mac — schmale Leiste unter der Modulleiste, rot und groß ohne VPN */
+  .vpn-leiste { display: flex; align-items: center; gap: 8px; padding: 6px 14px; font-size: 12px; line-height: 1.4; flex-shrink: 0; border-bottom: 1px solid var(--border2); background: var(--surface2); color: var(--text2); cursor: pointer; -webkit-user-select: none; user-select: none; }
+  .vpn-leiste .vpn-l-icon { font-size: 15px; line-height: 1; flex-shrink: 0; }
+  .vpn-leiste .vpn-l-inhalt { min-width: 0; flex: 1; }
+  .vpn-leiste .vpn-l-titel { font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+  .vpn-leiste .vpn-l-zeile { display: block; font-size: 11px; opacity: 0.95; margin-top: 2px; overflow-wrap: anywhere; }
+  .vpn-leiste.gruen { background: #1f7a3a; color: #fff; border-color: #2fa352; }
+  .vpn-leiste.gelb { background: #8a6200; color: #fff; border-color: #d39b1e; }
+  .vpn-leiste.rot { background: #b3261e; color: #fff; border-color: #ff5a4f; padding: 10px 14px; font-size: 15px; min-height: 48px; }
+  .vpn-leiste.rot .vpn-l-icon { font-size: 22px; }
+  /* 2026-11-14-1 (Review U1): Band, wenn der Mac nicht antwortet — ruhig, mit dem Weg zum Notfall */
+  .mac-aus { flex-shrink: 0; padding: 12px 14px; background: var(--surface2); border-bottom: 1px solid var(--border2); }
+  .mac-aus-text b { display: block; font-size: 15px; color: var(--text); }
+  .mac-aus-text span { display: block; font-size: 13px; color: var(--text2); line-height: 1.45; margin-top: 2px; }
+  .mac-aus-knoepfe { display: flex; gap: 8px; margin-top: 10px; }
+  .mac-aus-knoepfe button { flex: 1; min-height: 44px; border-radius: 12px; border: 1px solid var(--border2); background: var(--surface); color: var(--text); font-size: 15px; font-weight: 600; }
+  .mac-aus-knoepfe button:first-child { border-color: var(--accent3); color: var(--accent3); }
+</style>
+<!-- ═══ 2026-11-14-2: OBERFLÄCHE, ZWEITE EBENE ═══
+     Die Regeln oben bleiben stehen; diese Ebene ordnet den Kopf neu und macht Schrift und Abstände ruhiger.
+     Leitlinie: oben nur Einstellungen · Bereich · Notfall, unten nur die Eingabe. Alles andere erscheint auf einen Tipp. -->
+<style id="oberflaeche-2">
+  /* ── Kopf ── */
+  .kopf { display: flex; align-items: center; gap: 8px; padding: calc(6px + env(safe-area-inset-top)) 10px 6px; background: var(--surface); border-bottom: 1px solid var(--border2); flex-shrink: 0; }
+  .kopf-knopf { flex: 0 0 44px; width: 44px; height: 44px; border-radius: 50%; border: none; background: transparent; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text); }
+  .kopf-knopf:active { background: var(--surface2); }
+  .kopf-notfall { background: rgba(224,122,95,0.16); box-shadow: inset 0 0 0 1.5px var(--accent3); }
+  .kopf-titel { flex: 1; min-width: 0; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 6px; background: transparent; border: none; border-radius: 12px; color: var(--text); font: inherit; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; cursor: pointer; padding: 0 8px; }
+  .kopf-titel:active { background: var(--surface2); }
+  #kopf-titel-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .kopf-pfeil { font-size: 12px; color: var(--text3); flex-shrink: 0; }
+  .kopf-badge { flex-shrink: 0; background: #e0842f; color: #111; border-radius: 10px; font-size: 12px; font-weight: 700; padding: 2px 7px; line-height: 1.4; }
+
+  /* ── Bereichswahl: ein Blatt von unten, alle Bereiche auf einen Blick ── */
+  .modul-overlay { position: fixed; inset: 0; z-index: 190; background: rgba(0,0,0,0.6); align-items: flex-end; }
+  .modul-blatt { width: 100%; max-height: 86dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--surface); border-top: 1px solid var(--border2); border-radius: 18px 18px 0 0; padding: 6px 14px calc(16px + env(safe-area-inset-bottom)); }
+  .modul-blatt-kopf { display: flex; align-items: center; justify-content: space-between; padding: 6px 2px 8px; font-size: 15px; font-weight: 600; color: var(--text); position: sticky; top: -6px; background: var(--surface); z-index: 1; }
+  .modul-blatt-kopf button { width: 44px; height: 44px; margin-right: -8px; border: none; background: transparent; color: var(--text2); font-size: 17px; border-radius: 50%; cursor: pointer; }
+  .modul-blatt .mod-bar { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; padding: 0; overflow: visible; background: none; border: none; }
+  .modul-blatt .mod-btn { min-width: 0; border-radius: 12px; }
+  /* Bereiche: zwei Spalten, Name links */
+  .modul-blatt .mod-btn[data-ctx] { grid-column: span 3; justify-content: flex-start; gap: 8px; min-height: 50px; padding: 10px 12px; font-size: 15px; color: var(--text); white-space: normal; text-align: left; line-height: 1.25; }
+  .modul-blatt .mod-btn[data-ctx].active { box-shadow: inset 0 0 0 1px var(--accent); }
+  /* Werkzeuge: Nachrichten, Karte, Anleitung — Symbol mit Namen darunter (der Name kommt aus aria-label und wird mit übersetzt) */
+  .modul-blatt .mod-btn:not([data-ctx]) { grid-column: span 2; flex-direction: column; justify-content: center; gap: 3px; min-height: 62px; padding: 8px 4px; font-size: 20px; font-weight: 400 !important; position: relative; }
+  .modul-blatt .mod-btn:not([data-ctx])::after { content: attr(aria-label); font-size: 12px; color: var(--text2); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .modul-blatt .mod-btn:not([data-ctx]) #m-nachrichten-badge { position: absolute; top: 6px; right: 8px; margin: 0 !important; }
+  /* Einstellungen und Notfall stehen im Kopf — im Blatt wären sie doppelt */
+  .modul-blatt .mod-btn[onclick="openSetup()"], .modul-blatt .mod-btn[onclick="openNotruf()"] { display: none; }
+
+  /* ── Gespräch ── */
+  #chat-area { padding: 14px 12px; }
+  .msg-bubble { font-size: 16px; line-height: 1.45; padding: 10px 14px; border-radius: 18px; }
+  .msg-user .msg-bubble { border-bottom-right-radius: 6px; }
+  .msg-assistant .msg-bubble { border-bottom-left-radius: 6px; }
+  .msg-meta { font-size: 12px; }
+  .welcome { padding: 2.5rem 1rem 1rem; }
+  .welcome-title { font-size: 24px; font-weight: 600; color: var(--text); letter-spacing: -0.015em; margin-bottom: 6px; }
+  .welcome-sub { font-size: 12px; }
+  .quick-wrap { gap: 8px; margin-top: 20px; }
+  .quick-chip { font-size: 15px; color: var(--text); border-radius: 14px; padding: 11px 14px; }
+
+  /* ── Statuszeile mit der Antwortsprache ── */
+  #status-hint { font-size: 12px; padding: 4px 8px 4px 14px; min-height: 36px; border-top: 1px solid var(--border2); }
+  #status-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lang-knopf { flex-shrink: 0; position: relative; display: inline-flex; align-items: center; gap: 4px; min-height: 28px; padding: 0 10px; background: var(--surface2); border: 1px solid var(--border2); border-radius: 14px; color: var(--text2); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .lang-knopf::before { content: ''; position: absolute; inset: -8px -6px; }   /* Tippfläche 44 pt, sichtbar bleibt der kleine Knopf */
+  .lang-knopf[aria-expanded="true"] { border-color: var(--accent2); color: var(--accent2); }
+  .lang-bar { border-top: none; padding: 2px 12px 8px; }
+  .lang-bar:not(.offen) { display: none; }
+  .lang-btn { min-height: 44px; font-size: 14px; padding: 8px 14px; color: var(--text2); }
+
+  /* ── Eingabe ── */
+  .input-bar { border-top: none; padding-top: 4px; }
+  #input-box { min-height: 44px; border-radius: 22px; padding: 11px 16px; }
+
+  /* ── Kleine Schrift aus style-Attributen anheben (wie am Mac): nichts unter 12 px ── */
+  [style*="font-size:9px"], [style*="font-size: 9px"], [style*="font-size:10px"], [style*="font-size: 10px"],
+  [style*="font-size:11px"], [style*="font-size: 11px"] { font-size: 12px !important; }
+  /* Notruf-Blatt: die Botschaftsnummern waren 11 px groß und 15 px hoch zum Tippen (Review U5) */
+  #notruf-gps-box [style*="font-size:11px"] { font-size: 14px !important; line-height: 1.5; }
+  #notruf-gps-box strong > a[href^="tel:"] { display: inline-block; padding: 12px 2px; margin: -6px 0; border-bottom: none !important; text-decoration: underline dotted !important; text-underline-offset: 4px; }
+
+  /* ── SOS im Notfall-Blatt (2026-11-14-3) ── */
+  .sos-box { background: rgba(224,122,95,0.10); border: 1.5px solid var(--accent3); border-radius: 14px; padding: 12px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .sos-knopf { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; box-sizing: border-box; min-height: 56px; padding: 10px 14px; border: none; border-radius: 12px; background: #c0362c; color: #fff; font: inherit; font-size: 17px; font-weight: 700; text-decoration: none; text-align: center; cursor: pointer; }
+  .sos-knopf:disabled { opacity: 0.75; }
+  .sos-knopf.sos-wa { background: #1e7e45; }
+  .sos-knopf.sos-erledigt { opacity: 0.6; }
+  .sos-knopf.sos-erledigt::after { content: ' ✓'; }
+  .sos-reihe { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .sos-reihe .sos-hinweis { flex: 1; min-width: 0; }
+  .sos-klein { min-height: 44px; padding: 0 12px; background: var(--surface2); border: 1px solid var(--border2); border-radius: 10px; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+  .sos-klein.sos-ok { border-color: var(--accent); }
+  .sos-titel { font-size: 15px; font-weight: 600; color: var(--text); }
+  .sos-hinweis { font-size: 12px; color: var(--text2); line-height: 1.45; }
+  .sos-vorschau { white-space: pre-wrap; word-break: break-word; font-size: 13px; color: var(--text); background: var(--surface2); border-radius: 10px; padding: 8px 10px; }
+  .sos-box textarea, .sos-kontakt input:not([type="checkbox"]) { width: 100%; box-sizing: border-box; background: var(--surface2); border: 1px solid var(--border2); border-radius: 10px; padding: 10px; color: var(--text); font: inherit; font-size: 16px; }
+  .sos-kontakt { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px 0; border-top: 1px solid var(--border2); }
+  .sos-kontakt label { display: flex; align-items: center; gap: 6px; min-height: 36px; font-size: 13px; color: var(--text2); }
+
+  /* ── Blätter ── */
+  /* Das Einstellungs-Blatt ist höher als der Bildschirm und ließ sich nicht rollen — Kopf, Version und Darstellung lagen
+     oberhalb des Bildschirms und waren nicht erreichbar (gemessen: 994 px Inhalt auf 844 px). */
+  #setup-overlay > div { max-height: 92dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+
+  /* ── Bänder ── */
+  .vpn-leiste { font-size: 13px; }
 </style>
 </head>
 <body>
 
-<div class="mod-bar" id="mod-bar"></div>
+<!-- 2026-11-14-2: Kopf — links Einstellungen, in der Mitte der Bereich (antippen öffnet die Auswahl), rechts der Notfall.
+     Vorher: eine Leiste zum Wischen mit fünf Symbolen und vierzehn Bereichen, von denen einer zu sehen war. -->
+<header class="kopf" id="kopf">
+  <button class="kopf-knopf" onclick="openSetup()" aria-label="Einstellungen">⚙️</button>
+  <button class="kopf-titel" id="kopf-titel" onclick="modulBlatt(true)" aria-haspopup="dialog" aria-expanded="false" aria-controls="modul-overlay">
+    <span id="kopf-titel-text"></span><span class="kopf-pfeil" aria-hidden="true">▾</span><span id="kopf-badge" class="kopf-badge" style="display:none"></span>
+  </button>
+  <button class="kopf-knopf kopf-notfall" onclick="openNotruf()" aria-label="Notfall">🚨</button>
+</header>
+<!-- Die Auswahl: renderModBar() füllt #mod-bar wie bisher — dieselben Knöpfe, hier als Raster mit Namen -->
+<div id="modul-overlay" class="modul-overlay" style="display:none" onclick="if(event.target===this)modulBlatt(false)">
+  <div class="modul-blatt" role="dialog" aria-modal="true" aria-label="Bereich wählen">
+    <div class="modul-blatt-kopf"><span>Bereich wählen</span><button onclick="modulBlatt(false)" aria-label="Schließen">✕</button></div>
+    <div class="mod-bar" id="mod-bar"></div>
+  </div>
+</div>
+<!-- 2026-10-30-1: VPN-Stand vom Mac — rot und groß, solange der Mac ohne VPN online ist; antippen zeigt Details -->
+<div id="vpn-leiste" class="vpn-leiste grau" role="status" aria-live="polite" style="display:none" onclick="vpnLeisteUmschalten()"></div>
+
+<!-- 2026-11-14-1 (Review U1): Der Mac antwortet nicht — die Seite kommt dann aus dem Speicher des iPhones (Service Worker) -->
+<div id="mac-aus" class="mac-aus" role="status" aria-live="polite" style="display:none">
+  <div class="mac-aus-text"><b>Keine Verbindung zum Mac</b><span>Sofort-Protokolle, Notrufnummern und deine Position funktionieren trotzdem. KI-Antworten erst wieder mit dem Mac.</span></div>
+  <div class="mac-aus-knoepfe">
+    <button onclick="openNotruf()">🚨 Notfall</button>
+    <button onclick="location.reload()">Neu verbinden</button>
+  </div>
+</div>
 
 <div id="chat-area"></div>
 
@@ -146,12 +280,21 @@
       <button onclick="loescheApiKeyMobil()" title="Key löschen" style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:0 12px;color:var(--accent3);font-size:13px;min-height:44px">🗑</button>
     </div>
     <div id="m-api-key-hint" style="font-size:10px;color:var(--text3);margin-bottom:10px">Wird nur in diesem Browser gespeichert (localStorage, unverschlüsselt).</div>
+    <!-- 2026-11-14-4: Key vom Mac übernehmen — der Mac zeigt Gerät und Code und muss bestätigen -->
+    <button id="m-key-holen" onclick="keyVomMacHolen()" style="width:100%;min-height:44px;background:var(--surface2);border:1px solid var(--accent);border-radius:10px;padding:10px;color:var(--text);font-size:13px;margin:-4px 0 14px">📲 Vom Mac holen</button>
+    <div id="m-key-code" style="display:none;margin:-6px 0 14px;padding:12px;border:1px solid var(--accent);border-radius:10px;background:var(--surface2);text-align:center">
+      <div style="font-size:12px;color:var(--text2)">Am Mac „Erlauben“ tippen, wenn dort derselbe Code steht:</div>
+      <div id="m-key-code-wert" data-i18n-skip style="font-size:34px;font-weight:700;letter-spacing:0.15em;color:var(--accent);margin-top:4px"></div>
+    </div>
     <div style="font-size:12px;color:var(--text2);margin-bottom:6px">Claude-Modell (Online-Module)</div>
     <div style="display:flex;gap:8px;margin-bottom:4px">
       <select id="m-claude-model" onchange="setzeClaudeModellMobil(this.value)" style="flex:1;min-width:0;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px;color:var(--text);font-size:14px;min-height:44px"></select>
       <button onclick="ladeClaudeModellListeMobil()" style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:0 12px;color:var(--text);font-size:13px;min-height:44px">Liste laden</button>
     </div>
     <div id="m-claude-model-hint" style="font-size:10px;color:var(--text3);margin-bottom:14px"></div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:6px">Claude-Aufwand (Online-Module)</div>
+    <select id="m-claude-aufwand" onchange="setzeClaudeAufwandMobil(this.value)" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px;color:var(--text);font-size:14px;min-height:44px;margin-bottom:4px"></select>
+    <div id="m-claude-aufwand-hint" style="font-size:10px;color:var(--text3);margin-bottom:14px;line-height:1.5"></div>
     <button onclick="openWikipedia()" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px;color:var(--text);font-size:13px;margin-bottom:8px">📚 Offline-Wikipedia öffnen</button>
     <button onclick="clearAllChats()" style="width:100%;background:var(--surface2);border:1px solid var(--accent3);border-radius:10px;padding:12px;color:var(--accent3);font-size:13px;margin-bottom:8px">🗑 Alle Chat-Verläufe löschen</button>
     <button onclick="closeSetup()" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px;color:var(--text);font-size:13px">Schließen</button>
@@ -168,8 +311,19 @@
   </div>
 </div>
 
+<!-- NACHRICHTEN-SHEET (2026-10-18-2): Meldungen aus RSS-Feeds nach Themen — nur lesen, die Quellen verwaltet der Mac -->
+<div id="nachrichten-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:200;align-items:flex-end;" onclick="if(event.target===this)closeNachrichten()">
+  <div style="background:var(--surface);border-top:1px solid var(--border2);border-radius:16px 16px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));width:100%;max-height:88vh;overflow-y:auto">
+    <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:12px">📰 Nachrichten nach Themen</div>
+    <div id="nachrichten-body"></div>
+    <button onclick="closeNachrichten()" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px;color:var(--text);font-size:13px;margin-top:12px">Schließen</button>
+  </div>
+</div>
+
 <div id="img-preview"></div>
-<div id="status-hint"><span id="conn-dot">●</span><span id="status-text">Bereit</span></div>
+<div id="status-hint"><span id="conn-dot">●</span><span id="status-text">Bereit</span>
+  <!-- 2026-11-14-2: die Antwortsprache belegte dauerhaft eine eigene Zeile — jetzt ein Knopf, der die Auswahl aufklappt -->
+  <button class="lang-knopf" id="lang-knopf" onclick="sprachLeiste()" aria-expanded="false" aria-controls="lang-bar" title="Antwortsprache"><span aria-hidden="true">🌐</span> <span id="lang-knopf-text" data-i18n-skip>DE</span></button></div>
 
 <div class="lang-bar" id="lang-bar">
   <button class="lang-btn active" data-lang="Deutsch" onclick="setLang(this)">🇩🇪 DE</button>
@@ -317,8 +471,8 @@ CRITICAL AFRICA-SPECIFIC KNOWLEDGE:
   },
   claude: {
     icon: '✦', label: 'Claude — Online KI',
-    model: 'claude-sonnet-4-6',
-    modelLabel: 'Claude Sonnet 4.6',
+    model: 'claude-sonnet-5-5',
+    modelLabel: 'Claude Sonnet 5.5',
     modelReason: 'Anthropic Cloud — nur mit Internet',
     placeholder: 'Frage an Claude stellen (Internet erforderlich)...',
     hint: 'Bereich: Claude Online — Anthropic API',
@@ -329,7 +483,7 @@ You have deep knowledge of vehicle mechanics, African wildlife, wilderness and t
   },
   sicherheit: {
     icon: '🌍', label: 'Sicherheitslage — Live',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5-5',
     modelLabel: 'Claude + Web-Search',
     modelReason: 'Live-Recherche aus vertrauenswürdigen Quellen',
     placeholder: 'Land, Region oder konkrete Sicherheitsfrage...',
@@ -681,7 +835,7 @@ function clearAllChats() {
 
 // ═══ SETUP-SHEET (Bug-2-Fix: Modellwahl war vorher nicht vorhanden —
 // Modelle waren pro Modul hartkodiert, eine Auswahl am Handy hatte keinen Effekt) ═══
-const APP_VERSION = 'v2026-10-05-2';
+const APP_VERSION = 'v2026-11-14-5';
 
 // Kontext-Schutz (BYTEIDENTISCH index + mobile): Dokument-/Wikipedia-Auszüge landen im System-Prompt.
 // Ein PDF aus dem Forum oder ein vandalisierter Wiki-Artikel könnte dort „Ignoriere deine Regeln" sagen.
@@ -699,7 +853,8 @@ function neutralisiereMarker(t) {
 // Jetzt wählbar: die Liste kommt live aus der Anthropic-Models-API (GET /v1/models — id, display_name,
 // created_at; neueste zuerst), wird lokal gecacht und funktioniert damit auch offline in der Auswahl.
 // Keine Modell-IDs sind im Code hinterlegt außer dem Standard — was die API nicht kennt, gibt es nicht.
-const CLAUDE_STANDARD_MODELL = 'claude-sonnet-4-6';
+// 2026-11-14-5 (Modell-Check): Sonnet 5.5 statt 4.6 — ein Drittel günstiger, laut Anthropic nicht vor 28.09.2027 abgeschaltet (4.6: frühestens 17.02.2027)
+const CLAUDE_STANDARD_MODELL = 'claude-sonnet-5-5';
 const CLAUDE_MODELLE_KEY = 'safari-claude-modelle';
 function claudeModellStufe(id) {
   const s = String(id || '').toLowerCase();
@@ -725,12 +880,101 @@ async function ladeClaudeModelle(apiKey) {
   try { localStorage.setItem(CLAUDE_MODELLE_KEY, JSON.stringify(cache)); } catch (e) {}
   return cache;
 }
+function claudeAufwandAusFaehigkeiten(cap) {
+  // capabilities.effort eines Modells aus der Modell-Liste → Liste der Stufen, die es kann;
+  // [] = das Modell kann keinen Aufwand; null = keine Angabe (unbekannt — die Liste nennt capabilities nicht immer)
+  const e = (cap && typeof cap === 'object') ? cap.effort : null;
+  if (!e || typeof e !== 'object') return null;
+  if (e.supported === false) return [];
+  const stufen = ['low', 'medium', 'high', 'xhigh', 'max'].filter(s => e[s] && e[s].supported === true);
+  return stufen.length ? stufen : null;
+}
 function claudeModelleAusAntwort(j) {
-  // API-Antwort → { liste: [{id, name, seit}], geholt }; unbrauchbare Einträge werden übersprungen
+  // API-Antwort → { liste: [{id, name, seit, aufwand}], geholt }; unbrauchbare Einträge werden übersprungen
   const liste = (j && Array.isArray(j.data) ? j.data : []).filter(m => m && typeof m.id === 'string')
-    .map(m => ({ id: m.id, name: String(m.display_name || m.id), seit: String(m.created_at || '').slice(0, 10) }));
+    .map(m => ({ id: m.id, name: String(m.display_name || m.id), seit: String(m.created_at || '').slice(0, 10), aufwand: claudeAufwandAusFaehigkeiten(m.capabilities) }));
   return { liste, geholt: Date.now() };
 }
+
+// ── CLAUDE-AUFWAND (BYTEIDENTISCH in index.html und mobile.html) ──
+// „Aufwand“ (bei Anthropic: effort) steuert, wie gründlich Claude arbeitet: Nachdenken, Werkzeugaufrufe, Länge der Antwort.
+// Die API nimmt ihn als output_config: { effort } in der Anfrage (2026-11-03-1). Gesendet wird NUR, wenn eine Stufe gewählt
+// ist — „Standard“ heißt: nichts senden, das Modell nutzt seinen eigenen Standard. Welche Stufen ein Modell kann, steht in
+// der Modell-Liste (capabilities.effort). Fehlt die Angabe, gilt „unbekannt“: die App probiert es, und lehnt die API die
+// Stufe ab (HTTP 400 mit „effort“ oder „output_config“ im Text), geht die Anfrage einmal ohne Aufwand erneut raus.
+const CLAUDE_AUFWAND_STUFEN = ['low', 'medium', 'high', 'xhigh', 'max'];
+const CLAUDE_AUFWAND_MAX_TOKENS = 8192;
+const CLAUDE_AUFWAND_ABGELEHNT = new Set();   // „modell|stufe“, von der API abgelehnt — gilt nur bis zum Neuladen
+function claudeAufwandName(stufe) {
+  const i = CLAUDE_AUFWAND_STUFEN.indexOf(stufe);
+  return i < 0 ? 'Standard' : ['Niedrig', 'Mittel', 'Hoch', 'Sehr hoch', 'Maximal'][i];
+}
+function claudeAufwandMoeglich(modellId) {
+  // Stufen laut Modell-Liste; [] = das Modell kann keinen Aufwand; null = unbekannt (keine Liste oder keine Angabe)
+  const c = claudeModelleCache(); const e = c && c.liste.find(m => m.id === modellId);
+  return (e && Array.isArray(e.aufwand)) ? e.aufwand : null;
+}
+function claudeAufwandWirksam(wahl, modellId) {
+  // Die Stufe, die wirklich gesendet wird; '' = nichts senden (Standard, ungültiger Wert, vom Modell nicht gekonnt, von der API abgelehnt)
+  if (!CLAUDE_AUFWAND_STUFEN.includes(wahl)) return '';
+  const m = claudeAufwandMoeglich(modellId);
+  if (m && !m.includes(wahl)) return '';
+  return CLAUDE_AUFWAND_ABGELEHNT.has(modellId + '|' + wahl) ? '' : wahl;
+}
+function claudeAnfrageMitAufwand(body, stufe) {
+  // Kopie der Anfrage mit output_config.effort; das Original bleibt unverändert, damit ein Wiederholen ohne Aufwand möglich ist
+  if (!CLAUDE_AUFWAND_STUFEN.includes(stufe)) return body;
+  const neu = Object.assign({}, body, { output_config: Object.assign({}, body.output_config, { effort: stufe }) });
+  // Bei „Sehr hoch“ und „Maximal“ zählt das Nachdenken auf max_tokens mit — sonst bliebe für die Antwort zu wenig übrig
+  if ((stufe === 'xhigh' || stufe === 'max') && !(neu.max_tokens >= CLAUDE_AUFWAND_MAX_TOKENS)) neu.max_tokens = CLAUDE_AUFWAND_MAX_TOKENS;
+  return neu;
+}
+function claudeAufwandFehlerText(text) { return /effort|output_config/i.test(String(text || '')); }
+function claudeAufwandOptionenHtml(modellId, wahl) {
+  // <option>-Liste für beide Auswahlfelder; nur feste Werte, keine Nutzereingaben
+  const m = claudeAufwandMoeglich(modellId);
+  const stufen = m === null ? CLAUDE_AUFWAND_STUFEN : CLAUDE_AUFWAND_STUFEN.filter(s => m.includes(s));
+  const gewaehlt = CLAUDE_AUFWAND_STUFEN.includes(wahl) ? wahl : '';
+  const opt = (wert, text) => '<option value="' + wert + '"' + (wert === gewaehlt ? ' selected' : '') + '>' + text + '</option>';
+  let html = opt('', 'Aufwand: Standard');
+  for (const s of stufen) html += opt(s, 'Aufwand: ' + claudeAufwandName(s));
+  if (gewaehlt && !stufen.includes(gewaehlt)) html += opt(gewaehlt, 'Aufwand: ' + claudeAufwandName(gewaehlt) + ' — bei diesem Modell nicht verfügbar');
+  return html;
+}
+function claudeAufwandHinweis(modellId, wahl) {
+  // Erklärung zur gewählten Stufe und zum Modell, als Zeilen (feste Texte)
+  const gewaehlt = CLAUDE_AUFWAND_STUFEN.includes(wahl) ? wahl : '';
+  const beschreibung = {
+    '': 'Standard: Die App sendet keinen Aufwand, das Modell nutzt seinen eigenen Standard.',
+    low: 'Niedrig: schnell und sparsam, weniger Nachdenken — für einfache Fragen.',
+    medium: 'Mittel: ausgewogen.',
+    high: 'Hoch: gründlich — laut Anthropic-Dokumentation bei den meisten Modellen ohnehin der Standard.',
+    xhigh: 'Sehr hoch: für schwierige Aufgaben — braucht mehr Tokens, Zeit und Geld.',
+    max: 'Maximal: der gründlichste Modus — am langsamsten und am teuersten.'
+  };
+  const zeilen = [beschreibung[gewaehlt]];
+  const m = claudeAufwandMoeglich(modellId);
+  if (gewaehlt && m && !m.includes(gewaehlt)) zeilen.push('Diese Stufe gibt es laut Modell-Liste bei diesem Modell nicht — es wird nichts gesendet.');
+  else if (gewaehlt && CLAUDE_AUFWAND_ABGELEHNT.has(modellId + '|' + gewaehlt)) zeilen.push('Die API hat diese Stufe für dieses Modell abgelehnt — bis zum Neuladen wird nichts gesendet.');
+  else if (m === null) zeilen.push('Ob dieses Modell einen Aufwand kann, weiß die App noch nicht („Liste laden“ fragt Anthropic). Lehnt die API ihn ab, läuft die Anfrage automatisch ohne.');
+  else if (m.length === 0) zeilen.push('Dieses Modell kann laut Modell-Liste keinen Aufwand — es wird nichts gesendet.');
+  else zeilen.push('Dieses Modell unterstützt den Aufwand laut Modell-Liste.');
+  if (gewaehlt === 'xhigh' || gewaehlt === 'max') zeilen.push('Bei dieser Stufe erlaubt die App Antworten bis ' + CLAUDE_AUFWAND_MAX_TOKENS + ' Tokens, weil das Nachdenken darauf angerechnet wird.');
+  return zeilen;
+}
+function claudeFristSignal(userSignal, ms) {
+  // Wartefrist NUR bis die Antwort beginnt. AbortSignal.timeout() bräche auch den laufenden Antwort-Strom ab
+  // (in Node nachgestellt: nach dem Kopf der Antwort wirft read() weiter TimeoutError) — bei hohem Aufwand dauert eine Antwort länger.
+  const frist = new AbortController();
+  const timer = setTimeout(() => {
+    const fehler = new Error('Zeitüberschreitung: Anthropic hat in ' + Math.round(ms / 1000) + ' s nicht geantwortet — Internet prüfen?');
+    fehler.name = 'TimeoutError';
+    frist.abort(fehler);
+  }, ms);
+  const signal = (typeof AbortSignal.any === 'function') ? AbortSignal.any([userSignal, frist.signal]) : userSignal;
+  return { signal, fertig: () => clearTimeout(timer) };
+}
+// ── ENDE CLAUDE-AUFWAND ──
 
 // ── GRUNDREGELN für alle Offline-Module (BYTEIDENTISCH in index.html und mobile.html) ──
 // Ergebnis des Prompt-Audits 12.09.2026: Unsicherheits-Regel, Antwortlänge, keine erfundenen Zahlen
@@ -912,6 +1156,201 @@ async function kopiereText(text, okMeldung) {
   } catch (e) { return 'Kopieren nicht möglich — bitte markieren und manuell kopieren'; }
 }
 
+// ── VPN-ANZEIGE (BYTEIDENTISCH in index.html und mobile.html) ──
+// VPN-Prüfung (2026-10-30-1): server.py misst, mit welcher Adresse und über welches Netz der Mac ins Internet geht
+// (IPv4 und IPv6 getrennt), und vergleicht das mit den gemerkten Netzen des eigenen VPNs. Hier nur die Anzeige:
+// Stufe → Farbe, Symbol, Kurztext, Zeile. Netznamen kommen von RIPEstat — fremder Text, darum immer maskiert
+// (vpnEsc) und nie übersetzt (data-i18n-skip). Rot (kein VPN, Leck) soll man sehen, ohne danach zu suchen.
+const VPN_STUFEN = {
+  vpn: { farbe: 'gruen', icon: '🔒', titel: 'VPN aktiv' },
+  kein_vpn: { farbe: 'rot', icon: '⚠️', titel: 'Kein VPN' },
+  leck: { farbe: 'rot', icon: '⚠️', titel: 'VPN-Leck' },
+  einrichten: { farbe: 'gelb', icon: '🔧', titel: 'VPN-Prüfung einrichten' },
+  unklar: { farbe: 'gelb', icon: '❓', titel: 'VPN unklar' },
+  anmeldung: { farbe: 'gelb', icon: '🔑', titel: 'WLAN-Anmeldung' },
+  offline: { farbe: 'grau', icon: '○', titel: 'Offline' },
+  pruefe: { farbe: 'grau', icon: '⏳', titel: 'VPN wird geprüft …' },
+  aus: { farbe: 'grau', icon: '○', titel: 'VPN-Prüfung aus' }
+};
+function vpnEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+function vpnLandName(code) {
+  const c = String(code || '');
+  if (!/^[A-Z]{2}$/.test(c)) return '';
+  try { return new Intl.DisplayNames([(window.DARK_I18N && window.DARK_I18N.lang) || 'de'], { type: 'region' }).of(c) || c; }
+  catch (e) { return c; }
+}
+// Ein Ausgang als HTML: „Netzname · Land" — fremder Text, maskiert und nicht übersetzt.
+// Hat der Anbieter den Ausgang bestätigt (Mullvad-Erkennung, 2026-11-02-1), steht sein Name statt des Netznamens da
+// und „vom Anbieter bestätigt" dahinter — so ist sichtbar, dass diese Bewertung nur für diesen Anbieter gilt.
+function vpnAusgangHtml(a) {
+  if (!a) return '';
+  const teile = [a.anbieter || a.name || (a.asn ? 'AS' + a.asn : ''), vpnLandName(a.land)].filter(Boolean);
+  return teile.length ? '<span data-i18n-skip>' + vpnEsc(teile.join(' · ')) + '</span>'
+    + (a.anbieter ? ' <span>· vom Anbieter bestätigt</span>' : '') : '';
+}
+function vpnAlterText(s) {
+  if (typeof s !== 'number' || !isFinite(s) || s < 0) return '';
+  if (s < 10) return 'gerade eben';
+  if (s < 120) return 'vor ' + Math.round(s) + ' s';
+  if (s < 7200) return 'vor ' + Math.round(s / 60) + ' Min.';
+  return 'vor ' + Math.round(s / 3600) + ' h';
+}
+// Stand vom Server → was die Seite zeigt. geraet: 'mac' oder 'iphone' (eingerichtet wird nur am Mac).
+function vpnAnzeige(st, geraet) {
+  const stufe = (st && Object.prototype.hasOwnProperty.call(VPN_STUFEN, st.stufe)) ? st.stufe : 'pruefe';
+  const s = VPN_STUFEN[stufe];
+  const wege = (st && Array.isArray(st.ausgaenge)) ? st.ausgaenge : [];
+  const ohne = wege.find(a => a.vpn === false) || wege.find(a => a.vpn !== true) || wege[0];
+  const amMac = geraet !== 'iphone';
+  let zeile = '', band = '';
+  if (stufe === 'vpn') zeile = 'Ausgang: ' + vpnAusgangHtml(wege[0]);
+  else if (stufe === 'kein_vpn') {
+    zeile = (ohne && ohne.zugang) ? vpnEsc('Direkt über ' + ohne.zugang + ' — ohne Tunnel')
+      : 'Ausgang: ' + vpnAusgangHtml(ohne) + ' — nicht als dein VPN bekannt';
+    band = 'Online ohne VPN — dein Internetverkehr läuft nicht durch dein VPN.';
+  } else if (stufe === 'leck') {
+    zeile = (st.leck === 'IPv4' ? 'IPv4 läuft am VPN vorbei:' : 'IPv6 läuft am VPN vorbei:') + ' ' + vpnAusgangHtml(ohne);
+    band = 'VPN-Leck — ein Teil deines Internetverkehrs läuft am VPN vorbei.';
+  } else if (stufe === 'einrichten') {
+    zeile = 'Online über ' + vpnAusgangHtml(ohne) + '. <span>' + (amMac
+      ? 'VPN am Router einschalten, dann in ⚙️ Einstellungen → VPN-Prüfung „Das ist mein VPN“ drücken.'
+      : 'Einrichten am Mac: ⚙️ Einstellungen → VPN-Prüfung.') + '</span>';
+  } else if (stufe === 'unklar') {
+    zeile = wege.length ? 'Ein Ausgang ließ sich keinem Netz zuordnen (RIPEstat nicht erreichbar?).'
+      : 'Internet erreichbar, aber die Prüfdienste antworten nicht.';
+  } else if (stufe === 'anmeldung') zeile = 'Das WLAN verlangt eine Anmeldung. Erst im Browser anmelden, dann das VPN am Router einschalten.';
+  else if (stufe === 'offline') zeile = 'Keine Internetverbindung. Ist am Router eine Sperre für Verkehr ohne VPN an, kann auch ein getrenntes VPN die Ursache sein.';
+  else if (stufe === 'pruefe') zeile = (st && st.zuletzt) ? 'Netz gewechselt oder letzte Messung zu alt — wird neu geprüft.' : 'Erste Messung läuft.';
+  else if (stufe === 'aus') zeile = amMac ? 'Einschalten in ⚙️ Einstellungen → VPN-Prüfung.' : 'Einschalten am Mac: ⚙️ Einstellungen → VPN-Prüfung.';
+  // kurz: für die Kachel in der Seitenleiste — dort steht der Stand dauerhaft, die Erklärung gibt es beim Klick
+  let kurz = zeile;
+  if (stufe === 'einrichten' && amMac) kurz = 'Online über ' + vpnAusgangHtml(ohne) + '. <span>Zum Einrichten hier klicken.</span>';
+  else if (stufe === 'anmeldung') kurz = 'Das WLAN verlangt eine Anmeldung.';
+  else if (stufe === 'offline') kurz = 'Keine Internetverbindung.';
+  return { stufe, farbe: s.farbe, icon: s.icon, titel: s.titel, zeile, kurz, band, rot: s.farbe === 'rot' };
+}
+// ── ENDE VPN-ANZEIGE ──
+
+// ── NACHRICHTEN (BYTEIDENTISCH in index.html und mobile.html) ──
+// Meldungen aus RSS-Feeds (2026-10-18-2): server.py holt sie, sobald der Mac online ist, und ordnet sie mit einer
+// festen Stichwortliste Themen und Ländern zu (keine KI). Gespeichert und gezeigt werden nur Titel, ein kurzer
+// Anriss, Quelle, Datum und Link. Feed-Inhalt ist fremder Text: immer maskiert (nachrichtEsc — eine eigene Funktion,
+// weil escHtml auch Markdown formatiert), nie übersetzt (data-i18n-skip), Links nur http(s).
+const NACHRICHTEN_KEY = 'safari-nachrichten';
+const NACHRICHTEN_GESEHEN_KEY = 'safari-nachrichten-gesehen';
+let nachrichtenImSpeicher = null;     // falls localStorage voll ist, gilt wenigstens der letzte Abruf dieser Sitzung
+function nachrichtEsc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function nachrichtenCache() {
+  if (nachrichtenImSpeicher) return nachrichtenImSpeicher;
+  try {
+    const c = JSON.parse(localStorage.getItem(NACHRICHTEN_KEY) || 'null');
+    return (c && Array.isArray(c.eintraege)) ? c : null;
+  } catch (e) { return null; }
+}
+async function ladeNachrichten(serverUrl) {
+  const res = await fetch(serverUrl + '/api/nachrichten', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const j = await res.json();
+  const c = { eintraege: Array.isArray(j.eintraege) ? j.eintraege : [], themen: Array.isArray(j.themen) ? j.themen : [],
+    laender: (j.laender && typeof j.laender === 'object') ? j.laender : {}, status: j.status || {}, hinweis: j.hinweis || '',
+    gespeichert: Date.now() };
+  nachrichtenImSpeicher = c;
+  try { localStorage.setItem(NACHRICHTEN_KEY, JSON.stringify(c)); } catch (e) { /* voll — dann gilt nachrichtenImSpeicher */ }
+  return c;
+}
+function nachrichtenGesehenBis() {
+  try { return Number(localStorage.getItem(NACHRICHTEN_GESEHEN_KEY)) || 0; } catch (e) { return 0; }
+}
+function nachrichtenAlsGesehen() {
+  try { localStorage.setItem(NACHRICHTEN_GESEHEN_KEY, String(Math.floor(Date.now() / 1000))); } catch (e) {}
+}
+function nachrichtHatLand(e, land) { return !land || (Array.isArray(e.laender) && e.laender.includes(land)); }
+// Nach Themen ordnen — die Reihenfolge der Themen kommt vom Server. Jede Meldung steht unter ihrem ersten Thema
+// (weitere zeigt sie als Hinweis); ist ein Thema gewählt, stehen dort alle Meldungen mit diesem Thema. Innerhalb eines
+// Themas: wichtige zuerst, dann das Land, in dem man gerade ist, dann die neuesten.
+function nachrichtenGruppieren(c, opt) {
+  opt = opt || {};
+  const themen = (c && Array.isArray(c.themen)) ? c.themen : [];
+  const liste = ((c && c.eintraege) || []).filter(e => e && e.titel && nachrichtHatLand(e, opt.land)
+    && (!opt.nurWichtig || e.kritisch) && (!opt.thema || (Array.isArray(e.themen) && e.themen.includes(opt.thema))));
+  const rang = e => (e.kritisch ? 2 : 0) + (opt.hier && nachrichtHatLand(e, opt.hier) ? 1 : 0);
+  liste.sort((a, b) => (rang(b) - rang(a)) || ((Number(b.zeit) || 0) - (Number(a.zeit) || 0)));
+  if (opt.thema) {
+    const t = themen.find(x => x.id === opt.thema);
+    return (t && liste.length) ? [{ thema: t, eintraege: liste }] : [];
+  }
+  const gruppen = themen.map(t => ({ thema: t, eintraege: [] }));
+  const nachId = {};
+  gruppen.forEach(g => { nachId[g.thema.id] = g; });
+  liste.forEach(e => { const g = nachId[(e.themen || [])[0]] || nachId.sonstiges; if (g) g.eintraege.push(e); });
+  return gruppen.filter(g => g.eintraege.length);
+}
+// Wie viele Meldungen je Thema (für die Themen-Knöpfe) — mit denselben Filtern, nur ohne das Thema
+function nachrichtenZaehlen(c, opt) {
+  opt = opt || {};
+  const z = {};
+  ((c && c.eintraege) || []).forEach(e => {
+    if (!e || !e.titel || !nachrichtHatLand(e, opt.land) || (opt.nurWichtig && !e.kritisch)) return;
+    (e.themen || []).forEach(t => { z[t] = (z[t] || 0) + 1; });
+  });
+  return z;
+}
+function nachrichtZeitText(sek) {
+  const s = Number(sek) || 0;
+  if (!s) return '';
+  const diff = Date.now() / 1000 - s;
+  if (diff < 3600) return `vor ${Math.max(1, Math.round(diff / 60))} Min.`;
+  if (diff < 48 * 3600) return `vor ${Math.round(diff / 3600)} h`;
+  if (diff < 8 * 86400) return `vor ${Math.round(diff / 86400)} Tagen`;
+  return new Date(s * 1000).toLocaleDateString('de-DE', { day: 'numeric', month: 'short' });
+}
+function nachrichtHtml(e, c, gesehenBis) {
+  const link = /^https?:\/\//i.test(String(e.link || '')) ? String(e.link) : '';
+  const namen = (c && c.laender) || {}, themen = (c && c.themen) || [];
+  const neu = (Number(e.gesehen) || 0) > (Number(gesehenBis) || 0);
+  const weitere = (e.themen || []).slice(1).map(id => themen.find(t => t.id === id)).filter(Boolean);
+  const titel = `<span data-i18n-skip>${nachrichtEsc(e.titel)}</span>`;
+  const marke = (text, farbe) => `<span style="font-size:9px;font-weight:700;color:#111;background:${farbe};border-radius:8px;padding:1px 6px;flex-shrink:0">${text}</span>`;
+  return '<div style="padding:9px 0;border-top:1px solid var(--border2)">'
+    + '<div style="display:flex;gap:6px;align-items:baseline;flex-wrap:wrap;font-size:13px;line-height:1.45">'
+    + (e.kritisch ? marke('Wichtig', '#e0842f') : '') + (neu ? marke('Neu', 'var(--accent)') : '')
+    + (link ? `<a href="${nachrichtEsc(link)}" target="_blank" rel="noopener noreferrer" style="color:var(--text);font-weight:500;text-decoration:none">${titel} <span style="color:var(--accent4)">↗</span></a>`
+      : `<span style="color:var(--text);font-weight:500">${titel}</span>`)
+    + '</div><div style="font-size:10px;color:var(--text3);margin-top:3px;display:flex;gap:4px 8px;flex-wrap:wrap">'
+    + (e.laender || []).map(k => `<span>${nachrichtEsc(namen[k] || k)}</span>`).join('')
+    + `<span data-i18n-skip>${nachrichtEsc(e.quelle_name)}</span>`
+    + (e.zeit ? `<span>${nachrichtEsc(nachrichtZeitText(e.zeit))}</span>` : '')
+    + weitere.map(t => `<span>${nachrichtEsc(t.icon)} ${nachrichtEsc(t.name)}</span>`).join('')
+    + '</div>'
+    + (e.text ? `<div data-i18n-skip style="font-size:11px;color:var(--text2);line-height:1.55;margin-top:4px">${nachrichtEsc(e.text)}</div>` : '')
+    + '</div>';
+}
+// Die Themen untereinander, je Thema die ersten opt.max Meldungen; „Alle … zeigen" ruft die Funktion opt.mehr der Seite.
+function nachrichtenListeHtml(c, gruppen, opt) {
+  opt = opt || {};
+  const max = opt.max || 6, offen = opt.offen || {}, gesehenBis = Number(opt.gesehenBis) || 0;
+  const mehr = /^[A-Za-z]+$/.test(opt.mehr || '') ? opt.mehr : '';
+  return gruppen.map(g => {
+    const id = /^[a-z]+$/.test(g.thema.id || '') ? g.thema.id : '';
+    const neu = g.eintraege.filter(e => (Number(e.gesehen) || 0) > gesehenBis).length;
+    const zeigen = offen[id] ? g.eintraege : g.eintraege.slice(0, max);
+    return '<div style="margin:18px 0 4px;display:flex;align-items:center;gap:8px">'
+      + `<span style="font-size:16px">${nachrichtEsc(g.thema.icon)}</span>`
+      + `<b style="font-size:13px;color:var(--text)">${nachrichtEsc(g.thema.name)}</b>`
+      + `<span style="font-size:10px;color:var(--text3)">${g.eintraege.length}</span>`
+      + (neu ? `<span style="font-size:10px;color:var(--accent)">${neu} neu</span>` : '')
+      + '</div>'
+      + zeigen.map(e => nachrichtHtml(e, c, gesehenBis)).join('')
+      + ((mehr && id && g.eintraege.length > max)
+        ? `<button onclick="${mehr}('${id}')" style="margin-top:6px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:6px 12px;min-height:32px;color:var(--text2);font-size:11px;cursor:pointer">${offen[id] ? 'Weniger zeigen' : `Alle ${g.eintraege.length} zeigen`}</button>` : '');
+  }).join('');
+}
+
 // ── SOFORT-PROTOKOLLE OHNE KI (BYTEIDENTISCH in index.html und mobile.html — Regel wie NOTRUF_LAENDER) ──
 // In einem Notfall wartet niemand 60 Sekunden auf ein kaltes 35B-Modell. Diese Abläufe stehen
 // deshalb als fester Text sofort bereit — offline, ohne Ollama, ohne Netz. Sie folgen den gängigen
@@ -1019,7 +1458,9 @@ async function openWikipedia() {
         alert('📚 Offline-Wikipedia nicht erreichbar.\n\n' + (s.grund || '') + '\n\nManueller Start am Mac:\nkiwix-tools von download.kiwix.org laden, kiwix-serve und ZIM-Dateien nach ~/safari-zim/ legen, Safari Assistant neu starten.');
         return;
       }
-      if (s.proxy) url = location.origin + s.proxy;
+      // 2026-11-14-1 (Review S3): eigener Port = eigene Herkunft — Skripte aus der Wikipedia kommen so nicht an den Speicher der App
+      if (s.proxy && s.wiki_port) url = location.protocol + '//' + location.hostname + ':' + s.wiki_port + s.proxy;
+      else if (s.proxy) url = location.origin + s.proxy;
       else if (location.protocol === 'https:') {
         alert('📚 Die Offline-Wikipedia läuft, lässt sich von hier aus aber nicht öffnen.\n\nDiese Seite ist verschlüsselt, kiwix-serve antwortet nur unverschlüsselt auf Port 8090 — Safari blockiert den Wechsel. Am Mac (http://localhost:8090) geht es weiterhin.\n\nDauerhafte Lösung: eine kiwix-Version mit --urlRootLocation (brew upgrade kiwix-tools); der Assistent reicht sie dann selbst durch.');
         return;
@@ -1077,8 +1518,23 @@ function renderClaudeModellMobil() {
   const c = claudeModelleCache(); const aktuell = getClaudeModelMobil();
   const liste = c ? c.liste.slice() : [];
   if (!liste.some(m => m.id === aktuell)) liste.unshift({ id: aktuell, name: aktuell, seit: '' });
-  sel.innerHTML = liste.map(m => `<option value="${escHtml(m.id)}" ${m.id === aktuell ? 'selected' : ''}>${escHtml(m.name)}${m.seit ? ' · ' + escHtml(m.seit) : ''}</option>`).join('');
+  sel.innerHTML = liste.map(m => `<option value="${nachrichtEsc(m.id)}" ${m.id === aktuell ? 'selected' : ''}>${escHtml(m.name)}${m.seit ? ' · ' + escHtml(m.seit) : ''}</option>`).join('');
   if (hint) hint.textContent = aktuell + ' — ' + claudeModellStufe(aktuell) + (c ? '' : '. „Liste laden" holt die verfügbaren Modelle (Internet + Key).');
+  renderClaudeAufwandMobil();
+}
+// Aufwand (effort): die Stufen hängen vom Modell ab; Hinweis zeilenweise, damit jede Zeile ein eigener Textknoten ist (2026-11-03-1)
+function renderClaudeAufwandMobil() {
+  const modell = getClaudeModelMobil();
+  const sel = document.getElementById('m-claude-aufwand'); if (sel) sel.innerHTML = claudeAufwandOptionenHtml(modell, mSettings.claudeEffort);
+  const hint = document.getElementById('m-claude-aufwand-hint');
+  if (hint) hint.innerHTML = claudeAufwandHinweis(modell, mSettings.claudeEffort).map(z => '<div>' + z + '</div>').join('');
+}
+function setzeClaudeAufwandMobil(wert) {
+  wert = String(wert || '');
+  if (wert && !CLAUDE_AUFWAND_STUFEN.includes(wert)) return;
+  if (wert) mSettings.claudeEffort = wert; else delete mSettings.claudeEffort;
+  try { localStorage.setItem('safari-mobile-settings', JSON.stringify(mSettings)); } catch (e) { showToast('⚠️ Speichern fehlgeschlagen (Speicher voll?)'); }
+  renderClaudeAufwandMobil(); showToast('Aufwand: ' + claudeAufwandName(wert));
 }
 function setzeClaudeModellMobil(id) {
   id = String(id || '').trim(); if (!id) return;
@@ -1116,6 +1572,58 @@ function loescheApiKeyMobil() {
   showToast('API-Key gelöscht'); zeigeApiKeyStatus();
 }
 function closeSetup() { document.getElementById('setup-overlay').style.display = 'none'; }
+// ═══ CLAUDE-KEY VOM MAC HOLEN (2026-11-14-4) ═══
+// Fragt am Mac an und zeigt einen vierstelligen Code. Der Mac zeigt Gerät, Adresse und denselben Code; erst nach
+// „Erlauben" dort holt diese Seite den Key einmal ab (nur über https). Abbruch nach der Frist des Servers.
+const keyHolen = { id: null, timer: null };
+function keyHolenHinweis(t) { const h = document.getElementById('m-api-key-hint'); if (h) h.textContent = t; }
+function keyHolenEnde(text) {
+  if (keyHolen.timer) clearInterval(keyHolen.timer);
+  keyHolen.id = null; keyHolen.timer = null;
+  const b = document.getElementById('m-key-holen'); if (b) b.disabled = false;
+  const c = document.getElementById('m-key-code'); if (c) c.style.display = 'none';
+  zeigeApiKeyStatus();
+  if (text) { keyHolenHinweis(text); showToast(text); }
+}
+async function keyVomMacHolen() {
+  if (keyHolen.id) return;
+  let d;
+  try {
+    const res = await fetch(SERVER_URL + '/api/schluessel/anfrage', { method: 'POST', headers: zugangHeader(), cache: 'no-store' });
+    d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.error || ('HTTP ' + res.status));
+  } catch (e) { keyHolenEnde('⚠️ ' + uiMulti('Mac nicht erreichbar') + ': ' + ((e && e.message) || '')); return; }
+  keyHolen.id = d.id;
+  const b = document.getElementById('m-key-holen'); if (b) b.disabled = true;
+  keyHolenHinweis(uiMulti('Am Mac bestätigen. Code auf diesem iPhone:') + ' ' + d.code);
+  const c = document.getElementById('m-key-code'), w = document.getElementById('m-key-code-wert');
+  if (c && w) { w.textContent = d.code; c.style.display = 'block'; }
+  showToast('📲 ' + uiMulti('Am Mac bestätigen — Code') + ' ' + d.code);
+  keyHolen.timer = setInterval(keyHolenPruefen, 2000);
+}
+async function keyHolenPruefen() {
+  const id = keyHolen.id;
+  if (!id) return;
+  let d;
+  try {
+    const res = await fetch(SERVER_URL + '/api/schluessel/anfrage?id=' + encodeURIComponent(id), { headers: zugangHeader(), cache: 'no-store' });
+    d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.error || ('HTTP ' + res.status));
+  } catch (e) { return; }   // kurzer Aussetzer: beim nächsten Durchlauf weiter
+  if (keyHolen.id !== id) return;
+  if (d.status === 'wartet') return;
+  if (d.status === 'erlaubt' && typeof d.key === 'string' && /^sk-ant-[A-Za-z0-9_-]{20,200}$/.test(d.key)) {
+    mSettings.anthropicKey = d.key;
+    try { localStorage.setItem('safari-mobile-settings', JSON.stringify(mSettings)); }
+    catch (e) { keyHolenEnde('⚠️ ' + uiMulti('Speichern fehlgeschlagen (Speicher voll?)')); return; }
+    keyHolenEnde('✅ ' + uiMulti('Claude-Key vom Mac übernommen'));
+    return;
+  }
+  keyHolenEnde(d.status === 'abgelehnt' ? uiMulti('Am Mac abgelehnt.')
+    : d.status === 'abgelaufen' ? uiMulti('Abgelaufen — nicht rechtzeitig am Mac bestätigt.')
+    : uiMulti('Anfrage ersetzt oder abgelaufen — bitte neu holen.'));
+}
+
 
 async function populateModelSelect() {
   const sel = document.getElementById('m-model-select');
@@ -1125,7 +1633,7 @@ async function populateModelSelect() {
     const data = await res.json();
     const models = (data.models || []).map(m => m.name);
     sel.innerHTML = '<option value="">Automatisch (pro Modul)</option>' +
-      models.map(m => `<option value="${escHtml(m)}">${escHtml(m)}</option>`).join('');
+      models.map(m => `<option value="${nachrichtEsc(m)}">${escHtml(m)}</option>`).join('');
     // Gespeichertes Override wiederherstellen — aber nur wenn Modell noch installiert ist
     if (mSettings.manualModel && !models.includes(mSettings.manualModel)) {
       hint.textContent = '⚠️ "' + mSettings.manualModel + '" ist nicht mehr installiert — zurück auf Automatik.';
@@ -1611,6 +2119,155 @@ function openNotruf() {
 }
 function closeNotruf() { document.getElementById('notruf-overlay').style.display = 'none'; }
 
+// ═══ SOS: POSITION + VORGEFERTIGTE NACHRICHT (2026-11-14-3) ═══
+// 🚨 im Kopf → „🆘 Position senden": holt eine frische GPS-Position (sonst die letzte bekannte, mit Uhrzeit), setzt
+// sie unter den eigenen Text und öffnet damit Nachrichten (iMessage oder SMS — das entscheidet das iPhone je Kontakt)
+// bzw. WhatsApp. Abschicken muss man selbst: Eine Webseite darf keine Nachricht ohne Tipp auf „Senden" verschicken.
+// Empfänger und Text liegen nur auf diesem iPhone (localStorage), nicht auf dem Mac.
+const SOS_KEY = 'safari-mobile-sos';
+const SOS_TEXT_VORGABE = '🆘 Notfall — ich brauche Hilfe. Hier ist meine Position:';
+const SOS_MAX = 8;
+const sosStand = { modus: 'start', text: '', quelle: '' };
+function sosLesen() {
+  let d = {};
+  try { d = JSON.parse(localStorage.getItem(SOS_KEY) || '{}') || {}; } catch (_) { d = {}; }
+  const kontakte = Array.isArray(d.kontakte) ? d.kontakte.filter(k => k && typeof k === 'object').slice(0, SOS_MAX).map(k => ({
+    name: String(k.name || '').slice(0, 40), nummer: String(k.nummer || '').slice(0, 30), sms: k.sms !== false, wa: k.wa === true })) : [];
+  return { text: typeof d.text === 'string' && d.text.trim() ? d.text.slice(0, 500) : uiMulti(SOS_TEXT_VORGABE), kontakte };
+}
+// „+49 170 …", „0049…", „(+27) 82-…" → „+4917…". Ohne Ländervorwahl kein Treffer: im Ausland wäre „0170…" eine andere Nummer.
+function sosNummer(roh) {
+  let n = String(roh || '').replace(/[\s()./-]/g, '');
+  if (n.startsWith('00')) n = '+' + n.slice(2);
+  return /^\+[1-9]\d{6,14}$/.test(n) ? n : '';
+}
+function sosZeit(ms) {
+  const d = new Date(ms), z = x => String(x).padStart(2, '0');
+  return z(d.getDate()) + '.' + z(d.getMonth() + 1) + '. ' + z(d.getHours()) + ':' + z(d.getMinutes());
+}
+// Nachricht: eigener Text, Koordinaten (Dezimalgrad), Karten-Link, Plus Code — ohne Position steht das ausdrücklich drin
+function sosNachricht(text, lat, lng, genau, zeit, frisch) {
+  const zeilen = [String(text || SOS_TEXT_VORGABE).trim()];
+  const p = (typeof lat === 'number' && typeof lng === 'number') ? positionFormate(lat, lng) : null;
+  if (!p) { zeilen.push('📍 ' + uiMulti('Position unbekannt (kein GPS)')); return zeilen.join('\n'); }
+  const la = lat.toFixed(5), lo = lng.toFixed(5);
+  const info = [];
+  if (typeof genau === 'number' && genau > 0) info.push('±' + Math.round(genau) + ' m');
+  if (zeit) info.push((frisch ? '' : uiMulti('letzte bekannte Position') + ', ') + sosZeit(zeit));
+  zeilen.push('📍 ' + la + ', ' + lo + (info.length ? ' (' + info.join(', ') + ')' : ''));
+  zeilen.push('https://www.google.com/maps/search/?api=1&query=' + la + ',' + lo);
+  zeilen.push('Plus Code ' + p.plus);
+  return zeilen.join('\n');
+}
+// Nachrichten-App: iMessage oder SMS wählt iOS je Empfänger selbst. Mehrere Empfänger: sms:/open?addresses=…
+function sosSmsUrl(nummern, text) {
+  const n = nummern.map(sosNummer).filter(Boolean);
+  const body = encodeURIComponent(text);
+  if (!n.length) return 'sms:&body=' + body;
+  if (n.length === 1) return 'sms:' + n[0] + '&body=' + body;
+  return 'sms:/open?addresses=' + n.join(',') + '&body=' + body;
+}
+// WhatsApp kennt je Link nur EINEN Empfänger (wa.me/<Nummer ohne +>)
+function sosWaUrl(nummer, text) {
+  const n = sosNummer(nummer);
+  return n ? 'https://wa.me/' + n.slice(1) + '?text=' + encodeURIComponent(text) : '';
+}
+function sosBlockMobil() {
+  return `<div id="sos-box" class="sos-box">${sosInhalt()}</div>`;
+}
+function sosZeigen() { const b = document.getElementById('sos-box'); if (b) b.innerHTML = sosInhalt(); }
+function sosInhalt() {
+  const d = sosLesen(), m = sosStand.modus;
+  if (m === 'bearbeiten') return sosEditor(d);
+  if (m === 'ortet') return `<button class="sos-knopf" disabled>🛰 ${escHtml(uiMulti('Position wird bestimmt …'))}</button>
+    <button class="sos-klein" onclick="sosOhneWarten()">${escHtml(uiMulti('Nicht warten — letzte bekannte Position nehmen'))}</button>`;
+  if (m === 'bereit') {
+    const sms = d.kontakte.filter(k => k.sms && sosNummer(k.nummer)), wa = d.kontakte.filter(k => k.wa && sosNummer(k.nummer));
+    const t = sosStand.text;
+    let h = `<div class="sos-titel">🆘 ${escHtml(uiMulti('Nachricht ist fertig — App wählen, dort „Senden“ tippen'))}</div>
+      <div class="sos-vorschau" data-i18n-skip>${escHtml(t)}</div>`;
+    if (sms.length) h += `<a class="sos-knopf" href="${nachrichtEsc(sosSmsUrl(sms.map(k => k.nummer), t))}" onclick="sosGetippt(this)">💬 iMessage/SMS · <span data-i18n-skip>${escHtml(sms.map(k => k.name || k.nummer).join(', '))}</span></a>`;
+    wa.forEach(k => { h += `<a class="sos-knopf sos-wa" href="${nachrichtEsc(sosWaUrl(k.nummer, t))}" target="_blank" rel="noopener" onclick="sosGetippt(this)">🟢 WhatsApp · <span data-i18n-skip>${escHtml(k.name || k.nummer)}</span></a>`; });
+    if (!sms.length && !wa.length) h += `<a class="sos-knopf" href="${nachrichtEsc(sosSmsUrl([], t))}" onclick="sosGetippt(this)">💬 ${escHtml(uiMulti('Nachrichten (Empfänger wählen)'))}</a>`;
+    h += `<div class="sos-reihe"><button class="sos-klein" onclick="sosTeilen()">📤 ${escHtml(uiMulti('Andere App …'))}</button>
+      <button class="sos-klein" onclick="sosKopieren()">📋 ${escHtml(uiMulti('Kopieren'))}</button>
+      <button class="sos-klein" onclick="sosStand.modus='start';sosZeigen()">✕</button></div>
+      <div class="sos-hinweis">${escHtml(uiMulti('Ohne Mobilfunk geht keine SMS raus; WhatsApp und iMessage brauchen Internet.'))}</div>`;
+    return h;
+  }
+  const n = d.kontakte.filter(k => sosNummer(k.nummer)).length;
+  return `<button class="sos-knopf" onclick="sosStart()">🆘 ${escHtml(uiMulti('Position senden'))}</button>
+    <div class="sos-reihe"><span class="sos-hinweis">${n ? escHtml(uiMulti('Empfänger:')) + ' <span data-i18n-skip>' + escHtml(d.kontakte.filter(k => sosNummer(k.nummer)).map(k => k.name || k.nummer).join(', ')) + '</span>'
+      : escHtml(uiMulti('Noch keine Empfänger — einmal einrichten.'))}</span>
+      <button class="sos-klein" onclick="sosStand.modus='bearbeiten';sosZeigen()">✏️ ${escHtml(uiMulti('Empfänger & Text'))}</button></div>`;
+}
+function sosEditor(d) {
+  const zeilen = d.kontakte.concat([{ name: '', nummer: '', sms: true, wa: false }]).slice(0, SOS_MAX).map((k, i) => `
+    <div class="sos-kontakt">
+      <input id="sos-name-${i}" placeholder="${nachrichtEsc(uiMulti('Name'))}" value="${nachrichtEsc(k.name)}" autocomplete="off">
+      <input id="sos-nr-${i}" type="tel" inputmode="tel" placeholder="${nachrichtEsc(uiMulti('Nummer mit Ländervorwahl, z. B. +49 …'))}" value="${nachrichtEsc(k.nummer)}" autocomplete="off">
+      <label><input type="checkbox" id="sos-sms-${i}" ${k.sms ? 'checked' : ''}> iMessage/SMS</label>
+      <label><input type="checkbox" id="sos-wa-${i}" ${k.wa ? 'checked' : ''}> WhatsApp</label>
+    </div>`).join('');
+  return `<div class="sos-titel">✏️ ${escHtml(uiMulti('SOS-Nachricht einrichten'))}</div>
+    <div class="sos-hinweis">${escHtml(uiMulti('Text — die Position wird automatisch angehängt:'))}</div>
+    <textarea id="sos-text" rows="3" maxlength="500">${escHtml(d.text)}</textarea>
+    <div class="sos-hinweis">${escHtml(uiMulti('Empfänger (bis zu 8). Leere Zeilen werden ignoriert.'))}</div>
+    ${zeilen}
+    <div id="sos-fehler" class="sos-hinweis" style="color:var(--accent3)"></div>
+    <div class="sos-reihe"><button class="sos-klein sos-ok" onclick="sosSpeichern()">${escHtml(uiMulti('Speichern'))}</button>
+      <button class="sos-klein" onclick="sosStand.modus='start';sosZeigen()">${escHtml(uiMulti('Abbrechen'))}</button></div>
+    <div class="sos-hinweis">${escHtml(uiMulti('Bleibt nur auf diesem iPhone gespeichert. Tipp: einmal an die eigene Nummer testen.'))}</div>`;
+}
+function sosSpeichern() {
+  const kontakte = [], fehler = [];
+  for (let i = 0; i < SOS_MAX; i++) {
+    const nm = document.getElementById('sos-name-' + i), nr = document.getElementById('sos-nr-' + i);
+    if (!nm || !nr) break;
+    const name = nm.value.trim(), nummer = nr.value.trim();
+    if (!name && !nummer) continue;
+    if (!sosNummer(nummer)) { fehler.push((name || nummer || '?')); continue; }
+    kontakte.push({ name: name.slice(0, 40), nummer: sosNummer(nummer),
+      sms: document.getElementById('sos-sms-' + i).checked, wa: document.getElementById('sos-wa-' + i).checked });
+  }
+  const f = document.getElementById('sos-fehler');
+  if (fehler.length) { if (f) f.textContent = uiMulti('Nummer bitte mit Ländervorwahl (+49 …, +27 …):') + ' ' + fehler.join(', '); return; }
+  const text = (document.getElementById('sos-text') || {}).value || '';
+  try { localStorage.setItem(SOS_KEY, JSON.stringify({ text: text.trim().slice(0, 500), kontakte })); }
+  catch (_) { if (f) f.textContent = uiMulti('Speichern nicht möglich (Speicher des Browsers voll oder gesperrt).'); return; }
+  sosStand.modus = 'start'; sosZeigen(); showToast('✅ ' + uiMulti('SOS-Nachricht gespeichert'));
+}
+let sosWarten = null;
+function sosFertig(lat, lng, genau, zeit, frisch) {
+  if (sosWarten) { clearTimeout(sosWarten); sosWarten = null; }
+  if (sosStand.modus !== 'ortet') return;   // schon fertig (z. B. „Nicht warten" getippt)
+  sosStand.text = sosNachricht(sosLesen().text, lat, lng, genau, zeit, frisch);
+  sosStand.modus = 'bereit';
+  if (frisch) renderNotruf(); else sosZeigen();   // frische Position: auch Land und Notrufnummern im Blatt nachziehen
+}
+function sosLetzte() {
+  const lat = mSettings.userLat, lng = mSettings.userLng;
+  if (lat == null || lng == null) return sosFertig(null, null, null, null, false);
+  sosFertig(Number(lat), Number(lng), null, mSettings.userLocationTime || null, false);
+}
+function sosOhneWarten() { sosLetzte(); }
+function sosStart() {
+  sosStand.modus = 'ortet'; sosZeigen();
+  if (!navigator.geolocation) return sosLetzte();
+  sosWarten = setTimeout(sosLetzte, 12000);   // höchstens 12 s warten, dann die letzte bekannte Position
+  navigator.geolocation.getCurrentPosition(pos => {
+    mSettings.userLat = pos.coords.latitude; mSettings.userLng = pos.coords.longitude; mSettings.userLocationTime = pos.timestamp || Date.now();
+    try { localStorage.setItem('safari-mobile-settings', JSON.stringify(mSettings)); } catch (_) {}
+    sosFertig(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, mSettings.userLocationTime, true);
+  }, () => sosLetzte(), { enableHighAccuracy: true, timeout: 11000, maximumAge: 30000 });
+}
+function sosGetippt(a) { a.classList.add('sos-erledigt'); }
+async function sosTeilen() {
+  if (navigator.share) { try { await navigator.share({ text: sosStand.text }); return; } catch (_) { /* abgebrochen */ } }
+  sosKopieren();
+}
+async function sosKopieren() { showToast(await kopiereText(sosStand.text, '📋 ' + uiMulti('Nachricht kopiert'))); }
+
 function captureLocationMobile() {
   const st = document.getElementById('notruf-gps-status');
   if (!navigator.geolocation) {
@@ -1713,6 +2370,105 @@ async function ladeReisewarnungenMobil() {
   try { await ladeReisewarnungen(SERVER_URL); } catch (e) { /* offline — gespeicherter Stand gilt weiter */ }
   await ladeWarnzonen(SERVER_URL);
 }
+
+// ── VPN-PRÜFUNG am iPhone (2026-10-30-1): nur lesen — gemessen und eingerichtet wird am Mac ──
+// Leiste unter der Modulleiste: grün knapp, rot groß mit Satz; antippen klappt Details auf. Ist der Mac nicht
+// erreichbar, verschwindet die Leiste (es gibt dann keinen Stand, und „Mac nicht erreichbar" steht unten).
+let vpnStandMobil = null;
+let vpnLeisteOffen = false;
+let vpnLeisteGezeigt = '';
+async function ladeVpnMobil() {
+  try {
+    const res = await fetch(SERVER_URL + '/api/vpn/status', { cache: 'no-store', headers: zugangHeader(), signal: AbortSignal.timeout(6000) });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    vpnStandMobil = await res.json();
+  } catch (e) { vpnStandMobil = null; }
+  zeigeVpnMobil();
+}
+function zeigeVpnMobil() {
+  const el = document.getElementById('vpn-leiste');
+  if (!el) return;
+  const st = vpnStandMobil;
+  if (!st) { el.style.display = 'none'; vpnLeisteGezeigt = ''; return; }
+  const a = vpnAnzeige(st, 'iphone');
+  const alter = st.geprueft ? 'Gemessen am Mac ' + vpnAlterText(st.alter_s) + '.' : '';
+  const schluessel = [a.stufe, a.zeile, vpnLeisteOffen, vpnLeisteOffen ? alter : ''].join('#');
+  if (schluessel === vpnLeisteGezeigt) return;
+  vpnLeisteGezeigt = schluessel;
+  const w0 = (st.ausgaenge && st.ausgaenge[0]) || {};
+  const kurz = a.stufe === 'vpn' ? [w0.anbieter, vpnLandName(w0.land)].filter(Boolean).join(' · ') : '';
+  let html = '<span class="vpn-l-icon" aria-hidden="true">' + a.icon + '</span><span class="vpn-l-inhalt"><span class="vpn-l-titel">'
+    + vpnEsc(a.titel) + '</span>' + (kurz ? ' · <span data-i18n-skip>' + vpnEsc(kurz) + '</span>' : '');
+  if (a.rot) html += '<span class="vpn-l-zeile">' + vpnEsc(a.band) + '</span>';
+  if (a.rot || vpnLeisteOffen) html += '<span class="vpn-l-zeile">' + a.zeile + '</span>';
+  if (vpnLeisteOffen) html += (alter ? '<span class="vpn-l-zeile">' + vpnEsc(alter) + '</span>' : '')
+    + '<span class="vpn-l-zeile">Gilt fürs iPhone nur, solange es im selben WLAN ist.</span>';
+  html += '</span>';
+  el.className = 'vpn-leiste ' + a.farbe;
+  el.innerHTML = html;
+  el.style.display = 'flex';
+}
+function vpnLeisteUmschalten() { vpnLeisteOffen = !vpnLeisteOffen; zeigeVpnMobil(); }
+
+// ── NACHRICHTEN am iPhone (2026-10-18-2): nur lesen — die Quellen verwaltet der Mac ──
+const mNachrichten = { land: '', thema: '', nurWichtig: false, offen: {}, gesehenBis: 0 };
+// Zahl am 📰-Knopf: neue wichtige Meldungen seit dem letzten Öffnen (wie das Abzeichen am Mac)
+function zeigeNachrichtenBadgeMobil() {
+  const b = document.getElementById('m-nachrichten-badge');
+  if (!b) return;
+  const c = nachrichtenCache(), bis = nachrichtenGesehenBis();
+  const n = c ? c.eintraege.filter(e => e && e.kritisch && (Number(e.gesehen) || 0) > bis).length : 0;
+  b.textContent = n ? String(n) : '';
+  b.style.display = n ? 'inline-block' : 'none';
+  // 2026-11-14-2: die Bereichswahl ist meist zu — die Zahl steht deshalb auch am Kopf
+  const k = document.getElementById('kopf-badge');
+  if (k) { k.textContent = n ? '📰 ' + n : ''; k.style.display = n ? 'inline-block' : 'none'; }
+}
+function openNachrichten() {
+  mNachrichten.gesehenBis = nachrichtenGesehenBis();
+  nachrichtenAlsGesehen();
+  zeigeNachrichtenBadgeMobil();
+  document.getElementById('nachrichten-overlay').style.display = 'flex';
+  renderNachrichtenMobil();
+  ladeNachrichten(SERVER_URL).then(() => renderNachrichtenMobil()).catch(() => { /* offline — der gespeicherte Stand gilt */ });
+}
+function closeNachrichten() { document.getElementById('nachrichten-overlay').style.display = 'none'; }
+function renderNachrichtenMobil() {
+  const box = document.getElementById('nachrichten-body');
+  if (!box) return;
+  const c = nachrichtenCache() || { eintraege: [], themen: [], laender: {}, status: {} };
+  const a = mNachrichten, st = c.status || {}, namen = c.laender || {};
+  const land = aktivesLand();
+  const hier = land ? (Object.keys(namen).find(k => namen[k] === land.name) || '') : '';
+  const gruppen = nachrichtenGruppieren(c, { land: a.land, thema: a.thema, nurWichtig: a.nurWichtig, hier });
+  const zahl = nachrichtenZaehlen(c, { land: a.land, nurWichtig: a.nurWichtig });
+  const feld = 'background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:8px;color:var(--text);font-size:16px';
+  const knopf = (id, inhalt, n) => `<button onclick="nachrichtenFilterMobil('thema','${id}')" style="flex-shrink:0;background:${a.thema === id ? 'var(--accent)' : 'var(--surface2)'};color:${a.thema === id ? '#111' : 'var(--text2)'};border:1px solid var(--border2);border-radius:16px;padding:6px 12px;min-height:36px;font-size:12px">${inhalt}${n != null ? ` <span style="opacity:.7">${n}</span>` : ''}</button>`;
+  const laender = Object.keys(namen).filter(k => k !== hier).sort((x, y) => String(namen[x]).localeCompare(String(namen[y]), 'de'));
+  box.innerHTML = `<div style="font-size:11px;color:var(--text3);margin-bottom:8px"><span>Letzter Abruf am Mac:</span> <span>${nachrichtEsc(st.geholt ? new Date(st.geholt * 1000).toLocaleString('de-DE') : 'noch keiner')}</span></div>`
+    + `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px"><select onchange="nachrichtenFilterMobil('land', this.value)" style="${feld};flex:1;min-width:150px">`
+    + '<option value="">Alle Länder</option>'
+    + (hier ? `<option value="${nachrichtEsc(hier)}" ${a.land === hier ? 'selected' : ''}>📍 ${nachrichtEsc(namen[hier] || hier)}</option>` : '')
+    + laender.map(k => `<option value="${nachrichtEsc(k)}" ${a.land === k ? 'selected' : ''}>${nachrichtEsc(namen[k])}</option>`).join('')
+    + '</select>'
+    + `<label style="display:flex;gap:6px;align-items:center;font-size:13px;color:var(--text2);min-height:44px"><input type="checkbox" ${a.nurWichtig ? 'checked' : ''} onchange="nachrichtenFilterMobil('nurWichtig', this.checked)" style="width:20px;height:20px"><span>Nur wichtige</span></label></div>`
+    + '<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px">'
+    + knopf('', 'Alle Themen', null)
+    + (c.themen || []).filter(t => zahl[t.id] && /^[a-z]+$/.test(t.id)).map(t => knopf(t.id, `${nachrichtEsc(t.icon)} <span>${nachrichtEsc(t.name)}</span>`, zahl[t.id])).join('')
+    + '</div>'
+    + (!(c.eintraege || []).length ? '<div style="padding:16px 0;font-size:13px;color:var(--text3);line-height:1.6">Noch keine Meldungen. Der Mac holt sie, sobald er online ist.</div>'
+      : (!gruppen.length ? '<div style="padding:16px 0;font-size:13px;color:var(--text3)">Keine Meldungen für diese Auswahl.</div>' : ''))
+    + nachrichtenListeHtml(c, gruppen, { max: a.thema ? 40 : 5, offen: a.offen, gesehenBis: a.gesehenBis, mehr: 'nachrichtenMehrMobil' })
+    + '<div style="font-size:10px;color:var(--text3);margin-top:12px;line-height:1.5">Themen und Länder ordnet eine feste Stichwortliste zu, keine KI. Titel und Anriss stammen unverändert von der Quelle; für Entscheidungen den Originalartikel lesen. Die Quellen verwaltest du am Mac.</div>';
+}
+function nachrichtenFilterMobil(feld, wert) {
+  const a = mNachrichten;
+  if (feld === 'land') a.land = String(wert || '');
+  else if (feld === 'thema') a.thema = (a.thema === wert) ? '' : String(wert || '');
+  else if (feld === 'nurWichtig') a.nurWichtig = !!wert;
+  renderNachrichtenMobil();
+}
+function nachrichtenMehrMobil(id) { mNachrichten.offen[id] = !mNachrichten.offen[id]; renderNachrichtenMobil(); }
 function renderNotruf() {
   const body = document.getElementById('notruf-body');
   if (!body) return;
@@ -1741,9 +2497,11 @@ function renderNotruf() {
     <div id="notruf-gps-status" style="font-size:10px;color:var(--text3);margin-top:6px">${gpsAlter != null ? 'GPS-Position von vor ' + gpsAlter + ' Min.' : 'Keine GPS-Position gespeichert — erfassen oder Land manuell wählen.'}</div>
   </div>`;
 
+  html = sosBlockMobil() + html;   // 2026-11-14-3: SOS ganz oben — erster Knopf im Notfall-Blatt
   html += reisewarnBlockMobil(land);
   html += positionBlockMobil();
   html += sofortBlockMobil();
+  html += notfallkarteBlockMobil();
   html += sonnenBlockMobil();
 
   html += malariaBlockMobil();
@@ -1766,6 +2524,47 @@ function renderNotruf() {
   body.innerHTML = html;
   // Kurse im Hintergrund aktualisieren (online) — aktualisiert nur den Kurs-Block
   ladeWechselkurse(refreshFxBlockMobil);
+}
+
+// ═══ NOTFALLKARTE VOM MAC (2026-11-14-1, Review U1) ═══
+// Blutgruppe, Allergien, Versicherungs-Hotline standen nur im Browser des Macs. Ist am Mac der Schalter
+// „Notfallkarte fürs iPhone bereitstellen" an, holt das iPhone sie bei jedem Kontakt (nur über https, mit Zugangscode),
+// legt sie hier ab und zeigt sie unter 🚨 auch ohne Mac. Schalter aus → die Kopie hier wird gelöscht.
+const NK_MOBIL_KEY = 'safari-mobile-notfallkarte';
+let nkMobilGeholt = 0;
+function nkMobilLesen() {
+  try { const d = JSON.parse(localStorage.getItem(NK_MOBIL_KEY) || 'null'); return (d && typeof d === 'object' && d.karte && typeof d.karte === 'object') ? d : null; }
+  catch (e) { return null; }
+}
+async function ladeNotfallkarteMobil() {
+  if (Date.now() - nkMobilGeholt < 5 * 60 * 1000) return;
+  nkMobilGeholt = Date.now();
+  try {
+    const res = await fetch(SERVER_URL + '/api/notfallkarte', { headers: zugangHeader(), cache: 'no-store' });
+    if (!res.ok) return;
+    const d = await res.json();
+    if (d.freigegeben === true && d.karte) localStorage.setItem(NK_MOBIL_KEY, JSON.stringify({ karte: d.karte, zeit: Number(d.zeit) || 0 }));
+    else if (d.freigegeben === false && !d.grund) localStorage.removeItem(NK_MOBIL_KEY);
+  } catch (e) { /* ohne Mac gilt die gespeicherte Kopie */ }
+}
+function notfallkarteBlockMobil() {
+  const d = nkMobilLesen();
+  if (!d) return '';
+  const zeile = (k, v) => v ? `<div style="display:flex;gap:10px;padding:7px 0;border-top:1px solid var(--border)"><span style="flex:0 0 40%;font-size:12px;color:var(--text3)">${nachrichtEsc(k)}</span><span data-i18n-skip style="flex:1;font-size:15px;color:var(--text);overflow-wrap:anywhere">${nachrichtEsc(v)}</span></div>` : '';
+  const block = (titel, felder, skip) => {
+    const z = Object.entries(felder && typeof felder === 'object' ? felder : {}).map(([k, v]) => zeile(String(k), String(v == null ? '' : v))).join('');
+    return z ? `<div style="margin-top:12px"><div ${skip ? 'data-i18n-skip ' : ''}style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:2px">${nachrichtEsc(titel)}</div>${z}</div>` : '';
+  };
+  const k = d.karte;
+  const teile = (Array.isArray(k.personen) ? k.personen : []).map(p => block('👤 ' + String((p && p.fields && p.fields.Name) || (p && p.label) || ''), p && p.fields, true)).join('')
+    + block('🐕 Hund', k.hund) + block('🛡 Versicherung', k.versicherung) + block('🚙 Fahrzeug', k.fahrzeug) + block('☎️ Kontakte', k.kontakte);
+  if (!teile) return '';
+  const stand = d.zeit ? new Date(d.zeit * 1000).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+  return `<details style="background:var(--surface2);border:1px solid var(--border2);border-radius:12px;padding:12px;margin-bottom:10px">
+    <summary style="font-size:15px;font-weight:600;color:var(--text);min-height:28px;cursor:pointer">🪪 Notfallkarte <span style="font-size:12px;font-weight:400;color:var(--text3)">${stand ? 'Stand ' + nachrichtEsc(stand) : ''}</span></summary>
+    ${teile}
+    <div style="font-size:11px;color:var(--text3);margin-top:10px;line-height:1.5">Kopie vom Mac, liegt auf diesem iPhone. Ändern am Mac: 🆘 Notfall-Karte.</div>
+  </details>`;
 }
 
 // Kurze, nicht blockierende Rückmeldung (2026-09-05-1) — gleiche Optik wie am Desktop
@@ -1813,12 +2612,49 @@ function renderModBar() {
   const onlineCtx = ['claude', 'sicherheit'];
   bar.innerHTML = `<button class="mod-btn" onclick="openSetup()" aria-label="Einstellungen" style="flex-shrink:0">⚙️</button>` +
     `<button class="mod-btn" onclick="openNotruf()" aria-label="Notfall" style="flex-shrink:0;border-color:var(--accent3)">🚨</button>` +
-    `<button class="mod-btn" onclick="openKarte()" style="flex-shrink:0" title="POI-Karte öffnen (neuer Tab)">📍</button>` +
+    `<button class="mod-btn" onclick="openNachrichten()" aria-label="Nachrichten" title="Nachrichten nach Themen — die Zahl zählt neue wichtige Meldungen" style="flex-shrink:0">📰<span id="m-nachrichten-badge" style="display:none;background:#e0842f;color:#111;border-radius:9px;font-size:10px;font-weight:700;padding:1px 6px;line-height:1.4"></span></button>` +
+    `<button class="mod-btn" onclick="openKarte()" style="flex-shrink:0" title="POI-Karte öffnen (neuer Tab)" aria-label="Karte">📍</button>` +
     `<button class="mod-btn" onclick="oeffneHilfe()" style="flex-shrink:0;font-weight:700" title="Anleitung öffnen (README in der gewählten Sprache)" aria-label="Hilfe">?</button>` +
     moduleOrder().map(key => { const m = MODULES[key]; return `
     <button class="mod-btn ${onlineCtx.includes(key) ? 'online-mod' : ''} ${key === currentCtx ? 'active' : ''}"
       data-ctx="${key}" onclick="switchMod('${key}')">${m.icon} ${m.label.split('—')[0].trim()}</button>
   `; }).join('');
+  zeigeNachrichtenBadgeMobil();
+  kopfTitelZeigen();
+}
+
+// ═══ 2026-11-14-2: KOPF UND BEREICHSWAHL ═══
+// Der Kopf zeigt Einstellungen · Bereich · Notfall. Bereiche und Werkzeuge stehen in einem Blatt, das renderModBar()
+// wie bisher füllt — dieselben Knöpfe, anders angeordnet. Ein Tipp auf einen Knopf im Blatt schließt es.
+function kopfTitelZeigen() {
+  const el = document.getElementById('kopf-titel-text');
+  const m = MODULES[currentCtx];
+  if (el && m) el.textContent = m.icon + ' ' + m.label.split('—')[0].trim();
+}
+function modulBlatt(auf) {
+  const o = document.getElementById('modul-overlay');
+  if (!o) return;
+  o.style.display = auf ? 'flex' : 'none';
+  const k = document.getElementById('kopf-titel');
+  if (k) k.setAttribute('aria-expanded', auf ? 'true' : 'false');
+  if (auf) sprachLeiste(false);
+}
+function modulBlattEinrichten() {
+  const bar = document.getElementById('mod-bar');
+  if (bar) bar.addEventListener('click', e => { if (e.target.closest && e.target.closest('.mod-btn')) modulBlatt(false); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { modulBlatt(false); sprachLeiste(false); } });
+}
+// Antwortsprache: der Knopf zeigt die gewählte Sprache, ein Tipp klappt die Auswahl auf und wieder zu
+function sprachLeiste(auf) {
+  const l = document.getElementById('lang-bar'), k = document.getElementById('lang-knopf');
+  if (!l || !k) return;
+  const offen = auf === undefined ? !l.classList.contains('offen') : !!auf;
+  l.classList.toggle('offen', offen);
+  k.setAttribute('aria-expanded', offen ? 'true' : 'false');
+}
+function sprachKnopfZeigen() {
+  const a = document.querySelector('.lang-btn.active'), t = document.getElementById('lang-knopf-text');
+  if (a && t) t.textContent = a.textContent.replace(/^\S+\s+/, '');   // „🇩🇪 DE“ → „DE“ (die Flagge steht in der Auswahl)
 }
 
 function switchMod(ctx) {
@@ -2118,16 +2954,19 @@ async function sendOllama(msgs, thisCtx, controller, hadImage) {
         msgs.push({ role: 'assistant', content: partial, model: effectiveModel(thisCtx) });
       }
       if (e.httpStatus === 403) {
-        appendMsgEl('assistant', uiMulti('⚠️ Der Mac lässt die Anfrage nicht durch: ' + (e.ollamaDetail || 'Zugang verweigert') + '\n\nAm Mac: ⚙️ Einstellungen → Mobile App → iPhone-Modus einschalten und die dort angezeigte Adresse (mit /go/…) hier einmal öffnen.'), null, null, thisCtx);
+        appendMsgEl('assistant', uiMulti('⚠️ Der Mac lässt die Anfrage nicht durch: ' + (e.ollamaDetail || 'Zugang verweigert') + '\n\nAm Mac: ⚙️ Einstellungen → Mobile App → „QR-Code zeigen“ und den Code mit der Kamera des iPhones scannen.'), null, null, thisCtx);
       } else if (e.httpStatus === 502) {
-        appendMsgEl('assistant', uiMulti('⚠️ Ollama läuft am Mac nicht (der Assistent-Server antwortet, Ollama nicht).\n\nAm Mac: `ollama serve` bzw. Ollama starten, dann hier erneut fragen.'), null, null, thisCtx);
+        appendMsgEl('assistant', uiMulti('⚠️ Die KI am Mac läuft nicht (der Mac antwortet, Ollama nicht).\n\nAm Mac: Safari Assistant beenden und neu öffnen, dann hier erneut fragen.'), null, null, thisCtx);
       } else if (e.httpStatus === 404 || /not found/i.test(e.ollamaDetail || '')) {
         appendMsgEl('assistant', uiMulti(`⚠️ Modell \`${e.modelName}\` ist am Mac nicht installiert (Ollama antwortet, kennt es aber nicht).\n\nAm Mac einmalig mit Internet: \`ollama pull ${e.modelName}\` — oder hier in ⚙️ ein installiertes Modell wählen.`), null, null, thisCtx);
       } else if (e.httpStatus) {
         appendMsgEl('assistant', uiMulti(`⚠️ Ollama meldet Fehler ${e.httpStatus}${e.ollamaDetail ? ': ' + e.ollamaDetail : ''}.`), null, null, thisCtx);
       } else {
-        appendMsgEl('assistant', uiMulti('⚠️ Keine Verbindung zum Laptop.\n\nPrüfe:\n1. Laptop an + gleiches WLAN (Starlink/Hotspot)?\n2. iPhone-Modus am Mac eingeschaltet? (⚙️ Einstellungen → Mobile App)\n3. IP noch aktuell? Nach WLAN-Wechsel die neue Adresse aus den Mac-Einstellungen öffnen.\n4. Fehler: ' + e.message), null, null, thisCtx);
+        appendMsgEl('assistant', uiMulti('⚠️ Keine Verbindung zum Mac.\n\nPrüfe:\n1. Mac wach und Safari Assistant geöffnet?\n2. Freigabe am Mac an? (⚙️ Einstellungen → Mobile App → „QR-Code zeigen“)\n3. iPhone im selben WLAN wie der Mac (Starlink oder Hotspot)?\n4. Fehler: ' + e.message), null, null, thisCtx);
       }
+      // 2026-11-14-1 (Review U4): ohne KI das passende Sofort-Protokoll gleich mitliefern
+      const ohneKi = sofortOhneKi(letzteNutzerfrage(msgs), thisCtx);
+      if (ohneKi) appendMsgEl('assistant', ohneKi, null, '📋 ' + uiMulti('ohne KI'), thisCtx);
     }
   }
 }
@@ -2166,17 +3005,33 @@ async function sendClaude(msgs, thisCtx, controller) {
     if (isSicherheit) {
       body.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }];
     }
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify(body),
-      signal: (typeof AbortSignal.any === 'function') ? AbortSignal.any([controller.signal, AbortSignal.timeout(25000)]) : controller.signal   // 2026-09-12 (M9)
-    });
+    // Aufwand (output_config.effort) nur senden, wenn gewählt; lehnt die API ihn ab, läuft die Anfrage einmal ohne (2026-11-03-1)
+    let aufwand = claudeAufwandWirksam(mSettings.claudeEffort, body.model);
+    let res;
+    for (let versuch = 0; versuch < 2; versuch++) {
+      // 2026-09-12 (M9): 25 s bis zur ersten Antwort. 2026-11-03-1: gilt nur bis die Antwort beginnt — danach darf der Strom laufen
+      const frist = claudeFristSignal(controller.signal, 25000);
+      try {
+        res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': key,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true'
+          },
+          body: JSON.stringify(claudeAnfrageMitAufwand(body, aufwand)),
+          signal: frist.signal
+        });
+      } finally { frist.fertig(); }
+      if (res.ok || res.status !== 400 || !aufwand) break;
+      let fehlerBody = {}; try { fehlerBody = await res.clone().json(); } catch (_) {}
+      if (!claudeAufwandFehlerText(fehlerBody.error && fehlerBody.error.message)) break;
+      CLAUDE_AUFWAND_ABGELEHNT.add(body.model + '|' + aufwand);
+      aufwand = '';
+      showToast('Dieses Modell nimmt den gewählten Aufwand nicht an — die Anfrage läuft ohne');
+      renderClaudeAufwandMobil();
+    }
     if (!res.ok) { let err = {}; try { err = await res.json(); } catch(_) {} const e2 = new Error(err.error?.message || 'HTTP ' + res.status); e2.httpStatus = res.status; throw e2; }
     startStream(thisCtx);
     // SSE lesen: data:-Zeilen mit JSON-Events (content_block_delta → text_delta)
@@ -2240,6 +3095,46 @@ function sendQuick(text) {
 }
 // 2026-10-04-3: Meldungen, die die App selbst in eine Chat-Blase schreibt (Fehler, Abbruch, Platzhalter — nie
 // Modell-Antworten), beim Erzeugen in die Oberflächensprache übersetzen: i18n.js lässt .msg-bubble absichtlich aus.
+// ═══ SOFORT-PROTOKOLL STATT KI (2026-11-14-1, Review U4) — BYTEIDENTISCH in index.html und mobile.html ═══
+// Antwortet die KI nicht, bekam man bisher nur die Fehlermeldung — das passende KI-freie Protokoll lag zwei Klicks
+// entfernt und wurde nicht genannt. Jetzt hängt die App es an die Fehlermeldung an (Stichwörter aus der Frage, deutsch
+// und in den Sprachen der Oberfläche) und nennt die Notrufnummern des aktiven Landes. Kein Treffer in einem der
+// Notfall-Module: Verweis auf 🚨. Kurze Stichwörter stehen mit Leerzeichen, damit sie nur als ganzes Wort greifen.
+const SOFORT_STICHWORTE = {
+  bewusstlos: ['bewusstlos', 'reagiert nicht', 'ohnmacht', 'ohnmächtig', 'atmet nicht', 'kein puls', 'herzstillstand', 'reanim', 'wiederbeleb', 'herzdruck', 'ertrunken', 'ertrink', 'unconscious', 'not breathing', ' cpr ', 'inconscient', 'ne respire', 'no respira'],
+  blutung: ['blutung', 'blutet', 'schnittwunde', 'tourniquet', 'abbinden', 'bleeding', 'hémorragie', 'saigne', 'hemorragia', 'sangra'],
+  schlange: ['schlange', 'kobra', 'mamba', 'puffotter', 'giftbiss', 'snake', 'serpent', 'serpiente', 'cobra'],
+  hitze: ['hitzschlag', 'hitzeerschöpfung', 'hitzekollaps', 'überhitz', 'sonnenstich', 'heat stroke', 'heatstroke', 'heat exhaustion', 'coup de chaleur', 'golpe de calor'],
+  brand: ['fahrzeugbrand', 'auto brennt', 'motor brennt', 'brennt', ' brand ', 'feuer im', 'feuer am', 'verbrennung', 'verbrannt', 'vehicle fire', 'car fire', 'on fire', 'incendie', 'incendio', 'brûlure', 'quemadura'],
+  fieber: ['fieber', 'malaria', 'schüttelfrost', 'fever', 'fièvre', 'fiebre', 'paludisme'],
+  anaphylaxie: ['allerg', 'anaphyla', 'bienenstich', 'wespenstich', 'insektenstich', 'zunge schwillt', 'gesicht schwillt', 'epipen', 'autoinjektor', 'bee sting', 'wasp sting', 'piqûre', 'picadura'],
+  tierbiss: ['tierbiss', 'hundebiss', 'affenbiss', 'gebissen', 'tollwut', 'fledermaus', 'rabies', ' la rage', 'rabia', 'mordedura', 'morsure', 'dog bite', 'animal bite']
+};
+const SOFORT_MODULE = ['notfall', 'medizin', 'hund', 'ueberleben'];
+function sofortPassend(frage) {
+  const t = ' ' + String(frage || '').toLowerCase().replace(/[.,;:!?()„“"'’\n]+/g, ' ').replace(/\s+/g, ' ') + ' ';
+  return NOTFALL_PROTOKOLLE.filter(p => (SOFORT_STICHWORTE[p.id] || []).some(w => t.includes(w))).slice(0, 2);
+}
+function letzteNutzerfrage(msgs) {
+  for (let i = (msgs || []).length - 1; i >= 0; i--) {
+    const m = msgs[i];
+    if (m && m.role === 'user') return typeof m.content === 'string' ? m.content : '';
+  }
+  return '';
+}
+// Text für die Chat-Blase (schon in der Oberflächensprache) — '' heißt: nichts anhängen
+function sofortOhneKi(frage, ctx) {
+  const ui = s => (window.DARK_I18N ? DARK_I18N.t(s) : s);
+  const treffer = sofortPassend(frage);
+  if (!treffer.length) return SOFORT_MODULE.includes(ctx) ? ui('Ohne KI: Die Sofort-Protokolle und die Notrufnummern stehen unter 🚨 Notfall.') : '';
+  let text = treffer.map(p => '**' + ui('Ohne KI — Sofort-Protokoll') + ': ' + p.icon + ' ' + ui(p.titel) + '**\n' + p.schritte.map((st, i) => (i + 1) + '. ' + ui(st)).join('\n')).join('\n\n');
+  let land = null;
+  try { land = aktivesLand(); } catch (e) {}
+  const n = land ? NOTRUF_LAENDER.find(x => x.land.includes(land.name)) : null;
+  if (n) text += '\n\n📞 ' + n.land + ' — ' + ui('Polizei') + ' ' + n.polizei + ' · ' + ui('Rettung') + ' ' + n.medizin;
+  return text;
+}
+
 function uiMulti(t) { return window.DARK_I18N ? DARK_I18N.tMulti(t) : t; }
 // Anleitung (README) in der Sprache der Oberfläche — vom Mac gerendert, im selben Tab (Home-Bildschirm-App)
 function oeffneHilfe() {
@@ -2267,6 +3162,7 @@ function setLang(el) {
   currentLang = el.dataset.lang;
   try { localStorage.setItem('safari-antwortsprache', JSON.stringify(currentLang)); } catch (e) {}   // bleibt nach dem Neuladen
   document.getElementById('status-text').textContent = 'Sprache: ' + currentLang;
+  sprachKnopfZeigen(); sprachLeiste(false);
 }
 function ladeAntwortsprache() {
   let l = null;
@@ -2277,6 +3173,7 @@ function ladeAntwortsprache() {
   currentLang = l;
   const b = document.querySelector(`.lang-btn[data-lang="${l}"]`);
   if (b) { document.querySelectorAll('.lang-btn').forEach(x => x.classList.remove('active')); b.classList.add('active'); }
+  sprachKnopfZeigen();
 }
 
 function autoResize(el) {
@@ -2324,6 +3221,7 @@ function clearImage() {
 }
 
 // ═══ INIT ═══
+modulBlattEinrichten();
 renderModBar();
 switchMod('mechanik');
 
@@ -2346,12 +3244,23 @@ async function checkConnection() {
     clearTimeout(t);
   }
   if (dot) dot.style.color = ollamaOnline ? 'var(--accent2)' : 'var(--accent3)';
+  // 2026-11-14-1 (Review U1): keine Antwort vom Mac (oder kein Zugang) → Band mit dem Weg zu den KI-freien Notfall-Inhalten
+  const band = document.getElementById('mac-aus');
+  if (band) band.style.display = (!macAntwortet || zugangProblem) ? '' : 'none';
+  if (macAntwortet && !zugangProblem) ladeNotfallkarteMobil();
   updateStatusHint();
 }
 ladeAntwortsprache();        // 2026-09-27: gespeicherte Antwortsprache (Review P1-9)
 checkConnection();
 ladeReisewarnungenMobil();   // amtliche Warnungen vom Mac holen; ohne Netz gilt der gespeicherte Stand
+// Nachrichten (2026-10-18-2): ohne Netz gilt der gespeicherte Stand; alle 15 Minuten nachsehen, ob der Mac Neues hat
+ladeNachrichten(SERVER_URL).then(zeigeNachrichtenBadgeMobil).catch(() => {});
+setInterval(() => { ladeNachrichten(SERVER_URL).then(zeigeNachrichtenBadgeMobil).catch(() => {}); }, 15 * 60 * 1000);
 setInterval(checkConnection, 30000);
+// VPN-Prüfung (2026-10-30-1): den Stand vom Mac alle 15 s holen (im WLAN, kostet nichts) — gemessen wird am Mac
+ladeVpnMobil();
+setInterval(() => { if (document.visibilityState === 'visible') ladeVpnMobil(); }, 15000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') ladeVpnMobil(); });
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') checkConnection();
 });
@@ -2373,6 +3282,20 @@ document.addEventListener('visibilitychange', () => {
       updateStatusHint();
     }
   } catch(e) { /* Ollama offline — Check beim nächsten Start */ }
+})();
+</script>
+<script>
+// 2026-10-18-1 (wie Wingfoilscout 2.5.3): Hinweis statt leerer Seite, wenn der Mac nicht antwortet.
+// Der Service Worker (server.py SW_JS) legt beim ersten Besuch nur den Hinweis /api/netz/hinweis ab und
+// zeigt ihn, wenn ein Seitenaufruf nicht ankommt — jede Antwort des Macs kommt unverändert an.
+// Nur über https (Service Worker gibt es nur im sicheren Kontext) und nie am Mac selbst.
+(function () {
+  try {
+    if (!('serviceWorker' in navigator) || location.protocol !== 'https:') return;
+    var h = location.hostname;
+    if (h === 'localhost' || h === '127.0.0.1' || h === '[::1]' || h === '::1') return;
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function () {});
+  } catch (e) {}
 })();
 </script>
 </body>

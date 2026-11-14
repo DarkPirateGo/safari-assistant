@@ -14,7 +14,7 @@ For Macs with Apple Silicon. In English, German, French and Spanish. Free for no
 > [!IMPORTANT]
 > - **Apple Silicon Macs only.**
 > - **Which Mac you need:** see [Which model on which Mac](#which-model-on-which-mac).
-> - **Status:** used by the author for trip preparation. Not yet field-tested. Tested on one machine (Apple Silicon, 36 GB).
+> - **Status:** in use by the author on an overland trip since November 2026. Tested on one Mac (Apple Silicon, 36 GB) and one iPhone.
 
 <p align="center">
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/en/chat-dark.png"><img src="docs/img/en/chat-light.png" width="250" alt="A chat with one of Safari Assistant's modules"></picture>
@@ -49,8 +49,8 @@ Each module has its own system prompt, chat history and model. 12 run on local m
 | 🌍 Security Situation — Live | Current security situation, with web search (online) | Claude, selectable |
 | ✦ Claude — Online AI | General online assistant with web search (online) | Claude, selectable |
 
-- One setting switches every local module to another model: ⚙️ Settings → **Global Model**.
-- The online model is chosen in ⚙️ Settings → Claude API → **Load list**, which asks Anthropic which models your key can use.
+- One setting switches every local module to another model: ⚙️ Settings → AI & models → **Global Model**.
+- The online model is chosen in ⚙️ Settings → AI & models → **Load list**, which asks Anthropic which models your key can use; the effort level can be set there too. Default: `claude-sonnet-5-5`.
 - **Your own manuals:** upload PDFs, such as a workshop manual, a first-aid book or a travel guide, and assign them to a module (needs PyMuPDF, see [Quick start](#quick-start)). The module searches them offline and cites document, chapter and page.
 - **Photos:** attach a photo of a sign, a part, a plant or an animal and ask about it. With the local modules, the model looks at it on your Mac; nothing is uploaded.
 - Modules can also search an optional offline Wikipedia and cite it.
@@ -71,14 +71,36 @@ Each module has its own system prompt, chat history and model. 12 run on local m
 - Your position as decimal degrees, degrees/minutes/seconds and Plus Code, for radio or satellite messenger.
 - 8 first-aid protocols as fixed text (**Instant Protocols**), readable in one tap.
 - Personal fields (medical, documents, vehicle, contacts), exchange rate, sun times, document deadlines.
+- A red **Emergency** button sits at the top of the sidebar (Ctrl+Shift+N) and opens the Emergency Card.
+- If the local AI does not answer, Medicine, Emergency Chat, Dog and Survival show the matching Instant Protocol and the country's emergency numbers instead.
+
+### News by topic
+
+- 📰 **News:** items from RSS feeds, sorted into nine topics — Security, Borders & entry, Fuel & supplies, Money & cash, Health, Natural events & weather, Roads & ferries, Parks & camps, Other news. The country you are in comes first; **Important only** shows situations such as closed borders, curfews or cyclones.
+- 50 sources are built in: GDACS, CDC and UK FCDO, one newspaper per country (or AllAfrica) and a keyword search on Google News. Each can be switched off, and you can add your own feeds under **Sources**; **Check** shows first what a feed would deliver.
+- The Mac fetches the feeds every 6 hours once it is online; offline, the last state stays readable, on the iPhone too.
 
 ### Trip tools
 
 Checklists, document deadlines, a maintenance plan (template for the Toyota HZJ78 / 1HZ, plus your own items), a logbook for fuel and maintenance, notes, saved answers, chat history and backups.
 
+- **Automatic backup on the Mac:** a few seconds after each change, the browser data (logbook, Emergency Card, deadlines, notes, chats, settings) is mirrored to `~/.safari-assistant-sicherung/` (owner-only), with daily copies for a week. If the app ever opens empty (another port, `127.0.0.1` instead of `localhost`, deleted website data), a banner offers to restore. Uploaded documents and the iPhone's own data are not included; the Claude key never is. ⚙️ Settings → Data & backup.
+- **Backup files with a password:** the exported file can be encrypted (AES-256-GCM, key from PBKDF2-SHA256 with 310,000 rounds, in the browser). A forgotten password cannot be recovered.
+
+### VPN check
+
+- 🔒 Shows clearly whether the Mac is online **with or without a VPN**: green, red ("No VPN" or "VPN leak" when IPv4 or IPv6 bypasses the tunnel), yellow (set up, unclear, Wi-Fi login page) or grey. A tile at the top of the sidebar, a red banner over every view when there is no VPN, and a bar on the iPhone.
+- Measured from outside, so it also works with a VPN on a travel router: which public address the Mac has (IPv4 and IPv6 separately) and which network that address belongs to. You remember your VPN's network once; optionally, Mullvad exits are confirmed by Mullvad itself.
+- Starlink counts as the connection, never as the VPN. Between two checks a VPN can drop unnoticed; a kill switch on the router helps. ⚙️ Settings → Network & VPN.
+
 ### Phone view over your own Wi-Fi
 
-`mobile.html` runs on an iPhone in the same Wi-Fi: the same modules, a 🚨 emergency sheet and the map, all through the Mac over HTTPS with an access code. See [iPhone mode](#iphone-mode).
+`mobile.html` runs on an iPhone in the same Wi-Fi: the same modules, a 🚨 emergency sheet, 📰 news and the map, all through the Mac over HTTPS with an access code. See [iPhone mode](#iphone-mode).
+
+- A simple header: ⚙️ Settings · the current area (tap to switch areas and open the tools) · 🚨 Emergency.
+- **🆘 Send position:** the first button in the 🚨 sheet gets a fresh GPS fix and puts it under your own prepared message (coordinates, accuracy, time, map link, Plus Code). One more tap opens Messages (iMessage or SMS, the iPhone decides per contact) or WhatsApp with everything filled in; you tap **Send** there. Recipients and text are set once and stay on the iPhone.
+- **Without the Mac:** once the iPhone has connected over HTTPS, the page also starts when the Mac is asleep, closed or not sharing. Instant Protocols, emergency numbers, your position and SOS work; AI answers do not. Optionally a copy of your Emergency Card is kept on the iPhone (⚙️ Settings → Data & backup on the Mac, off by default).
+- **Claude key from the Mac:** iPhone ⚙️ → **Get from Mac** shows a four-digit code; the Mac shows the device, its address and the same code, and you allow it there. Optionally a separate key just for the iPhone.
 
 ### Optional
 
@@ -207,17 +229,18 @@ The offline map, offline Wikipedia and all other details: [docs/SETUP.md](docs/S
 
 ## iPhone mode
 
-1. On the Mac: ⚙️ Settings → **iPhone Mode** → **Turn on**. The Mac opens a second listener on its Wi-Fi address, on the same port 8765, over HTTPS. On first use Safari Assistant creates a local certificate authority (CA) for this.
-2. Once per iPhone, trust that CA:
-   - Settings in Safari Assistant show the certificate file with a button **Show in Finder**. Send the file to the iPhone with AirDrop.
-   - iPhone: Settings → **Profile Downloaded** → Install.
-   - iPhone: Settings → General → About → **Certificate Trust Settings** → turn on **"Safari Assistant lokale CA"** (older installs: "DARK lokale CA" or "Safari Assistent lokale CA"). This trust step is the one people forget.
-3. Scan the QR code in Settings with the iPhone camera, or open `https://<your-mac>.local:8765/go/<code>` in Safari. It stores the access code and opens the phone view.
-4. Share → **Add to Home Screen**.
+1. On the Mac: ⚙️ Settings → **iPhone** → **Mobile app**. The first time, Settings lead through five steps, and the QR code comes last:
+   - **Create certificate** (Mac): Safari Assistant creates a local certificate authority (CA) for this Mac, once.
+   - **Download profile** (Mac): the browser saves `Safari Assistant iPhone.mobileconfig` in Downloads; send it to the iPhone with AirDrop.
+   - **Install** (iPhone): Settings → **Profile Downloaded** → Install. Then Settings → General → About → **Certificate Trust Settings** → turn on **"Safari Assistant lokale CA"** (older installs: "DARK lokale CA" or "Safari Assistent lokale CA"). This trust step is the one people forget.
+2. **Show QR code** (Mac) and scan it with the iPhone camera. The Mac now also listens on its Wi-Fi address, on the same port 8765, and accepts only HTTPS. While it is shared, Settings show what arrives from the iPhone: connected, a broken-off connection (usually missing trust) or a wrong access code.
+3. Share → **Add to Home Screen**. Once it has worked, Settings open straight with **Show QR code**.
+4. **Not working?** at the bottom of Settings lists the usual causes. Only if the profile can't be installed: the way without a certificate (http, Safari's "Not Secure Connection Warning" off) — unencrypted, and without GPS on the iPhone.
 
 Good to know:
 
 - iPhone mode is always off after a start. It switches itself off after 12 hours without requests from the phone and when Safari Assistant quits.
+- If the Mac doesn't answer, the iPhone page still starts with its emergency content instead of a blank page (once it has connected over HTTPS).
 - **Never switch it on in a Wi-Fi you do not trust** (lodge, camp, border). Use your own router or a phone hotspot.
 - Uploading, deleting, shutting down and switching the mode work only on the Mac itself.
 - The address contains the Mac's network name and so does the certificate. Give the Mac a neutral name first: System Settings → General → Sharing → Local hostname.
@@ -233,13 +256,16 @@ Offline, nothing leaves the Mac. With a connection, this is everything Safari As
 |---|---|---|---|
 | Travel advisories | From 20 s after start: whenever the cache is older than 12 h, retried every 15 min | Auswärtiges Amt, UK FCDO, US State Department. No personal data | No switch yet ([roadmap](docs/ROADMAP.md)) |
 | Warn-zone areas | After an advisory fetch, when a warning text changed or no areas exist yet (at most every 6 h) | Overpass API (OpenStreetMap). No personal data | `SAFARI_OHNE_WARNZONEN_AUTO=1` |
+| News (RSS) | From 60 s after start: whenever the last fetch is older than 6 h (`SAFARI_NACHRICHTEN_H`), retried at most every 30 min; also **Fetch now**, **Check** and adding a source of your own | The sources that are switched on: gdacs.org, cdc.gov, gov.uk, one newspaper per country or allafrica.com, news.google.com (country name and search terms) and your own feeds. No personal data | Switch sources off (📰 News → Sources) |
 | Exchange rates | When the Emergency Card (Mac) or the 🚨 sheet (phone) opens | open.er-api.com. No position | No switch yet ([roadmap](docs/ROADMAP.md)) |
 | Map tiles | While the map shows online tiles, the default until an offline `karte.mbtiles` exists. With an offline map, a few overview tiles still load each time the map opens, before it switches | tile.openstreetmap.org. The tiles reveal the area you look at | Build the offline map |
 | Map label glyphs | Only if `karte.mbtiles` exists but its `fonts/` folder is missing | fonts.openmaptiles.org | `setup-offline-karte.sh` installs `fonts/` |
 | Map libraries | Only if files in `vendor/` are missing | unpkg.com (the map page falls back to the CDN) | Keep `vendor/` complete (`./deploy.sh`) |
 | Place search | Only when you press Enter in the map search | nominatim.openstreetmap.org. The search text | Typing without Enter searches offline only |
 | Weather panel | Only when you click **Today** or **🌐 load** on the map | api.open-meteo.com. Position rounded to about 1 km | Don't click |
-| Anthropic | With an API key: when you use the Claude or Security Situation module or the Weather & Rainy Seasons module on the Mac, and for **Test** / **Load list** in Settings | api.anthropic.com. The key, your question, an attached photo, the chat context and, if stored, your position (±100 m) | Delete the key |
+| VPN check | While a page of Safari Assistant is open (Mac or iPhone), about once a minute (30 s to 15 min, adjustable), and on **Check now** | www.cloudflare.com (`/cdn-cgi/trace`), fallback api.ipify.org / api6.ipify.org: your public address. stat.ripe.net: the network of that address. captive.apple.com: Wi-Fi login page check. ipv4/ipv6.am.i.mullvad.net only if the Mullvad confirmation is switched on. No position, no personal data beyond the address every website sees | ⚙️ Settings → Network & VPN → **Turn off** |
+| Anthropic | With an API key: when you use the Claude or Security Situation module or the Weather & Rainy Seasons module on the Mac, and for **Test** / **Load list** in Settings. On the iPhone, Claude and Security Situation call Anthropic directly from the phone | api.anthropic.com. The key, your question, an attached photo, the chat context and, if stored, your position (±100 m) | Delete the key |
+| SOS message | Only when you tap a send button in the 🚨 sheet and then **Send** in Messages or WhatsApp | Your recipients, through Messages (iMessage/SMS) or WhatsApp: your text and your position | Don't send |
 | One-off scripts | Only when you run them | `deploy.sh` → unpkg.com (missing `vendor/` files only; with `DEPLOY_LIZENZEN=1` also raw.githubusercontent.com for the original licence texts). `fetch-*.py` → Overpass, GeoNames, NASA POWER. `fauna-gbif-check.py` → GBIF. Map build → GitHub, Geofabrik and the ocean and Natural Earth files that Planetiler downloads | Don't run them |
 | Ollama | Never for Safari Assistant | The launcher starts Ollama with `OLLAMA_NO_CLOUD=1` if it is not running. An Ollama you started yourself keeps its own settings | – |
 
@@ -258,9 +284,12 @@ Safari Assistant gives advice about medicine, snakebite, vehicle repair, water c
 - The **Instant Protocols** in English, French and Spanish are translations of the German text, not yet reviewed by first-aid professionals.
 - The **embassy column lists German embassies**, for German citizens. Everyone else uses their own embassy or consulate.
 - **Travel-warning areas** are an automated reading of the official text, not official borders. The official text always rules; each entry links to it.
+- **News** items are sorted into topics and countries by a fixed keyword list, not by AI: an item can land in the wrong topic, and **Important** only recognises known words. Title and teaser come unchanged from the source; newspapers and Google News are not official sources. Read the article and the official travel advisory before you decide.
 - The **rain layer** is a 2001–2020 climatology from NASA POWER, not a forecast. Rainy seasons shift by weeks from year to year.
 - With the **light profile**, medical and emergency answers also come from the small model `gemma4:e4b`. Macs below 36 GB are not tested with Safari Assistant; see [Which model on which Mac](#which-model-on-which-mac).
 - The system prompts are not translated. They are written for a German-speaking traveller: for example, the embassy numbers are German, and the Languages module gives pronunciation for German readers. Answers still come in the language you choose. The Mechanics module and the maintenance plan target one vehicle. A travel profile is on the [roadmap](docs/ROADMAP.md). Exchange rates use EUR as the base currency.
+- **SOS** prepares a message; it does not send it and it is not a rescue service. SMS needs mobile reception, iMessage and WhatsApp need internet. Sending to several SMS recipients at once uses an iOS link format that Apple does not document: test it once with your own number.
+- The **VPN check** tells you what it measured, at most a minute or two ago; a VPN can drop between two checks.
 - The system prompts ask the model to state uncertainty and to say early when professional help is needed. That reduces the risk; it does not remove it.
 
 ---

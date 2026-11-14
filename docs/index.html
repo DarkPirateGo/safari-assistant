@@ -354,6 +354,8 @@ footer p{margin:0 0 .6em;max-width:72ch}
             <li>8 first-aid protocols as fixed text (<strong>Instant Protocols</strong>), readable in one tap.</li>
             <li>Personal fields (medical, documents, vehicle, contacts), exchange rate, sun times and
             document deadlines.</li>
+            <li>A red <strong>Emergency</strong> button at the top of the sidebar opens it (Ctrl+Shift+N).
+            If the local AI does not answer, the medical and emergency modules show the matching protocol instead.</li>
           </ul>
         </div>
       </div>
@@ -361,8 +363,11 @@ footer p{margin:0 0 .6em;max-width:72ch}
       <div class="part">
         <h3>iPhone view</h3>
         <div>
-          <p>On an iPhone in the same Wi-Fi you get the same modules, an emergency sheet and the map, all
-          through the Mac over HTTPS with an access code. The iPhone mode is off after every start and
+          <p>On an iPhone in the same Wi-Fi you get the same modules, an emergency sheet, the news and the map, all
+          through the Mac over HTTPS with an access code. <strong>🆘 Send position</strong> puts a fresh GPS fix under
+          your own prepared message and opens iMessage/SMS or WhatsApp; you tap Send. Once connected over HTTPS,
+          the iPhone keeps its emergency content (protocols, numbers, your position) even when the Mac is asleep or closed.
+          The iPhone mode is off after every start and
           switches itself off after 12 hours without requests from the phone and when Safari Assistant quits. Never switch it on in a
           Wi-Fi you do not trust; use your own router or a phone hotspot.
           <a href="https://github.com/DarkPirateGo/safari-assistant/blob/main/README.md#iphone-mode">Set up the iPhone mode</a></p>
@@ -374,7 +379,7 @@ footer p{margin:0 0 .6em;max-width:72ch}
         <div>
           <p>The interface comes in English, German, French and Spanish; until you choose, Safari Assistant uses your
           browser’s language if it is one of these four, otherwise English. AI answers follow the interface
-          language, and a separate row above the input box can set the answer language to German, English,
+          language, and a choice next to the input box can set the answer language to German, English,
           French, Spanish, Portuguese, Swahili or Afrikaans. The <span class="qmark">?</span>
           icon on every page opens the guide in the chosen language, offline.</p>
           <p class="small">German is the source language: anything not yet translated stays German, and the
@@ -387,7 +392,28 @@ footer p{margin:0 0 .6em;max-width:72ch}
         <h3>Trip tools</h3>
         <div>
           <p>Checklists, document deadlines, a maintenance plan (a template for the Toyota HZJ78 / 1HZ, plus
-          your own items), a logbook for fuel and maintenance, notes, saved answers, chat history and backups.</p>
+          your own items), a logbook for fuel and maintenance, notes, saved answers, chat history and backups.
+          The Mac backs up this data automatically a few seconds after each change and offers to restore it
+          if the app ever opens empty; exported backup files can be protected with a password.</p>
+        </div>
+      </div>
+
+      <div class="part">
+        <h3>News by topic</h3>
+        <div>
+          <p>Items from RSS feeds sorted into nine topics (security, borders, fuel, cash, health, natural
+          events, roads and ferries, parks, other) and by country: official sources, one newspaper per country,
+          a keyword search and your own feeds. Sorted by a fixed keyword list, not by AI; readable offline, on
+          the iPhone too.</p>
+        </div>
+      </div>
+
+      <div class="part">
+        <h3>VPN check</h3>
+        <div>
+          <p>Shows clearly whether the Mac is online with or without a VPN, for IPv4 and IPv6 separately, so a
+          leak past the tunnel shows. Measured from outside, so it also works with a VPN on a travel router.
+          It can be switched off.</p>
         </div>
       </div>
     </div>
@@ -467,8 +493,9 @@ cd safari-assistant
     <div class="wrap"><div class="read">
       <h2 id="online-title">What goes online</h2>
       <p>Offline, nothing leaves the Mac; with a connection, Safari Assistant fetches travel advisories, warning
-      areas, exchange rates and map tiles, and reaches the weather service, the place search or Anthropic
-      only when you use them. No telemetry, no analytics, no fonts from Google.</p>
+      areas, news feeds, exchange rates and map tiles, checks about once a minute whether a VPN is in use
+      (Cloudflare or ipify, RIPEstat, captive.apple.com; can be switched off), and reaches the weather service,
+      the place search or Anthropic only when you use them. No telemetry, no analytics, no fonts from Google.</p>
       <p><a href="https://github.com/DarkPirateGo/safari-assistant/blob/main/README.md#what-goes-online">Everything Safari Assistant sends, and how to avoid it</a></p>
     </div></div>
   </section>
@@ -510,8 +537,8 @@ cd safari-assistant
           <li>The prompts ask the model to state uncertainty and to say early when professional help is
           needed. That reduces the risk; it does not remove it.</li>
         </ul>
-        <p class="status"><strong>Status:</strong> used by the author for trip preparation. Not yet
-        field-tested. Tested on one machine (Apple Silicon, 36 GB).
+        <p class="status"><strong>Status:</strong> in use by the author on an overland trip since November 2026.
+        Tested on one Mac (Apple Silicon, 36 GB) and one iPhone.
         <a href="https://github.com/DarkPirateGo/safari-assistant/blob/main/README.md#safety-and-limitations">Read the full section</a></p>
       </div>
     </div>

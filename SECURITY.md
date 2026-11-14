@@ -40,11 +40,12 @@ Safari Assistant is built for **one person on their own Mac**, with the browser 
 - Every request from the network needs the **access code**: from the cookie `safari_zugang` (HttpOnly, SameSite=Lax, Secure over TLS), from `?t=` in the URL, or from the `X-Safari-Zugang` header. Without it the server answers `403`. The only exception is `/api/ping`, which tells the network nothing but app name, version and port.
 - The code has 10 characters, is generated with Python's `secrets` module and compared in constant time. It is stored in `~/.safari-assistant-zugang` (mode 0600) and survives restarts. **Renew access code** in Settings creates a new one; every phone must then open the new address.
 - The code stays in the home-screen URL on purpose: iOS opens home-screen web apps with a separate cookie store. Anyone who can read the phone's bookmarks or browser history can read the code.
-- Ollama stays on `127.0.0.1`. Phones reach it only through two fixed proxy paths (`/api/ollama/api/chat`, `/api/ollama/api/tags`) with a field allowlist; generation options from phones are clamped.
+- Ollama stays on `127.0.0.1`. Phones reach it only through two fixed proxy paths (`/api/ollama/api/chat`, `/api/ollama/api/tags`) with a field allowlist; generation options are clamped for every request. These paths and the document search reject requests from other websites (foreign `Origin` or `Sec-Fetch-Site: cross-site`).
 - A phone with the code can chat, read travel advisories, search synced documents and offline Wikipedia, read documents stored through the document API, load map tiles and search places. It cannot upload, delete, shut down or switch modes.
 - **Do not switch iPhone mode on in a Wi-Fi you do not trust.** Other devices in that network can see that something listens on port 8765 and can try to connect.
 - **Fallback without encryption:** if `openssl` is missing, if `SAFARI_OHNE_TLS=1` is set, or if the server had to bind `0.0.0.0` because the Mac's loopback interface is broken, iPhone mode runs over plain HTTP. The Settings page says so. The access code then crosses the Wi-Fi unencrypted.
-- **Offline Wikipedia:** Safari Assistant starts `kiwix-serve` on `127.0.0.1:8090` and serves it to the phone under `/wiki` (with access code and TLS). Only if the installed kiwix-tools version rejects `--address` (the process exits at once) does Safari Assistant start it without that option, listening on all interfaces; the server log then says so. A slow start does not trigger this. It serves public Wikipedia content, read-only.
+- **Offline Wikipedia:** Safari Assistant starts `kiwix-serve` on `127.0.0.1:8090` and serves it under `/wiki` on a **separate port** (the main port + 100, so 8865 by default; the next free one up to +109), with the same access code and TLS for the phone. A separate port is a separate browser origin: scripts inside ZIM content cannot read the app's storage. `/wiki` on the main port redirects there. Only if the installed kiwix-tools version rejects `--address` (the process exits at once) does Safari Assistant start it without that option, listening on all interfaces; the server log then says so. A slow start does not trigger this; Settings → Network & VPN then show a warning under the server status. It serves public Wikipedia content, read-only.
+- **Pages on the phone without the Mac:** over HTTPS, a service worker keeps a copy of `mobile.html`, the translation files and two images on the phone, so the page and its emergency content open when the Mac does not answer. API responses are never cached. If you choose to (⚙️ Settings → Data & backup, off by default), a copy of the Emergency Card is stored in the phone's site storage; it is delivered only over HTTPS and never contains the key-hiding-place field.
 
 ### The local certificate authority
 
@@ -68,7 +69,8 @@ On first use of iPhone mode, Safari Assistant creates a small certificate author
 ### Anthropic API key
 
 - The key for the online modules is stored in the browser's site storage (`localStorage`) for the app's address: on the Mac in its browser, on the iPhone in Safari. It is sent from the browser directly to `api.anthropic.com` and never passes through `server.py`.
-- Backups do not contain the key.
+- Backups and the automatic backup on the Mac do not contain the key (nor the optional separate key for the iPhone).
+- **Handing the key to an iPhone:** the iPhone asks (⚙️ → Get from Mac) and shows a four-digit code; the Mac shows the device, its address and the same code. Only after **Allow** on the Mac does the Mac page send the key to `server.py`, which holds it in memory only, for at most two minutes, and hands it out once, to the address that asked, over HTTPS only. Allowing is possible only from the Mac itself, from a page of this server. Compare the code: device name and address can be faked, the code cannot.
 - Any script running in the app's origin could read it. That is why the cross-site-scripting fixes below matter.
 - Set a spend limit in the Anthropic console, and revoke the key there if a device is lost. Delete it in ⚙️ Settings (Mac) or ⚙️ Setup (iPhone), or clear the site data.
 - With a key, the online modules send your question, an attached photo, the chat context and, if stored, your position (rounded to about 100 m) to Anthropic. Full list: [What goes online](README.md#what-goes-online).
@@ -76,6 +78,8 @@ On first use of iPhone mode, Safari Assistant creates a small certificate author
 ### Backups and local data
 
 - A backup file (⚙️ Settings → Backup & Restore → ⬇ Export) contains your chats, notes, checklists, logbook, deadlines, saved answers, indexed documents and the emergency card, including any medical, document and vehicle data you entered. It does not contain the API key or the stored GPS position — but chats can contain positions you asked about (for example location questions with coordinates).
+- Exported backups can be encrypted with a password (AES-256-GCM, key from PBKDF2-SHA256 with 310,000 iterations, in the browser). The key-hiding-place field of the Emergency Card is never exported.
+- **Automatic backup on the Mac:** the browser data (not uploaded documents) is mirrored to `~/.safari-assistant-sicherung/` (folder 0700, files 0600), with daily copies for seven days and a few copies before the data shrinks or the browser storage changes. Only `server.py` on the Mac itself reads or writes it; requests from the network or from other websites are refused. It never contains the API keys or the stored GPS position.
 - Treat a backup like a copy of your passport. Import only backups you made yourself: the importer accepts only known keys and validates their values, but before the September 2026 fixes a crafted backup could inject script.
 - The privacy gate refuses backups, `rag-store.json`, uploaded documents and similar files in commits. See [docs/PRIVACY-GATE.md](docs/PRIVACY-GATE.md).
 
@@ -109,6 +113,17 @@ Environment variables start with `SAFARI_` and files with `~/.safari-assistant-`
 | `SAFARI_LAN=1` or `--lan` | Starts with iPhone mode already on. Development only |
 
 ---
+
+## Security fixes in 2026.11
+
+Found in an internal review in November 2026.
+
+- **Stored script injection through a crafted backup:** one value of the maintenance plan (`kmDatum`) was shown on the Emergency Card without escaping. A crafted backup file could run script in the app's origin and read what is stored there, including the API key. Now escaped and validated as a date.
+- **Cross-site requests to the Ollama proxy:** `/api/ollama/api/chat`, `/api/ollama/api/tags` and `/api/rag/search` did not check where a request came from. Any website open in the Mac's browser could start model runs (with large contexts and `keep_alive`), though it could not read the answers. These routes now reject foreign origins, and the option limits apply to every request, not only to the phone's.
+- **Offline Wikipedia in the app's origin:** `/wiki` was served under the app's own address with the content security policy relaxed, so script in ZIM content (or a bug in `kiwix-serve`) would have run with access to the app's storage. It now has its own port.
+- **Map libraries from the CDN fallback** are now loaded with Subresource Integrity (the same SHA-256 values that `deploy.sh` pins).
+- **News fetching:** the host name was resolved once for the check and again for the connection; a hostile feed server could have answered the second lookup with a local address. The connection now goes to the address that was checked. (With a system proxy, the proxy resolves the name.)
+- **Attribute escaping on the iPhone page:** two `value="…"` attributes did not escape quotes; nothing could be executed in our tests, but they are now fully escaped.
 
 ## Security fixes in 2026.10 (first public release)
 

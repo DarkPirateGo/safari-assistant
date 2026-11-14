@@ -6,10 +6,11 @@ Where Safari Assistant is going, and where help would change its direction. This
 
 ## Status
 
-- Used by the author for trip preparation. **Not yet field-tested.** Tested on one machine (Apple Silicon, 36 GB).
+- In use by the author on an overland trip since November 2026. Tested on one Mac (Apple Silicon, 36 GB) and one iPhone.
 - 14 chat modules, 12 of them on local models.
 - Offline vector map, rain-season layer, official travel warnings, offline place search, optional offline Wikipedia.
 - iPhone view over HTTPS with a local certificate authority.
+- News by topic from RSS feeds, a VPN check, an automatic backup of the browser data on the Mac, SOS and emergency content on the iPhone without the Mac (2026.11).
 - Interface in English, German, French and Spanish; the answer language follows it.
 - macOS on Apple Silicon only.
 
