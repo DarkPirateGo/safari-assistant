@@ -1,6 +1,6 @@
 {
   "_hinweis": "Feature-Manifest für Safari Assistant. Jedes Feature wird durch Marker-Strings abgesichert, die in der Datei vorhanden sein MÜSSEN. test-app.js prüft alle Einträge automatisch (Sektion 22). Bei JEDEM neuen Feature hier einen Eintrag ergänzen — dann kann es nie wieder unbemerkt verschwinden.",
-  "_version": "2026-11-14-5",
+  "_version": "2026-11-22-1",
   "features": [
     {
       "file": "index.html",
@@ -341,7 +341,7 @@
       "name": "Race-Condition-Pattern (Bug 3)",
       "contains": [
         "const thisCtx = currentCtx;",
-        "function addMessage(role, text, imageUrl, badge, ctx)",
+        "function addMessage(role, text, imageUrl, badge, ctx, quellen)",
         "function showTyping(ctx)",
         "function removeTyping(ctx)"
       ]
@@ -351,7 +351,7 @@
       "name": "Race-Härtung condenseChat/History/GPS-Timeout (Bug 3)",
       "contains": [
         "'🗜 komprimiert', ctx)",
-        "m.badge || null, entry.ctx)",
+        "m.badge || null, entry.ctx, m.quellen)",
         "if (ctx !== currentCtx) return;\n          if (settings.userLat)"
       ]
     },
@@ -1066,7 +1066,7 @@
       "name": "📚 Wikipedia-Eintrag (Werkzeuge) → kiwix-serve, hostname-relativ mit Status-Check",
       "contains": [
         "onclick=\"openWikipedia()\"",
-        "async function openWikipedia()"
+        "async function openWikipedia(artikel)"
       ]
     },
     {
@@ -1074,7 +1074,7 @@
       "name": "📚 Offline-Wikipedia-Button (⚙️-Sheet) → kiwix-serve, byteident. openWikipedia()",
       "contains": [
         "onclick=\"openWikipedia()\"",
-        "async function openWikipedia()"
+        "async function openWikipedia(artikel)"
       ]
     },
     {
@@ -1554,7 +1554,7 @@
       "contains": [
         "function warnlageSatzMobil()",
         "${warnlageSatzMobil()}",
-        "await ladeWarnzonen(SERVER_URL);"
+        "await ladeWarnzonenMobil();"
       ]
     },
     {
@@ -2194,7 +2194,7 @@
         "const ZUSAMMENFASSUNG_MARKE = '[Zusammenfassung des bisherigen Gesprächs]';",
         "function verlaufText(m) {",
         "addMessage('assistant', uiMulti('⚠️ Claude API: ' + grund), null, null, thisCtx);",
-        "addMessage(m.role, verlaufText(m), null, m.badge || null, entry.ctx)"
+        "addMessage(m.role, verlaufText(m), null, m.badge || null, entry.ctx, m.quellen)"
       ]
     },
     {
@@ -3273,6 +3273,244 @@
       "contains": [
         "const CLAUDE_STANDARD_MODELL = 'claude-sonnet-5-5';",
         "modelLabel: 'Claude Sonnet 5.5',"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-11-15-1 SOS „An alle senden“: ein Knopf führt durch alle Kanäle (iPhone)",
+      "contains": [
+        "function sosZiele(d, t) {",
+        "function sosAlleGetippt(i) { sosMerken(i); setTimeout(sosZeigen, 600); }",
+        "onclick=\"sosAlleGetippt(${i})\"",
+        "sosStand.erledigt = [];   // neue Nachricht = neue Runde „An alle senden\""
+      ]
+    },
+    {
+      "file": "i18n/en.js",
+      "name": "2026-11-15-1 Texte von „An alle senden“ übersetzt (en)",
+      "contains": [
+        "\"An alle senden\": \"Send to all\"",
+        "\"Alle Kanäle geöffnet\": "
+      ]
+    },
+    {
+      "file": "i18n/fr.js",
+      "name": "2026-11-15-1 Texte von „An alle senden“ übersetzt (fr)",
+      "contains": [
+        "\"An alle senden\": \"Envoyer à tous\"",
+        "\"Alle Kanäle geöffnet\": "
+      ]
+    },
+    {
+      "file": "i18n/es.js",
+      "name": "2026-11-15-1 Texte von „An alle senden“ übersetzt (es)",
+      "contains": [
+        "\"An alle senden\": \"Enviar a todos\"",
+        "\"Alle Kanäle geöffnet\": "
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-11-15-2 kiwix nur auf diesem Mac: Rückfall auf ::1 (kiwix 3.8.2 lehnt 127.0.0.1 ab), Status per Gegenprobe aus dem WLAN",
+      "contains": [
+        "(['--address=::1', '--urlRootLocation', '/wiki'], True, True, '::1')",
+        "def kiwix_im_wlan_erreichbar():",
+        "KIWIX_NUR_LOKAL = bool(nur_lokal) and not kiwix_im_wlan_erreichbar()",
+        "def kiwix_url(pfad):"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-11-15-2 Wiki-Suche unter dem kiwix-Pfad /wiki",
+      "contains": [
+        "such_url = kiwix_url(f'{KIWIX_ROOT}/search?books.name={quote(buch)}'",
+        "kiwix_url(f'{KIWIX_ROOT}/content/{pfad}')"
+      ]
+    },
+    {
+      "file": "test-sicherheit.py",
+      "name": "2026-11-15-2 ausgeführter Test: nachgebautes kiwix lehnt 127.0.0.1 ab → Start auf ::1, Gegenprobe",
+      "contains": [
+        "# ── 12. kiwix nur auf diesem Mac (2026-11-15-2)",
+        "ERROR: IP address is not available on this system: 127.0.0.1"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-11-15-2 kiwix-Warnung nennt Firewall statt Update",
+      "contains": [
+        "Abhilfe: in der Mac-Firewall für kiwix-serve eingehende Verbindungen blockieren."
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-11-15-3 Wikipedia-Quellen als Links unter der Antwort (Mac), gespeichert mit der Antwort",
+      "contains": [
+        "function wikiQuellenHtml(quellen) {",
+        "addMessage('assistant', reply, null, modelBadge, thisCtx, quellen);",
+        "const w = await sucheWiki(text, 3, vorigeFrage(msgs));",
+        "async function openWikipedia(artikel) {"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-11-15-3 Wikipedia-Quellen als Links unter der Antwort (iPhone)",
+      "contains": [
+        "function wikiQuellenHtml(quellen) {",
+        "appendMsgEl('assistant', reply, null, model + ragBadge, thisCtx, undefined, quellen);",
+        "const w = await sucheWiki(lastUser.content, 3, vorigeFrage(msgs));",
+        "async function openWikipedia(artikel) {"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-11-15-3 Wiki-Suche: Schreibfehler korrigieren, Nachfragen mit voriger Frage, Akzente behalten, Auszug aus den Absätzen, Pfad für Links",
+      "contains": [
+        "def wiki_suchbegriffe(query, vorher=''):",
+        "Correct misspelled names of diseases, species, people and places",
+        "out = _re.sub(r'[^\\w -]', ' ', out).replace('_', ' ')",
+        "def wiki_artikeltext(html):",
+        "'pfad': sicher})"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-11-15-4 iPhone startet ohne Mac schnell: Hülle nach 2 s, Dateien der Hülle sofort aus dem Speicher",
+      "contains": [
+        "var FRIST_HUELLE_MS = 2000;",
+        "var FRIST_DATEI_MS = 1500;",
+        "if (macWeg) {   // die Seite kam eben aus der Hülle"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-11-15-4 Reiseprofil fürs iPhone (aus der Sicherung, Code + https)",
+      "contains": [
+        "def reiseprofil_fuers_iphone():",
+        "if path == '/api/reiseprofil':"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-11-15-4 Reiseprofil am Mac (⚙️ Allgemein) für jede Frage",
+      "contains": [
+        "function reiseprofilPrompt(text) {",
+        "<textarea class=\"settings-input\" id=\"reiseprofil\"",
+        "reiseprofilPrompt(settings.reiseprofil);"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-11-15-4 Reiseprofil am iPhone (vom Mac, nur im Arbeitsspeicher)",
+      "contains": [
+        "function reiseprofilPrompt(text) {",
+        "async function ladeReiseprofilMobil() {",
+        "reiseprofilPrompt(reiseprofilMobil.text)"
+      ]
+    },
+    {
+      "file": "app-starter.swift",
+      "name": "2026-11-15-4 Startprogramm: Dock-Klick holt die App nach vorn",
+      "contains": [
+        "func applicationShouldHandleReopen(",
+        "Contents/MacOS/launcher.sh"
+      ]
+    },
+    {
+      "file": "deploy.sh",
+      "name": "2026-11-15-4 deploy.sh übersetzt das Startprogramm, Rückfall aufs Skript",
+      "contains": [
+        "swiftc -O -o \"$STARTER_TMP\" \"$SRC/app-starter.swift\"",
+        "es bleibt beim Startskript"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-11-15-5 Websuche: Ortsbezug, Sperrliste, Quellenregeln, zitierte Quellen, Kürzungshinweis (Mac)",
+      "contains": [
+        "function suchWerkzeug(landName) {",
+        "const SUCHE_GESPERRT = [",
+        "reply += kuerzungsHinweis(stopGrund) + quellenText(sources, zitiert);",
+        "(usesWebSearch ? 4096 : 1024)"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-11-15-5 Websuche: Ortsbezug, Sperrliste, Quellenregeln, Quellen + Kürzungshinweis (iPhone)",
+      "contains": [
+        "function suchWerkzeug(landName) {",
+        "reply += kuerzungsHinweis(stopGrund) + quellenText(gefunden, zitiert);",
+        "max_tokens: isSicherheit ? 4096 : 1024,"
+      ]
+    },
+    {
+      "file": "index.html",
+      "name": "2026-11-15-6 In deiner Nähe + Lage hier (lokales Modell) + Stand der Gebietsgrenzen (Mac)",
+      "contains": [
+        "// ── IN DEINER NÄHE (2026-11-15-6, BYTEIDENTISCH in index.html und mobile.html) ──",
+        "async function lageHierStarten() {",
+        "function warnzonenStandHtml(wz) {"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-11-15-6 In deiner Nähe + Lage hier + Gebietsflächen ohne Mac (iPhone)",
+      "contains": [
+        "// ── IN DEINER NÄHE (2026-11-15-6, BYTEIDENTISCH in index.html und mobile.html) ──",
+        "async function lageHierStartenMobil() {",
+        "async function ladeWarnzonenMobil() {"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-11-15-6 US-Botschaften als Quelle, Orte je Meldung, Warngebiete auch ohne neuen Abruf nachziehen",
+      "contains": [
+        "'nur_titel': 'botschaft'",
+        "def orte_in_meldung(text, laender, maximal=4):",
+        "WARNZONEN_STATE['geprueft'] = time.time()"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-11-21-1 Orts-Kontakte im 🚨-Blatt (eigene Nummern je Ort, erscheinen im Umkreis)",
+      "contains": [
+        "// ═══ ORTS-KONTAKTE (2026-11-21-1) ═══",
+        "function ortskSpeichern() {",
+        "  html += ortskBlockMobil();   // 2026-11-21-1: eigene Orts-Kontakte direkt unter den Landesnummern"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-11-21-2 Wachen und Dienste aus OpenStreetMap im 🚨-Blatt (iPhone, offline)",
+      "contains": [
+        "// ═══ NOTFALL-STELLEN AUS OPENSTREETMAP (2026-11-21-2) ═══",
+        "async function ladeNotfallstellenMobil() {",
+        "function nkoAuswahl(daten, lat, lng) {"
+      ]
+    },
+    {
+      "file": "fetch-notfallkontakte.py",
+      "name": "2026-11-21-2 fetch-notfallkontakte.py: Polizei/Feuerwehr/Ranger/Sicherheitsfirmen aus OSM, amtliche Listen als Rohabruf",
+      "contains": [
+        "def verdichten(daten, cc):",
+        "def zusammenfuehren(alt, neu_je_land, stand):",
+        "AMTLICH = {"
+      ]
+    },
+    {
+      "file": "server.py",
+      "name": "2026-11-21-2 Server liefert data/notfallkontakte.json aus",
+      "contains": [
+        "'/data/notfallkontakte.json': '/data/notfallkontakte.json',"
+      ]
+    },
+    {
+      "file": "mobile.html",
+      "name": "2026-11-22-1 Parks und Ranger im 🚨-Blatt (recherchierte Nummern mit Quelle und Prüfdatum)",
+      "contains": [
+        "// ═══ PARKS UND RANGER (2026-11-22-1) ═══",
+        "function parkAuswahl(liste, lat, lng, iso) {",
+        "const PARK_GEPRUEFT = '22.11.2026';"
       ]
     }
   ]

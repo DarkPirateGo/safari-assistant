@@ -26,6 +26,8 @@ Nobody but the author has completed the setup yet. Every step in [SETUP.md](SETU
 
 The prompts, the maintenance plan, the checklists and the emergency card are written for one kind of trip: German-speaking travellers with one vehicle (Toyota HZJ78 / 1HZ). A profile in Settings (vehicle, engine, travellers, pets, home country, nationality for the embassy column) would make Safari Assistant useful for other trips. This is the prerequisite for most of the items below.
 
+Partly done in 2026.11.1: a free-text **travel profile** (Settings → General) goes with every question to the local model. The structured fields above, which would also change the embassy column, the maintenance plan and the prompts themselves, are still open.
+
 ### Hide modules
 
 Let users hide modules and cards they do not need (for example the dog module and the dog fields on the emergency card).

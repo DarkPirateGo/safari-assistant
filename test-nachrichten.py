@@ -205,7 +205,30 @@ try:
     lang = m.nachricht_aus_roh({'titel': 'Fuel ' + 'x' * 600, 'text': 'fuel ' * 300}, zeitung, JETZT)
     if len(lang['titel']) > m.NACHRICHT_TITEL_MAX + 2 or len(lang['text']) > m.NACHRICHT_TEXT_MAX + 2:
         f.append('Titel/Anriss nicht gekürzt')
-    if len(m.NACHRICHTEN_QUELLEN) != 2 + 3 * 16 or len({q['id'] for q in m.NACHRICHTEN_QUELLEN}) != len(m.NACHRICHTEN_QUELLEN):
+    # 2026-11-15-6: US-Botschaft — nur Warnungen, keine Routinemeldungen; Orte je Meldung für „In deiner Nähe"
+    bot = [q for q in m.NACHRICHTEN_QUELLEN if q['id'] == 'botschaft-za'][0]
+    for t in ('Security Alert: U.S. Consulate General Durban, South Africa (October 13, 2026)', 'Demonstration Alert: Unrest ahead of elections',
+              'Health Alert: Updates for Travelers Impacted by the Ebola-Related Travel Restrictions', 'Worldwide Caution: Public Health Arrival Restrictions'):
+        r = m.nachricht_aus_roh({'titel': t}, bot, JETZT)
+        if not r or r['laender'] != ['ZA'] or r['themen'][0] not in ('sicherheit', 'gesundheit', 'natur'):
+            f.append('Botschaftswarnung nicht übernommen: %s → %r' % (t, r))
+    for t in ('Consular Services in George and Plettenberg Bay November 17', 'Routine Message: Consular Services in Pietermaritzburg',
+              'Voting in U.S. Elections from Overseas', 'RFQ: Procurement and Delivery of Slide Gate Motor Systems'):
+        if m.nachricht_aus_roh({'titel': t}, bot, JETZT) is not None:
+            f.append('Routinemeldung der Botschaft übernommen: ' + t)
+    merk = m._ORTE_NAMEN
+    m._ORTE_NAMEN = {'Südafrika': {'cape town': ('Cape Town', -33.926, 18.423, 4772846), 'durban': ('Durban', -29.858, 31.029, 3338026),
+                                   'bethlehem': ('Bethlehem', -28.231, 28.307, 91075)},
+                     'Kenia': {'nairobi': ('Nairobi', -1.283, 36.817, 2750547)}}
+    o = m.orte_in_meldung('Protests near Cape Town airport; also in durban (klein) and Bethlehem. Nairobi quiet.', ['ZA'])
+    if o != [['Cape Town', -33.926, 18.423], ['Bethlehem', -28.231, 28.307]]:
+        f.append('Orte je Meldung (nur groß geschrieben, nur Länder der Meldung, größte zuerst): %r' % o)
+    if m.orte_in_meldung('Lage in Kapstadt angespannt', ['ZA']) != [['Cape Town', -33.926, 18.423]]:
+        f.append('deutscher Ortsname Kapstadt nicht erkannt')
+    if m.orte_in_meldung('Cape Town', []) != []:
+        f.append('Orte ohne Land der Meldung gesucht')
+    m._ORTE_NAMEN = merk
+    if len(m.NACHRICHTEN_QUELLEN) != 2 + 4 * 16 or len({q['id'] for q in m.NACHRICHTEN_QUELLEN}) != len(m.NACHRICHTEN_QUELLEN):
         f.append('eingebaute Quellen: %d (doppelte Kennungen?)' % len(m.NACHRICHTEN_QUELLEN))
     for q in m.NACHRICHTEN_QUELLEN:
         if m.feed_url_pruefen(q['url']):

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Safari Assistant — lokaler Server (Stand 2026-11-14-5)
+Safari Assistant — lokaler Server (Stand 2026-11-22-1)
 (Creator: DARK; Name seit 2026-10-05 in englischer Schreibweise, kurz davor „DARK", in der Entwicklung „Safari Assistent")
 Port 8765
 - Statische Dateien (HTML/JS)
@@ -81,7 +81,7 @@ DOCS_DIR.mkdir(exist_ok=True)
 #      niemals versehentlich abgeschossen wird.
 #   3. Eltern-Wache (nur aus der .app): stirbt der Launcher, beendet sich der Server mit.
 APP_SIGNATUR = 'safari-assistent'
-SERVER_VERSION = '2026-11-14-5'
+SERVER_VERSION = '2026-11-22-1'
 # Kennung gegenüber fremden Diensten (Reisewarnungen, Overpass, …) — mit Projektadresse, wie es deren
 # Nutzungsregeln verlangen; viele Installationen teilen sie sich (2026-09-27).
 PROJEKT_UA = 'SafariAssistant/2026.10 (+https://github.com/DarkPirateGo/safari-assistant)'
@@ -1041,7 +1041,13 @@ var FRIST_MS = 12000;
 var HUELLE = 'safari-assistant-huelle';
 var SEITE = '/mobile.html';
 var HUELLE_DATEIEN = [SEITE, '/i18n.js', '/i18n/en.js', '/i18n/fr.js', '/i18n/es.js', '/icon.png', '/dark-logo.jpg'];
-var FRIST_HUELLE_MS = 4000;      // mit Hülle wartet niemand 12 s auf einen Mac, der nicht antwortet
+var FRIST_HUELLE_MS = 2000;      // mit Hülle wartet niemand 12 s auf einen Mac, der nicht antwortet (2026-11-15-4: 4 → 2 s)
+// 2026-11-15-4: Ohne Mac brauchte der Start sehr lange. Ursache: i18n.js (steht im Kopf der Seite, hält das Zeichnen an)
+// wurde immer zuerst beim Mac geholt — OHNE Frist. Antwortet der Mac nicht, wartete das iPhone, bis die Verbindung
+// aufgab. Jetzt: hat der Seitenstart gerade ohne Mac geklappt, kommen die Dateien der Hülle sofort aus dem Speicher;
+// sonst höchstens FRIST_DATEI_MS auf den Mac warten. Eine verspätete Antwort frischt den Speicher trotzdem noch auf.
+var FRIST_DATEI_MS = 1500;
+var macWeg = false;
 
 function huelleHolen() {
   return caches.open(HUELLE).then(function (kasten) {
@@ -1101,21 +1107,34 @@ self.addEventListener('fetch', function (e) {
     // Die iPhone-Seite: erst der Mac, sonst die Hülle, sonst der Hinweis. Alle anderen Seiten wie bisher.
     if (pfad !== SEITE) { e.respondWith(mitFrist(fetch(anfrage)).catch(hinweisSeite)); return; }
     e.respondWith(ausHuelle(SEITE).then(function (huelle) {
-      return mitFrist(fetch(anfrage), huelle ? FRIST_HUELLE_MS : FRIST_MS).then(function (antwort) {
+      var netz = fetch(anfrage);
+      return mitFrist(netz, huelle ? FRIST_HUELLE_MS : FRIST_MS).then(function (antwort) {
+        macWeg = false;
         if (antwort.type === 'opaqueredirect') return antwort;      // Weiterleitungen folgt der Browser selbst
         if (antwort.ok) { inHuelle(SEITE, antwort); return antwort; }
         // Der Mac antwortet, gibt die Seite aber nicht her (Freigabe aus, Code fehlt): die Hülle, falls es eine gibt
         return (!antwort.ok && huelle) ? huelle : antwort;
-      }).catch(function () { return huelle || hinweisSeite(); });
+      }).catch(function () {
+        macWeg = true;
+        // Kommt die Seite nach der Frist doch noch, liegt sie beim nächsten Start bereit
+        netz.then(function (a) { if (a.ok) { macWeg = false; inHuelle(SEITE, a); } }).catch(function () {});
+        return huelle || hinweisSeite();
+      });
     }));
     return;
   }
   // Skripte und Bilder der Hülle: vom Mac, wenn er antwortet (und dabei auffrischen), sonst aus dem Speicher
   if (HUELLE_DATEIEN.indexOf(pfad) > 0) {
-    e.respondWith(fetch(anfrage).then(function (antwort) {
+    if (macWeg) {   // die Seite kam eben aus der Hülle → nicht noch einmal auf den Mac warten
+      e.respondWith(ausHuelle(pfad).then(function (alt) { return alt || fetch(anfrage); }));
+      return;
+    }
+    var netz = fetch(anfrage);
+    e.respondWith(mitFrist(netz, FRIST_DATEI_MS).then(function (antwort) {
       if (antwort.ok) inHuelle(pfad, antwort);
       return antwort.ok ? antwort : ausHuelle(pfad).then(function (alt) { return alt || antwort; });
     }).catch(function () {
+      netz.then(function (a) { if (a.ok) inHuelle(pfad, a); }).catch(function () {});
       return ausHuelle(pfad).then(function (alt) { return alt || Response.error(); });
     }));
   }
@@ -2116,6 +2135,12 @@ def starte_reisewarn_wache():
                 zuletzt = time.time() - REISEWARN_STATE['letzter_versuch']
                 if veraltet and not REISEWARN_STATE['laeuft'] and zuletzt >= REISEWARN_WIEDERHOLUNG_MIN * 60:
                     reisewarnungen_aktualisieren()
+                # 2026-11-15-6: Passen die Flächen nicht zum gespeicherten Warntext (z. B. weil Overpass beim letzten
+                # Mal nicht antwortete), alle 10 Minuten prüfen — nachgezogen wird höchstens alle WARNZONEN_MIN_ABSTAND_H
+                # Stunden. Was im Vorrat (verwaltungsgebiete.geojson) liegt, klappt dabei auch ohne Internet.
+                elif not WARNZONEN_STATE['laeuft'] and time.time() - WARNZONEN_STATE.get('geprueft', 0) >= 600:
+                    WARNZONEN_STATE['geprueft'] = time.time()
+                    warnzonen_pruefen_und_nachziehen()
             except Exception as e:
                 print(f'⚠️  Reisewarn-Wache: {e.__class__.__name__}: {e}')
             time.sleep(60)
@@ -2355,6 +2380,15 @@ def _standardquellen():
         name, url, sprache = ZEITUNGEN[c]
         q.append({'id': 'zeitung-' + c.lower(), 'name': name, 'url': url, 'land': c, 'thema': '', 'filter': True,
                   'nur_route': False, 'art': 'zeitung', 'sprache': sprache, 'geprueft': True})
+    # 2026-11-15-6: Sicherheitshinweise der US-Botschaften — am 15.11.2026 für alle 16 Länder als RSS bestätigt
+    # (<land>.usembassy.gov/category/alert/feed/). Der Feed enthält auch Routinemeldungen (Konsularsprechtage,
+    # Wahlen, Ausschreibungen); nur_titel='botschaft' lässt nur Sicherheits-, Demo-, Gesundheits- und Wetterwarnungen durch.
+    for l in REISEWARN_LAENDER:
+        c = l['aa']
+        q.append({'id': 'botschaft-' + c.lower(), 'name': 'US-Botschaft — ' + LAND_EN[c],
+                  'url': f'https://{c.lower()}.usembassy.gov/category/alert/feed/', 'land': c, 'thema': '',
+                  'ersatz': 'sicherheit', 'filter': False, 'nur_route': False, 'art': 'amtlich',
+                  'nur_titel': 'botschaft', 'geprueft': True})
     for l in REISEWARN_LAENDER:
         c = l['aa']
         q.append({'id': 'gnews-' + c.lower(), 'name': 'Google News — ' + LAND_EN[c], 'url': _google_news(c), 'land': c,
@@ -2690,6 +2724,10 @@ def _titel_schluessel(t):
     return _re.sub(r'[\W_]+', '', t)[:90]
 
 
+BOTSCHAFT_WARNUNG_RE = _re.compile(r'\b(security|demonstration|health|weather|emergency|travel)\s+alert\b|worldwide caution|'
+                                   r'ebola|mpox|cholera|evacuat|shelter[- ]in[- ]place|curfew|unrest|protest', _re.I)
+
+
 def nachricht_aus_roh(roh, quelle, jetzt=None):
     """Rohmeldung → gespeicherte Meldung, oder None, wenn sie nicht passt: kein Titel, älter als NACHRICHTEN_TAGE,
     bei weltweiten Quellen kein Land der Route, bei gefilterten Quellen kein Thema."""
@@ -2697,6 +2735,8 @@ def nachricht_aus_roh(roh, quelle, jetzt=None):
     titel = _kuerzen(_einzeilig(html_zu_text(roh.get('titel'))), NACHRICHT_TITEL_MAX)
     if len(titel) < 3:
         return None
+    if quelle.get('nur_titel') == 'botschaft' and not BOTSCHAFT_WARNUNG_RE.search(titel):
+        return None      # Routinemeldung der Botschaft (Sprechtage, Wahlen, Ausschreibungen)
     link = sicherer_feed_link(roh.get('link'))
     text = _WP_FUSS_RE.sub('', _einzeilig(html_zu_text(roh.get('text')))).strip()
     if 'news.google.' in (urlparse(quelle.get('url') or '').hostname or '') or text.lower() == titel.lower():
@@ -3068,6 +3108,74 @@ def _themen_oeffentlich():
     return [{'id': t['id'], 'name': t['name'], 'icon': t['icon']} for t in THEMEN]
 
 
+# ── ORTE IN MELDUNGEN (2026-11-15-6): für „In deiner Nähe“ — ohne KI, ohne Netz ──
+# Aus dem Offline-Ortsverzeichnis (data/orte.json, GeoNames) nur Orte mit mindestens ORTE_NAMEN_MIN_POP Einwohnern
+# und nur aus den Ländern der Meldung — sonst träfe jedes „Victoria“ oder „Hope“. Gesucht wird der Name als ganzes,
+# großgeschriebenes Wort. Ein Treffer heißt nur „wird erwähnt“, nicht „ist dort passiert“.
+ORTE_NAMEN_MIN_POP = 1000
+ORTE_NICHT = {n.lower() for n in (
+    'Alice', 'Amalia', 'Ashton', 'Bedford', 'Belfast', 'Belize', 'Benfica', 'Bochum', 'Bray', 'Brooke', 'Bute', 'Cambridge',
+    'Dalton', 'Darling', 'Derby', 'Devon', 'Dundee', 'Elim', 'Enon', 'Gama', 'Genet', 'George', 'Golfe', 'Gouda', 'Haarlem',
+    'Hamburg', 'Hamilton', 'Hanover', 'Highlands', 'Hilton', 'Kang', 'Kenton', 'Kingston', 'Kira', 'Kora', 'Leslie', 'Loss',
+    'Mena', 'Mojo', 'Moyo', 'Napier', 'Nigel', 'Northam', 'Norton', 'Oakley', 'Paredes', 'Penge', 'Puma', 'Retreat',
+    'Richmond', 'Riverside', 'Ritchie', 'Roma', 'Rothe', 'Same', 'Samba', 'Sega', 'Seymour', 'Simba', 'Springs', 'Stella',
+    'Tala', 'Tare', 'Utrecht', 'Verena', 'Victoria', 'Waal', 'Wales', 'Warden', 'Warder', 'Wesley', 'Zambezi')}
+ORTE_DEUTSCH = {'kapstadt': 'Cape Town', 'daressalam': 'Dar es Salaam', 'sansibar': 'Zanzibar', 'addis abeba': 'Addis Ababa',
+                'viktoriafälle': 'Victoria Falls'}
+_ORTE_NAMEN = None
+_ORT_WORT_RE = _re.compile(r"[^\W\d_][\w'’\-]*", _re.UNICODE)
+
+
+def _orte_namen():
+    """{Landname: {name_klein: (Name, lat, lng, Einwohner)}} — einmal gebaut, dann im Speicher."""
+    global _ORTE_NAMEN
+    if _ORTE_NAMEN is not None:
+        return _ORTE_NAMEN
+    idx = orte_index()
+    res = {}
+    if idx:
+        namen_l = idx.get('laender') or []
+        for o in idx.get('orte') or []:
+            try:
+                name, lat, lng, li, typ, pop = o[0], float(o[1]), float(o[2]), int(o[3]), o[4], int(o[5] or 0)
+            except (TypeError, ValueError, IndexError):
+                continue
+            k = str(name).lower()
+            if typ != 'o' or pop < ORTE_NAMEN_MIN_POP or len(k) < 4 or k in ORTE_NICHT or not (0 <= li < len(namen_l)):
+                continue
+            d = res.setdefault(namen_l[li], {})
+            if k not in d or pop > d[k][3]:
+                d[k] = (str(name), round(lat, 3), round(lng, 3), pop)
+    _ORTE_NAMEN = res
+    return res
+
+
+def orte_in_meldung(text, laender, maximal=4):
+    """Orte, die im Text als ganzes Wort (groß geschrieben) vorkommen, aus den Ländern der Meldung: [[Name, lat, lng], …]"""
+    verz = _orte_namen()
+    if not verz or not laender:
+        return []
+    dicts = [verz.get(LAND_NAME.get(c, '')) for c in laender]
+    dicts = [d for d in dicts if d]
+    if not dicts:
+        return []
+    woerter = _ORT_WORT_RE.findall(str(text or ''))
+    gefunden = {}
+    for i in range(len(woerter)):
+        for n in (3, 2, 1):
+            teil = woerter[i:i + n]
+            if len(teil) < n or not teil[0][:1].isupper():
+                continue
+            k = ' '.join(teil).lower()
+            k = ORTE_DEUTSCH.get(k, k).lower()
+            for d in dicts:
+                t = d.get(k)
+                if t and (t[0] not in gefunden or t[3] > gefunden[t[0]][3]):
+                    gefunden[t[0]] = t
+    beste = sorted(gefunden.values(), key=lambda t: -t[3])[:maximal]
+    return [[t[0], t[1], t[2]] for t in beste]
+
+
 def nachrichten_antwort():
     """GET /api/nachrichten — auch fürs iPhone: die Meldungen aktiver Quellen, neueste zuerst."""
     d, cfg = nachrichten_lesen(), feeds_lesen()
@@ -3076,7 +3184,8 @@ def nachrichten_antwort():
     liste = [e for e in d['eintraege'] if e.get('quelle') in ids and (e.get('zeit') or 0) >= grenze]
     liste.sort(key=lambda e: e.get('zeit') or 0, reverse=True)
     felder = ('id', 'quelle', 'quelle_name', 'titel', 'text', 'zeit', 'gesehen', 'laender', 'themen', 'kritisch')
-    return {'eintraege': [dict({k: e.get(k) for k in felder}, link=sicherer_feed_link(e.get('link')))
+    return {'eintraege': [dict({k: e.get(k) for k in felder}, link=sicherer_feed_link(e.get('link')),
+                               orte=orte_in_meldung((e.get('titel') or '') + ' ' + (e.get('text') or ''), e.get('laender') or []))
                           for e in liste[:NACHRICHTEN_ANTWORT_MAX]],
             'themen': _themen_oeffentlich(), 'laender': dict(LAND_NAME), 'status': nachrichten_status(d, cfg),
             'hinweis': ('Titel und Anriss stammen unverändert aus den Feeds; Themen und Länder ordnet eine feste '
@@ -3654,6 +3763,19 @@ KIWIX_PROC = None
 # und die App sagt dem Nutzer, warum das Öffnen am iPhone nicht geht.
 KIWIX_ROOT = ''
 KIWIX_NUR_LOKAL = True     # False: kiwix-serve kennt --address nicht und lauscht auf allen Schnittstellen (2026-11-14-1: steht jetzt auch im Status)
+# 2026-11-15-2: kiwix-serve 3.8.2 / libkiwix 14.2 lehnt „--address=127.0.0.1" ab („IP address is not available on this
+# system: 127.0.0.1" in kiwix.log), nimmt aber die IPv6-Loopback-Adresse ::1 an — ebenso nur von diesem Mac erreichbar.
+# KIWIX_HOST ist die Adresse, unter der der Server kiwix anspricht (Proxy, Wiki-Suche, Prüfungen).
+KIWIX_HOST = '127.0.0.1'
+
+# kiwix immer direkt ansprechen, nie über einen Proxy aus der Umgebung/Systemeinstellung: Python erkennt „[::1]" in
+# no_proxy nicht (eckige Klammern) und schickte die Anfrage sonst an den Proxy, der ::1 dieses Macs nicht erreicht.
+_KIWIX_DIREKT = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+def kiwix_url(pfad):
+    """http-Adresse von kiwix-serve für diesen Pfad — IPv6 in eckigen Klammern."""
+    h = KIWIX_HOST
+    return f'http://{"[" + h + "]" if ":" in h else h}:{KIWIX_PORT}{pfad}'
 # Wiki-RAG-Suchbegriffe: die ZIMs sind englisch → deutsche Frage vor der Suche in englische
 # Stichwörter übersetzen (schnelles lokales Modell). Fällt bei Ollama-Problemen auf die Rohfrage
 # zurück (englische Fragen funktionieren dann weiterhin).
@@ -3718,7 +3840,7 @@ def find_kiwix_bin():
 def kiwix_antwortet(pfad):
     """Liefert kiwix unter diesem Pfad wirklich eine Seite? (Prüfung für --urlRootLocation)"""
     try:
-        with urllib.request.urlopen(f'http://127.0.0.1:{KIWIX_PORT}{pfad}', timeout=3) as r:
+        with _KIWIX_DIREKT.open(kiwix_url(pfad), timeout=3) as r:
             return 200 <= r.status < 400
     except urllib.error.HTTPError as e:
         return e.code < 400
@@ -3727,8 +3849,25 @@ def kiwix_antwortet(pfad):
 
 
 def kiwix_laeuft():
+    """Antwortet kiwix lokal? Probiert die zuletzt benutzte Adresse, dann 127.0.0.1 und ::1 — und merkt sich die,
+    die antwortet (ein kiwix aus einem früheren Start kann auf der jeweils anderen liegen)."""
+    global KIWIX_HOST
+    for h in dict.fromkeys((KIWIX_HOST, '127.0.0.1', '::1')):
+        try:
+            with socket.create_connection((h, KIWIX_PORT), timeout=0.5):
+                KIWIX_HOST = h
+                return True
+        except OSError:
+            continue
+    return False
+
+def kiwix_im_wlan_erreichbar():
+    """Gegenprobe statt Annahme: Nimmt kiwix eine Verbindung über die WLAN-Adresse dieses Macs an?"""
+    ip = lan_ip()
+    if not ip:
+        return False
     try:
-        with socket.create_connection(('127.0.0.1', KIWIX_PORT), timeout=0.5):
+        with socket.create_connection((ip, KIWIX_PORT), timeout=0.5):
             return True
     except OSError:
         return False
@@ -3779,14 +3918,17 @@ def start_kiwix():
     # lesbar). Achtung: kiwix-serve 3.8.2 lehnte „--address 0.0.0.0" mit „Arguments did not match
     # expected patterns" ab und beendete sich; deshalb wird jeder Aufruf geprüft und notfalls der
     # nächste versucht — zuletzt exakt der von Hand funktionierende: kiwix-serve --port 8090 <zims>.
-    global KIWIX_ROOT, KIWIX_NUR_LOKAL
+    global KIWIX_ROOT, KIWIX_NUR_LOKAL, KIWIX_HOST
     KIWIX_ROOT = ''
-    versuche = ((['--address=127.0.0.1', '--urlRootLocation', '/wiki'], True, True),
-                (['--urlRootLocation', '/wiki'], True, False),
-                ([], False, False))
+    # 2026-11-15-2: zweiter Versuch mit ::1 (siehe KIWIX_HOST) — erst danach auf allen Schnittstellen
+    versuche = ((['--address=127.0.0.1', '--urlRootLocation', '/wiki'], True, True, '127.0.0.1'),
+                (['--address=::1', '--urlRootLocation', '/wiki'], True, True, '::1'),
+                (['--urlRootLocation', '/wiki'], True, False, '127.0.0.1'),
+                ([], False, False, '127.0.0.1'))
     nur_lokal = False
     import time as _t
-    for zusatz, mit_pfad, lokal in versuche:
+    for zusatz, mit_pfad, lokal, host in versuche:
+        KIWIX_HOST = host
         with _log_oeffnen('kiwix.log') as logf:
             KIWIX_PROC = subprocess.Popen(
                 [kbin, '--port', str(KIWIX_PORT)] + zusatz + [str(z) for z in zims],
@@ -3812,11 +3954,13 @@ def start_kiwix():
             break
         stoppe_kiwix()
     if kiwix_laeuft():
-        KIWIX_NUR_LOKAL = bool(nur_lokal)
-        print(f'📚 Offline-Wikipedia: kiwix-serve auf :{KIWIX_PORT} — {len(zims)} ZIM ({", ".join(z.name for z in zims)})')
-        if not nur_lokal:
-            print('⚠️  Diese kiwix-Version kennt --address nicht: Wikipedia lauscht auf allen Schnittstellen '
-                  f'(Port {KIWIX_PORT}) und ist im WLAN ohne Zugangscode lesbar. Abhilfe: kiwix-tools aktualisieren.')
+        # Nicht nur dem Startaufruf glauben: nimmt kiwix über die WLAN-Adresse an, ist es NICHT auf den Mac beschränkt
+        KIWIX_NUR_LOKAL = bool(nur_lokal) and not kiwix_im_wlan_erreichbar()
+        print(f'📚 Offline-Wikipedia: kiwix-serve auf {KIWIX_HOST}:{KIWIX_PORT} — {len(zims)} ZIM ({", ".join(z.name for z in zims)})')
+        if not KIWIX_NUR_LOKAL:
+            print('⚠️  kiwix-serve ließ sich nicht auf diesen Mac beschränken (siehe kiwix.log): Wikipedia lauscht auf allen '
+                  f'Schnittstellen (Port {KIWIX_PORT}) und ist im WLAN ohne Zugangscode lesbar. Abhilfe: in der Mac-Firewall '
+                  'für kiwix-serve eingehende Verbindungen blockieren.')
         if not KIWIX_ROOT:
             print('📚 kiwix-serve kennt --urlRootLocation nicht — Wikipedia lässt sich dann nur am Mac öffnen, nicht am iPhone.')
     else:
@@ -3866,15 +4010,32 @@ def wiki_html_zu_text(html):
         html = html.replace(a, b)
     return _re.sub(r'\s+', ' ', html).strip()
 
-def wiki_suchbegriffe(query):
+def wiki_artikeltext(html):
+    """Lesbarer Artikeltext für den Auszug: die Absätze (<p>) statt der ganzen Seite. Sonst stehen vorn
+    Titel (mehrfach), Infobox und Navigation — beim GBS-Artikel waren die ersten 1600 Zeichen fast nur das
+    (2026-11-15-3). Zu wenig Absatztext (Listen, Begriffsklärungen) → wie bisher die ganze Seite."""
+    absaetze = [wiki_html_zu_text(m) for m in _re.findall(r'(?is)<p\b[^>]*>(.*?)</p>', html)]
+    text = ' '.join(a for a in absaetze if len(a) > 40)
+    return text if len(text) >= 200 else wiki_html_zu_text(html)
+
+def wiki_suchbegriffe(query, vorher=''):
     """Frage (meist Deutsch) → 2-4 englische Suchbegriffe fürs englische ZIM.
-    Bei Ollama-Fehler/Timeout: Rohfrage zurück (englische Fragen bleiben nutzbar)."""
+    vorher: die vorige Frage im selben Modul — nur damit Nachfragen („und die Quelle dazu?") beim Thema
+    bleiben (2026-11-15-3). Bei Ollama-Fehler/Timeout: Rohfrage zurück (englische Fragen bleiben nutzbar)."""
     q = query.strip()
     if len(q) < 2:
         return q
+    vorher = str(vorher or '').strip()[:300]
+    # 2026-11-15-3: Schreibfehler in Namen verbessern („guillaume-barre" fand nur Listen, keinen Artikel)
     prompt = ('Extract 2 to 4 English search keywords for an offline Wikipedia full-text search '
-              'from this question. Reply with ONLY the keywords separated by spaces, no other text, '
-              'no punctuation, no explanation.\n\nQuestion: ' + q + '\nKeywords:')
+              'from this question. Correct misspelled names of diseases, species, people and places to the '
+              'spelling of the English Wikipedia article title. '
+              + ('If the question only refers back to the previous question (e.g. asks for its source or for '
+                 'more details), take the topic from the previous question. ' if vorher else '')
+              + 'Reply with ONLY the keywords separated by spaces, no other text, '
+              'no punctuation, no explanation.\n\n'
+              + ('Previous question: ' + vorher + '\n' if vorher else '')
+              + 'Question: ' + q + '\nKeywords:')
     try:
         import urllib.request
         body = json.dumps({'model': WIKI_TRANSLATE_MODEL, 'prompt': prompt, 'stream': False,
@@ -3884,7 +4045,8 @@ def wiki_suchbegriffe(query):
         with urllib.request.urlopen(req, timeout=8) as r:
             out = (json.load(r).get('response') or '').strip()
         out = out.splitlines()[0] if out else ''
-        out = _re.sub(r'[^A-Za-z0-9 -]', ' ', out)      # nur Wörter, kein Modell-Geschwätz
+        # nur Wörter, kein Modell-Geschwätz — Buchstaben mit Akzent bleiben (2026-11-15-3: aus „Barré" wurde „Barr")
+        out = _re.sub(r'[^\w -]', ' ', out).replace('_', ' ')
         out = _re.sub(r'\s+', ' ', out).strip()
         return out or q
     except Exception:
@@ -3900,9 +4062,10 @@ def wiki_suche(query, k=3, max_chars=1600):
         if len(quellen) >= k:
             break
         try:
-            such_url = (f'http://127.0.0.1:{KIWIX_PORT}/search?books.name={quote(buch)}'
-                        f'&pattern={quote(query)}&pageLength=4')
-            with urllib.request.urlopen(such_url, timeout=5) as r:
+            # 2026-11-15-2: mit KIWIX_ROOT — seit kiwix unter /wiki läuft (2026-09-14-1), liegt die Suche dort
+            such_url = kiwix_url(f'{KIWIX_ROOT}/search?books.name={quote(buch)}'
+                                 f'&pattern={quote(query)}&pageLength=4')
+            with _KIWIX_DIREKT.open(such_url, timeout=5) as r:
                 seite = r.read().decode('utf-8', 'ignore')
             # Tolerant: jeden Artikel-Link (Viewer ODER Content, mit/ohne ROOT-Präfix) einsammeln.
             # kiwix-serve-HTML variiert je Version — daher breit fangen statt auf ein Format wetten.
@@ -3919,13 +4082,16 @@ def wiki_suche(query, k=3, max_chars=1600):
                 gesehen.add(pfad)
                 titel = wiki_html_zu_text(titel_html) or pfad.rsplit('/', 1)[-1]
                 try:
-                    with urllib.request.urlopen(f'http://127.0.0.1:{KIWIX_PORT}/content/{pfad}', timeout=5) as ar:
-                        auszug = wiki_html_zu_text(ar.read().decode('utf-8', 'ignore'))[:max_chars]
+                    with _KIWIX_DIREKT.open(kiwix_url(f'{KIWIX_ROOT}/content/{pfad}'), timeout=5) as ar:
+                        auszug = wiki_artikeltext(ar.read().decode('utf-8', 'ignore'))[:max_chars]
                 except Exception:
                     continue
                 if len(auszug) < 200:
                     continue  # Redirect-/Stub-Seiten überspringen
-                quellen.append({'titel': titel, 'buch': buch, 'auszug': auszug, 'url': '/viewer#' + pfad})
+                # pfad: damit die App den Artikel zum Anklicken anbieten kann (2026-11-15-3) — nur unverdächtige Zeichen
+                sicher = pfad if (_re.fullmatch(r"[A-Za-z0-9%._~!$&'()*+,;=:@/-]{1,400}", pfad) and '..' not in pfad
+                                  and not pfad.startswith('/')) else ''
+                quellen.append({'titel': titel, 'buch': buch, 'auszug': auszug, 'url': '/viewer#' + pfad, 'pfad': sicher})
         except Exception:
             continue
     return quellen
@@ -4220,6 +4386,24 @@ def notfallkarte_fuers_iphone():
     return {'freigegeben': True, 'karte': karte, 'zeit': (d or {}).get('zeit') or 0}
 
 
+REISEPROFIL_MAX = 8000
+
+
+def reiseprofil_fuers_iphone():
+    """Das Reiseprofil aus der automatischen Sicherung (2026-11-15-4) — steht am Mac in den Einstellungen
+    (safari-settings.reiseprofil). Das iPhone gibt es seinen KI-Anfragen mit; claude: auch an Claude (online)."""
+    d = sicherung_lesen()
+    try:
+        st = json.loads((d or {}).get('daten', {}).get('safari-settings') or 'null')
+    except ValueError:
+        st = None
+    if not isinstance(st, dict):
+        return {'text': '', 'claude': False}
+    text = st.get('reiseprofil')
+    return {'text': text[:REISEPROFIL_MAX] if isinstance(text, str) else '',
+            'claude': st.get('reiseprofilClaude') is True}
+
+
 # ── RAG-MOBILE: Chunk-Store + Suche (v2026-07-14-1) ──────────
 # (server.py Stand 2026-07-16-1: CORS auf JEDER Antwort (end_headers-Override) — Fix für cross-origin
 #  Glyph-Fetches (Seite :8766 → API :8765), die vorher "Load failed"/schwarze Vektor-Karte verursachten;
@@ -4316,6 +4500,7 @@ HILFE, HILFE_FEHLER = _hilfe_laden()
 STATIK_DATEIEN = {'/': '/index.html', '/index.html': '/index.html', '/mobile.html': '/mobile.html', '/pois.html': '/pois.html',
                   '/data/parks.geojson': '/data/parks.geojson', '/data/warnzonen.geojson': '/data/warnzonen.geojson', '/data/orte.json': '/data/orte.json',
                   '/data/klima.json': '/data/klima.json',   # 2026-09-24-1: Klimatologie der Regenzeit-Ebene (fetch-klima.py)
+                  '/data/notfallkontakte.json': '/data/notfallkontakte.json',   # 2026-11-21-2: Notfall-Stellen aus OSM (fetch-notfallkontakte.py)
                   '/dark-logo.jpg': '/dark-logo.jpg',       # 2026-09-25-1: Creator-Logo (Einstellungen → App, ⚙️-Sheet)
                   '/icon.png': '/icon.png',
                   # 2026-10-04-1: Oberflächensprache — i18n.js und ihre Wörterbücher (i18n/<sprache>.js)
@@ -5248,6 +5433,15 @@ class SafariHandler(SimpleHTTPRequestHandler):
                 return
             self._json(notfallkarte_fuers_iphone())
             return
+        # Reiseprofil fürs iPhone (2026-11-15-4): Zugangscode wie überall, aus dem WLAN nur über https, nie zwischengespeichert
+        if path == '/api/reiseprofil':
+            if self._fremde_seite_abweisen():
+                return
+            if not ist_loopback(self.client_ip()) and not isinstance(self.connection, ssl.SSLSocket):
+                self._json_privat({'text': '', 'claude': False, 'grund': 'nur_https'})
+                return
+            self._json_privat(reiseprofil_fuers_iphone())
+            return
 
         # ── iPHONE-MODUS: Status (nur vom Mac) ────────────────────
         if path == '/api/netz/status':
@@ -5379,7 +5573,7 @@ class SafariHandler(SimpleHTTPRequestHandler):
             # DE→EN-Übersetzung, außer der Aufrufer schaltet sie ab (&translate=0)
             begriffe = query
             if params.get('translate', ['1'])[0] != '0':
-                begriffe = wiki_suchbegriffe(query)
+                begriffe = wiki_suchbegriffe(query, params.get('vorher', [''])[0])
             quellen = wiki_suche(begriffe, k)
             self._json({'available': True, 'grund': '', 'suchbegriffe': begriffe, 'quellen': quellen})
             return
@@ -5638,9 +5832,9 @@ class SafariHandler(SimpleHTTPRequestHandler):
         if '..' in path:
             self._error(400, 'Ungültiger Pfad.')
             return
-        ziel = f'http://127.0.0.1:{KIWIX_PORT}{path}' + (f'?{query}' if query else '')
+        ziel = kiwix_url(path) + (f'?{query}' if query else '')
         try:
-            upstream = urllib.request.urlopen(ziel, timeout=30)
+            upstream = _KIWIX_DIREKT.open(ziel, timeout=30)
         except urllib.error.HTTPError as e:
             upstream = e
         except Exception as e:

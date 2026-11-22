@@ -85,6 +85,8 @@ ${ICON_PLIST}
   <string>10.15</string>
   <key>NSHighResolutionCapable</key>
   <true/>
+  <key>NSAppleEventsUsageDescription</key>
+  <string>Damit ein Klick aufs Dock-Symbol das offene Fenster der App in Safari nach vorn holt.</string>
 </dict>
 </plist>
 PLIST

@@ -1,5 +1,7 @@
 #!/bin/bash
-# Safari Assistant — App-Launcher (liegt im Bundle unter Contents/MacOS/<CFBundleExecutable>), v2026-10-05-1
+# Safari Assistant — App-Launcher, v2026-11-15-4
+# Liegt im Bundle als Contents/MacOS/launcher.sh und wird vom Startprogramm (app-starter.swift) gestartet; lässt
+# sich das nicht übersetzen, ist dieses Skript wie bisher selbst die Programmdatei (Contents/MacOS/<CFBundleExecutable>).
 # Einzige Quelle: launcher_new.sh im Projektordner — build-app.sh und deploy.sh kopieren ihn ins Bundle.
 
 # 2026-09-27 (Audit M1): Logs nicht mehr unter /tmp (für alle Konten lesbar, feste Namen → Symlink-
@@ -10,6 +12,8 @@ umask 077
 LOG_DIR="$HOME/Library/Logs/Safari Assistant"
 mkdir -p "$LOG_DIR"
 OLLAMA_PID=""
+# 2026-11-15-4: Adresse der App für das Startprogramm (Klick aufs Dock-Symbol holt dieses Fenster nach vorn)
+rm -f "$LOG_DIR/app-adresse"
 
 # Ollama NUR starten, falls es nicht schon läuft (z. B. als Ollama.app oder LaunchAgent)
 if ! curl -s http://localhost:11434 > /dev/null 2>&1; then
@@ -84,6 +88,7 @@ for _ in $(seq 1 60); do
 done
 
 if [ -n "$URL" ]; then
+  printf '%s\n' "$URL" > "$LOG_DIR/app-adresse"
   open "$URL"
 else
   # Nichts scheitert still: statt einer toten Browserseite eine Meldung, die den Weg zeigt.
@@ -99,5 +104,11 @@ cleanup() {
   exit 0
 }
 trap cleanup SIGTERM SIGINT
+
+# 2026-11-15-4: Gestartet vom Startprogramm? Dann mit ihm enden — auch wenn es hart beendet wurde (sonst liefen
+# Server und Ollama ohne App weiter). Ohne Startprogramm (Skript ist selbst die Programmdatei) gibt es nichts zu beobachten.
+if [ -n "${SAFARI_STARTER_PID:-}" ]; then
+  ( while kill -0 "$SAFARI_STARTER_PID" 2>/dev/null; do sleep 2; done; kill -TERM $$ 2>/dev/null ) &
+fi
 
 wait $SERVER_PID

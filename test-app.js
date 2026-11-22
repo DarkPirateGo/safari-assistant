@@ -517,7 +517,7 @@ test('buildRagContext includes chapter and page citations', () => {
 });
 
 test('RAG context passed to Ollama path', () => {
-  return scriptContent.includes('sendToOllama(msgs, thisCtx, activeModel, usedFast, controller, false, ragContext)');
+  return scriptContent.includes('sendToOllama(msgs, thisCtx, activeModel, usedFast, controller, false, ragContext, wikiQuellen)');
 });
 
 test('RAG context passed to Claude path', () => {
@@ -601,7 +601,7 @@ test('sendMessage captures thisCtx as first statement', () => {
 });
 
 test('addMessage accepts ctx parameter', () => {
-  return scriptContent.includes('function addMessage(role, text, imageUrl, badge, ctx)');
+  return scriptContent.includes('function addMessage(role, text, imageUrl, badge, ctx, quellen)');
 });
 
 test('showTyping/removeTyping accept ctx', () => {
@@ -729,7 +729,7 @@ test('Bug 3: sendMessage beginnt mit const thisCtx = currentCtx', () => {
 });
 
 test('Bug 3: addMessage/showTyping/removeTyping akzeptieren ctx-Parameter', () => {
-  return scriptContent.includes('function addMessage(role, text, imageUrl, badge, ctx)')
+  return scriptContent.includes('function addMessage(role, text, imageUrl, badge, ctx, quellen)')
     && scriptContent.includes('function showTyping(ctx)')
     && scriptContent.includes('function removeTyping(ctx)');
 });
@@ -743,7 +743,7 @@ test('Bug 3: condenseChat übergibt ctx an addMessage (Race nach await)', () => 
 
 test('Bug 3: History-Restore übergibt entry.ctx an addMessage', () => {
   // 2026-10-04-3: Text über verlaufText(m) (App-Platzhalter in der Oberflächensprache)
-  return scriptContent.includes("addMessage(m.role, verlaufText(m), null, m.badge || null, entry.ctx)");
+  return scriptContent.includes("addMessage(m.role, verlaufText(m), null, m.badge || null, entry.ctx, m.quellen)");
 });
 
 test('Bug 3: GPS-setTimeout in sendQuickTo prüft Modulwechsel', () => {
@@ -1402,8 +1402,10 @@ if (mobileHtml) {
     return s.includes('stream: true') && s.includes('content_block_delta') && s.includes('text_delta');
   });
 
-  test('[mobile.html] kein stream:false mehr', () => {
-    return !p2MobileScript.includes('stream: false');
+  // 2026-11-15-6: nur die Chat-Sendefunktionen müssen streamen — „Lage hier" (eine kurze Zusammenfassung) darf auf die ganze Antwort warten
+  test('[mobile.html] kein stream:false mehr in den Send-Funktionen', () => {
+    const s = p2Slice(p2MobileScript, 'async function sendOllama', 'async function sendClaude') + p2Slice(p2MobileScript, 'async function sendClaude', '\n}\n');
+    return s.length > 500 && !s.includes('stream: false');
   });
 
   test('[mobile.html] Abbruch rettet Teilantwort in beiden Send-Funktionen', () => {
@@ -3001,7 +3003,7 @@ test('KIWIX: 📚-Einstieg in index (Werkzeuge-Nav) + mobile (⚙️-Sheet)', ()
 });
 
 test('KIWIX: openWikipedia() BYTEIDENTISCH in index + mobile (hostname-relativ, Status-Check, kein stilles Scheitern)', () => {
-  const rx = /\/\/ 📚 Offline-Wikipedia \(kiwix-serve :8090\)[\s\S]*?\nasync function openWikipedia\(\) \{[\s\S]*?\n\}/;
+  const rx = /\/\/ 📚 Offline-Wikipedia \(kiwix-serve :8090\)[\s\S]*?\nasync function openWikipedia\(artikel\) \{[\s\S]*?\n\}/;
   const a = (html40 || '').match(rx), b = (mobileHtml40 || '').match(rx);
   if (!a) return 'Funktion fehlt in index';
   if (!b) return 'Funktion fehlt in mobile';
@@ -3035,7 +3037,7 @@ test('WIKI-RAG: Kern (wikiAktiv/setzeWikiAktiv/sucheWiki/buildWikiContext) BYTEI
   if (!a) return 'Kern fehlt in index';
   if (!b) return 'Kern fehlt in mobile';
   if (a[0] !== b[0]) return 'index und mobile weichen ab (Single Source of Truth verletzt)';
-  const need = ["localStorage.getItem('safari-wiki-rag')", "'/api/wiki/search?query='", 'WIKIPEDIA-AUSZÜGE (Offline-Kiwix)', 'setTimeout(() => wc.abort(), 5000)'];
+  const need = ["localStorage.getItem('safari-wiki-rag')", "'/api/wiki/search?query='", 'WIKIPEDIA-AUSZÜGE (Offline-Kiwix)', 'setTimeout(() => wc.abort(), 8000)'];   // 2026-11-15-3: 8 s (Suchbegriffe + bis zu 3 Artikel)
   const missing = need.filter(s => !a[0].includes(s));
   if (missing.length) { console.log('    Fehlt:', missing.join(' | ')); return false; }
   return true;
@@ -3108,11 +3110,11 @@ test('WIKI-RAG: DE→EN-Übersetzung vor der Suche (englische ZIMs), Fallback au
   const sv = loadFile('server.py');
   if (!sv) return 'server.py fehlt';
   const need = ['def wiki_suchbegriffe(', 'WIKI_TRANSLATE_MODEL', "'/api/generate'",
-                'begriffe = wiki_suchbegriffe(query)', "'suchbegriffe': begriffe"];
+                "begriffe = wiki_suchbegriffe(query, params.get('vorher', [''])[0])", "'suchbegriffe': begriffe"];
   const missing = need.filter(s => !sv.includes(s));
   if (missing.length) { console.log('    Fehlt:', missing.join(' | ')); return false; }
   // Fallback: bei Exception muss die Rohfrage zurück (englische Fragen bleiben nutzbar)
-  const fn = sv.match(/def wiki_suchbegriffe\(query\):[\s\S]*?\n    except Exception:\n        return q/);
+  const fn = sv.match(/def wiki_suchbegriffe\(query, vorher=''\):[\s\S]*?\n    except Exception:\n        return q/);
   return !!fn || 'Fallback auf Rohfrage bei Ollama-Fehler fehlt';
 });
 
@@ -4538,7 +4540,7 @@ test('DATUM (ausgeführt): gueltigesDatum lehnt 2026-13-01/2026-02-30 ab; fristS
 
 test('FUNKTIONAL: Foto im Claude-Pfad (thisImage), Enter-Guard während Antwort (index + mobile), Claude-Kontext beginnt mit User (index + mobile), 25-s-Timeout (index + mobile), num_ctx explizit, Leisten überleben „Neuer Chat", eine position-card-ID, GPS zeigt vor dem Speichern, Ollama-URL-Prüfung', () => {
   if (!idx52 || !mob52) return 'Datei fehlt';
-  const needI = ["sendClaudeMessage(text || null, thisImage || null, msgs, thisCtx, { ragContext })", "if (abortControllers[thisCtx]) { showToast('Antwort läuft noch",
+  const needI = ["sendClaudeMessage(text || null, thisImage || null, msgs, thisCtx, { ragContext, wikiQuellen })", "if (abortControllers[thisCtx]) { showToast('Antwort läuft noch",
     "while (contextMsgs.length > 1 && contextMsgs[0].role !== 'user') contextMsgs = contextMsgs.slice(1);", "claudeFristSignal(controller.signal, 25000)",
     'options: { num_ctx: Number(settings.numCtx) || 16384 }', 'function leisteHtml(ctx)', 'c.innerHTML = leisteHtml(currentCtx) +', "if (currentCtx === 'notfall') renderFristen();",
     'updateGpsStatus();                       // erst anzeigen', "settings.ollamaUrl = /^https?:\\/\\/[^\\s/]+/.test(ou) ? ou : '';"];
@@ -5163,11 +5165,11 @@ test('WIKIPEDIA am iPhone: kiwix wird unter /wiki durchgereicht (sonst blockt HT
   if (!serverPy58 || !idx58 || !mob58) return 'Datei fehlt';
   const need = ['KIWIX_ROOT', "'--urlRootLocation', '/wiki'", 'def kiwix_antwortet(pfad):', 'def kiwix_proxy_pfad():',
     'def _proxy_kiwix(self, path, query):', "if KIWIX_ROOT and (path == '/wiki' or path.startswith('/wiki/')):",
-    "ziel = f'http://127.0.0.1:{KIWIX_PORT}{path}'", "if '..' in path:"];
+    "ziel = kiwix_url(path) + (f'?{query}' if query else '')", "if '..' in path:"];   // 2026-11-15-2: Adresse über kiwix_url (127.0.0.1 oder ::1)
   const miss = need.filter(n => !serverPy58.includes(n));
   if (miss.length) return 'server.py fehlt: ' + miss.join(' | ');
   if (!serverPy58.includes("kennt --urlRootLocation nicht")) return 'kein sichtbarer Rückfall, wenn kiwix den Schalter nicht kennt';
-  const wiki = /async function openWikipedia\(\) \{[\s\S]*?\n\}/;
+  const wiki = /async function openWikipedia\(artikel\) \{[\s\S]*?\n\}/;
   const a = idx58.match(wiki), b = mob58.match(wiki);
   if (!a || !b || a[0] !== b[0]) return 'openWikipedia weicht zwischen index und mobile ab';
   if (!a[0].includes('if (s.proxy) url = location.origin + s.proxy;')) return 'Proxy-Pfad wird nicht genutzt';
@@ -5250,7 +5252,7 @@ test('KARTE: Gebietsflächen statt Landesfläche, wo Grenzen vorliegen — Länd
   if (!poi59) return 'pois.html fehlt';
   const need = ['const zonen = (WARNZONEN && WARNZONEN.features) || [];', 'mitZonen.has(l.name)',
     "art: 'gebiet'", "art: 'land'", "if (p.art === 'gebiet')", 'Verwaltungsgrenze aus OpenStreetMap (ODbL)',
-    'Maßgeblich ist der amtliche Text, nicht diese Fläche', 'python3 fetch-warnzonen.py',
+    'Maßgeblich ist der amtliche Text, nicht diese Fläche', '<span>Der Assistent holt die Grenzen selbst, sobald der Mac online ist</span>',
     'function zeigeWarnlage(genauigkeitM)', 'zeigeWarnlage(acc);', 'await ladeWarnzonen(SERVER_BASE);'];
   const miss = need.filter(n => !poi59.includes(n));
   if (miss.length) return 'fehlt: ' + miss.join(' | ');
@@ -5265,7 +5267,7 @@ test('POSITION: Lage zur Warnung steht am Desktop, am iPhone und auf der Karte �
     'await ladeWarnzonen(getServerUrl());', 'warnFarbe(drin.stufe)'];
   const missIdx = needIdx.filter(n => !idx59.includes(n));
   if (missIdx.length) return 'index fehlt: ' + missIdx.join(' | ');
-  const needMob = ['function warnlageSatzMobil()', '${warnlageSatzMobil()}', 'await ladeWarnzonen(SERVER_URL);'];
+  const needMob = ['function warnlageSatzMobil()', '${warnlageSatzMobil()}', 'await ladeWarnzonenMobil();'];
   const missMob = needMob.filter(n => !mob59.includes(n));
   if (missMob.length) return 'mobile fehlt: ' + missMob.join(' | ');
   return /Flächen sind eine Darstellung des amtlichen Textes, nicht seine Grenze/.test(idx59)
@@ -5943,6 +5945,11 @@ test('INSTALLATION: deploy.sh lädt vendor/ ZUERST und bricht ohne Bundle nicht 
 test('SCHNITTSTELLEN: kiwix nur auf 127.0.0.1 (mit Rückfall für alte Versionen), Logs nicht mehr unter /tmp', () => {
   if (!srv62) return 'server.py fehlt';
   if (!srv62.includes("'--address=127.0.0.1'")) return 'kiwix lauscht auf allen Schnittstellen';
+  // 2026-11-15-2: kiwix 3.8.2 lehnt 127.0.0.1 ab → zweiter Versuch ::1, erst danach alle Schnittstellen; Status per Gegenprobe
+  const v = srv62.indexOf("(['--address=127.0.0.1', '--urlRootLocation', '/wiki'], True, True, '127.0.0.1')"), v6 = srv62.indexOf("(['--address=::1', '--urlRootLocation', '/wiki'], True, True, '::1')"), va = srv62.indexOf("(['--urlRootLocation', '/wiki'], True, False, '127.0.0.1')");
+  if (v < 0 || v6 < v || va < v6) return 'Reihenfolge 127.0.0.1 → ::1 → alle Schnittstellen';
+  if (!srv62.includes('KIWIX_NUR_LOKAL = bool(nur_lokal) and not kiwix_im_wlan_erreichbar()')) return 'Status ohne Gegenprobe aus dem WLAN';
+  if (!srv62.includes('_KIWIX_DIREKT = urllib.request.build_opener(urllib.request.ProxyHandler({}))') || /urllib\.request\.urlopen\((?:kiwix_url|such_url|ziel)/.test(srv62)) return 'kiwix-Anfragen könnten über einen Proxy laufen ([::1] fällt aus no_proxy)';
   // Final-Audit 2026-09-27: Rückfall ohne --address nur, wenn kiwix sich beendet hat — nicht bei langsamem Start
   if (!srv62.includes('if KIWIX_PROC.poll() is None and not kiwix_laeuft():')) return 'Rückfall ohne --address auch bei bloß langsamem Start';
   if (/open\('\/tmp\//.test(srv62) || /\/tmp\/safari-server\.log/.test(srv62)) return 'Log noch unter /tmp';
@@ -7124,7 +7131,7 @@ test('NACHRICHTEN (ausgeführt, python3): test-nachrichten.py — kein Abruf ins
   }
 });
 
-test('NACHRICHTEN (ausgeführt, python3): 50 eingebaute Quellen — GDACS + CDC, je Routen-Land das FCDO (Ersatzthema Einreise), eine Zeitung (nur passende Meldungen) und die Stichwortsuche bei Google News (als ungeprüft markiert); nur https, Kennungen eindeutig, Themen gültig', () => {
+test('NACHRICHTEN (ausgeführt, python3): 66 eingebaute Quellen — GDACS + CDC, je Routen-Land das FCDO (Ersatzthema Einreise), die US-Botschaft (nur Warnungen), eine Zeitung (nur passende Meldungen) und die Stichwortsuche bei Google News (als ungeprüft markiert); nur https, Kennungen eindeutig, Themen gültig', () => {
   const py = python69();
   if (!py) { console.log('    (python3 nicht gefunden — übersprungen)'); return true; }
   const skript = ['import sys, json, importlib.util', 'sys.dont_write_bytecode = True', "sys.argv = ['server.py']",
@@ -7135,7 +7142,7 @@ test('NACHRICHTEN (ausgeführt, python3): 50 eingebaute Quellen — GDACS + CDC,
   try { d = JSON.parse(require('child_process').execSync(py + ' -', { input: skript, encoding: 'utf8', timeout: 60000 }).trim().split('\n').pop()); }
   catch (e) { return 'server.py nicht ladbar: ' + ((e.stderr || '').toString().trim().split('\n').pop() || e.message); }
   const q = d.quellen, fehler = [];
-  if (q.length !== 50) fehler.push(`${q.length} statt 50 Quellen`);
+  if (q.length !== 66) fehler.push(`${q.length} statt 66 Quellen`);
   if (d.laender.length !== 16) fehler.push(`${d.laender.length} statt 16 Länder`);
   const ids = q.map(x => x.id);
   if (new Set(ids).size !== ids.length) fehler.push('doppelte Kennung');
@@ -7147,7 +7154,8 @@ test('NACHRICHTEN (ausgeführt, python3): 50 eingebaute Quellen — GDACS + CDC,
     if (!x || x.art !== 'amtlich' || x.thema !== thema || !x.nur_route) fehler.push(id + ' fehlt oder ist falsch eingestellt');
   }
   for (const c of d.laender) {
-    const k = c.toLowerCase(), f = nach['fcdo-' + k], z = nach['zeitung-' + k], g = nach['gnews-' + k];
+    const k = c.toLowerCase(), f = nach['fcdo-' + k], z = nach['zeitung-' + k], g = nach['gnews-' + k], b = nach['botschaft-' + k];
+    if (!b || b.art !== 'amtlich' || b.land !== c || b.nur_titel !== 'botschaft' || b.ersatz !== 'sicherheit' || b.url !== `https://${k}.usembassy.gov/category/alert/feed/`) fehler.push(c + ': Botschaftsquelle fehlt oder falsch');
     if (!f || f.art !== 'amtlich' || f.land !== c || f.ersatz !== 'einreise' || !/^https:\/\/www\.gov\.uk\/foreign-travel-advice\/[a-z-]+\.atom$/.test(f.url)) fehler.push(c + ': FCDO-Quelle fehlt oder falsch');
     if (!z || z.art !== 'zeitung' || z.land !== c || z.filter !== true || z.geprueft !== true) fehler.push(c + ': Zeitung fehlt oder ohne Filter');
     if (!g || g.art !== 'suche' || g.land !== c || g.filter !== true || g.geprueft !== false || !g.url.startsWith('https://news.google.com/rss/search?')) fehler.push(c + ': Stichwortsuche fehlt oder nicht als ungeprüft markiert');
@@ -7808,7 +7816,9 @@ test('AUFWAND (ausgeführt): claudeFristSignal — Frist löst TimeoutError aus,
 
 test('AUFWAND (ausgeführt, echter Code aus index + mobile in einem Node-Prozess mit Attrappen): sendet nur gewählten Aufwand; 400 wegen effort/output_config → einmal ohne wiederholen und merken; andere Fehler und 429 ohne Wiederholen; Fehlerantwort bleibt lesbar; Timer immer abgeräumt', () => {
   if (!idx71 || !mob71) return 'Datei fehlt';
-  const SCHLEIFE = /\/\/ Aufwand \(output_config\.effort\) nur senden[\s\S]*?\n      renderClaudeAufwand(?:Mobil)?\(\);\n    \}\n/;
+  // 2026-11-15-5: die Schleife wiederholt jetzt auch ohne Ort, wenn die API user_location ablehnt — endet mit „break; }“
+  const SCHLEIFE = /\/\/ Aufwand \(output_config\.effort\) nur senden[\s\S]*?\n      if \(suchOrtEntfernen\([^\n]*\n      break;\n    \}\n/;
+  const SUCHE71 = /\/\/ ═══ WEBSUCHE: ORTSBEZUG, QUELLENREGELN, KÜRZUNG \(2026-11-15-5\)[\s\S]*?\nfunction kuerzungsHinweis\(stopGrund\) \{[\s\S]*?\n\}\n/;
   const sI = idx71.match(SCHLEIFE), sM = mob71.match(SCHLEIFE);
   if (!sI || !sM) return 'Anfrage-Schleife nicht gefunden (' + [!!sI, !!sM].join('/') + ')';
   const script = `(function () {
@@ -7816,6 +7826,7 @@ const store = {};
 var localStorage = { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = v; } };
 ${idx71.match(BLK54)[0]}
 ${idx71.match(BLK71)[0]}
+${(idx71.match(SUCHE71) || [''])[0]}
 const offen = new Set(); const st0 = setTimeout, ct0 = clearTimeout;
 globalThis.setTimeout = (fn, ms) => { const id = st0(fn, ms); offen.add(id); return id; };
 globalThis.clearTimeout = id => { offen.delete(id); ct0(id); };
@@ -7826,10 +7837,11 @@ ${sI[0]}
   mobile: async function (ctx) { const { controller, key, body, mSettings, fetch, showToast, renderClaudeAufwandMobil } = ctx;
 ${sM[0]}
   return { res, aufwand }; } };
-async function szenario(variante, wahl, modell, antworten) {
+async function szenario(variante, wahl, modell, antworten, tools) {
   const aufrufe = [], toasts = [], controller = new AbortController();
   const f = async (url, opt) => { aufrufe.push({ url, body: JSON.parse(opt.body), signal: opt.signal, kopf: opt.headers }); const a = antworten.shift(); if (a instanceof Error) throw a; return a; };
   const rumpf = { model: modell, max_tokens: 1024, stream: true, messages: [] };
+  if (tools) rumpf.tools = tools;
   const ctx = { controller, key: 'k', requestBody: rumpf, body: rumpf, aufwandWunsch: claudeAufwandWirksam(wahl, modell), mSettings: { claudeEffort: wahl },
     fetch: f, showToast: t => toasts.push(t), renderClaudeAufwand: () => {}, renderClaudeAufwandMobil: () => {} };
   let ergebnis = null, fehler = null;
@@ -7838,6 +7850,7 @@ async function szenario(variante, wahl, modell, antworten) {
   controller.abort();
   return { n: aufrufe.length, effort: aufrufe.map(a => a.body.output_config ? a.body.output_config.effort : null), tokens: aufrufe.map(a => a.body.max_tokens), ok: ergebnis ? ergebnis.res.ok : null,
     status: ergebnis ? ergebnis.res.status : null, gesendet: ergebnis ? ergebnis.aufwand : null, lesbar: ergebnis && !ergebnis.res.ok ? await ergebnis.res.json() : null,
+    ort: aufrufe.map(a => a.body.tools ? !!a.body.tools[0].user_location : null),
     toasts, fehler, abgebrochen0, abgebrochen1: aufrufe[0] ? aufrufe[0].signal.aborted : null, abgelehnt: [...CLAUDE_AUFWAND_ABGELEHNT], kopf: aufrufe[0] ? aufrufe[0].kopf['anthropic-dangerous-direct-browser-access'] : null };
 }
 (async () => {
@@ -7853,6 +7866,10 @@ async function szenario(variante, wahl, modell, antworten) {
     e.s6 = await szenario(v, 'high', 'm-6', [new Error('Failed to fetch')]);
     e.s7 = await szenario(v, 'xhigh', 'm-2', [antwort(200, {})]);
     e.s8 = await szenario(v, 'high', 'm-8', [antwort(400, { error: { message: 'effort bad' } }), antwort(400, { error: { message: 'effort bad again' } })]);
+    suchOrtAbgelehnt = false;
+    e.s9 = await szenario(v, '', 'm-9', [antwort(400, { error: { message: 'tools.0.user_location.country: unsupported country code' } }), antwort(200, {})], [suchWerkzeug('Südafrika')]);
+    e.s10 = await szenario(v, '', 'm-10', [antwort(200, {})], [suchWerkzeug('Südafrika')]);
+    suchOrtAbgelehnt = false;
     aus[v] = e;
   }
   aus.timerOffen = offen.size;
@@ -7873,6 +7890,8 @@ async function szenario(variante, wahl, modell, antworten) {
     if (e.s2.tokens[0] !== 8192 || e.s2.tokens[1] !== 1024) fehler.push(p + 'max_tokens erst 8192, beim Wiederholen wieder 1024 ' + j(e.s2.tokens));
     if (e.s3.n !== 1 || e.s3.status !== 400 || !e.s3.lesbar || e.s3.lesbar.error.message !== 'max_tokens: too large' || e.s3.toasts.length) fehler.push(p + 'fremder 400-Fehler ' + j(e.s3));
     if (e.s4.n !== 1 || e.s4.effort[0] !== null) fehler.push(p + 'ohne Aufwand wiederholt oder gesendet ' + j(e.s4));
+    if (e.s9.n !== 2 || j(e.s9.ort) !== '[true,false]' || e.s9.ok !== true) fehler.push(p + 'Ort abgelehnt → einmal ohne Ort ' + j(e.s9));
+    if (e.s10.n !== 1 || j(e.s10.ort) !== '[false]') fehler.push(p + 'nach Ablehnung fragt die Sitzung weiter ohne Ort ' + j(e.s10));
     if (e.s5.n !== 1 || e.s5.status !== 429) fehler.push(p + '429 wiederholt ' + j(e.s5));
     if (e.s6.fehler !== 'Failed to fetch' || e.s6.n !== 1) fehler.push(p + 'Netzfehler ' + j(e.s6));
     if (e.s7.n !== 1 || e.s7.effort[0] !== null || e.s7.tokens[0] !== 1024) fehler.push(p + 'abgelehnte Stufe wird wieder gesendet ' + j(e.s7));
@@ -8024,7 +8043,7 @@ test('S2/S3 (server.py): Ollama-Durchgriff und Dokumentensuche prüfen die Herku
 });
 
 test('S3 (Seiten): openWikipedia öffnet die Wikipedia auf ihrem eigenen Port (s.wiki_port) — in index und mobile gleich; ohne Port wie bisher über den App-Port', () => {
-  const wiki = /async function openWikipedia\(\) \{[\s\S]*?\n\}/;
+  const wiki = /async function openWikipedia\(artikel\) \{[\s\S]*?\n\}/;
   const a = idx72.match(wiki), b = mob72.match(wiki);
   if (!a || !b || a[0] !== b[0]) return 'openWikipedia weicht ab';
   if (!a[0].includes("if (s.proxy && s.wiki_port) url = location.protocol + '//' + location.hostname + ':' + s.wiki_port + s.proxy;")) return 'eigener Port wird nicht genutzt';
@@ -8544,7 +8563,7 @@ test('I18N 2026-11-14-2 (ausgeführt): jeder neue Text der Oberfläche — Reite
   const mac = ['Allgemein', 'KI & Modelle', 'Netz & VPN', 'Daten & Sicherung', 'Bereiche der Einstellungen', 'Zeigt die iPhone-Ansicht hier am Mac — zum Ausprobieren.',
     'Notrufnummern, Position und Sofort-Protokolle — ohne KI (Ctrl+Umschalt+N)', 'Safari Assistant beenden', 'iPhone verbinden', 'iPhone verbinden — QR-Code und Einrichtung',
     'Die lokale KI läuft nicht', 'Sofort-Protokolle, Karte, Logbuch und Notizen gehen trotzdem.',
-    '⚠️ Die Offline-Wikipedia ist im WLAN ohne Zugangscode lesbar — diese kiwix-Version lässt sich nicht auf diesen Mac beschränken. Abhilfe: kiwix-tools aktualisieren.',
+    '⚠️ Die Offline-Wikipedia ist im WLAN ohne Zugangscode lesbar — kiwix ließ sich nicht auf diesen Mac beschränken (Grund steht in kiwix.log). Abhilfe: in der Mac-Firewall für kiwix-serve eingehende Verbindungen blockieren.',
     'Die App am iPhone — im selben WLAN wie der Mac', 'Einmal einrichten',
     '⚙️ Einstellungen → iPhone führt in fünf Schritten durch: Zertifikat erzeugen, Profil per AirDrop aufs iPhone, installieren, Vertrauen einschalten, QR-Code scannen.',
     'Der Schritt, der am häufigsten fehlt — am iPhone: Einstellungen → Allgemein → Info → Zertifikatsvertrauenseinstellungen → das Zertifikat des Safari Assistant einschalten.',
@@ -8587,18 +8606,18 @@ console.log('\n=== 74. SOS AM IPHONE 2026-11-14-3 — Position + eigene Nachrich
 const mob74 = loadFile('mobile.html');
 const js74 = mob74 ? mob74.slice(mob74.indexOf('<script>', mob74.lastIndexOf('</style>'))) : '';
 function sos74() {
-  const namen = ['formatDD', 'toDMS', 'plusCode', 'positionFormate', 'escHtml', 'nachrichtEsc', 'sosLesen', 'sosNummer', 'sosZeit', 'sosNachricht', 'sosSmsUrl', 'sosWaUrl', 'sosInhalt', 'sosEditor', 'sosSpeichern'];
+  const namen = ['formatDD', 'toDMS', 'plusCode', 'positionFormate', 'escHtml', 'nachrichtEsc', 'sosLesen', 'sosNummer', 'sosZeit', 'sosNachricht', 'sosSmsUrl', 'sosWaUrl', 'sosZiele', 'sosMerken', 'sosInhalt', 'sosEditor', 'sosSpeichern'];
   const q = namen.map(n => fn72(js74, n) || einzeiler72(js74, n));
   const fehlt = namen.filter((n, i) => !q[i]);
   if (fehlt.length) return { fehler: 'fehlt: ' + fehlt.join(',') };
-  const konst = ["const SOS_KEY = 'safari-mobile-sos';", "const SOS_TEXT_VORGABE = '🆘 Notfall — ich brauche Hilfe. Hier ist meine Position:';", 'const SOS_MAX = 8;', "const sosStand = { modus: 'start', text: '', quelle: '' };"];
+  const konst = ["const SOS_KEY = 'safari-mobile-sos';", "const SOS_TEXT_VORGABE = '🆘 Notfall — ich brauche Hilfe. Hier ist meine Position:';", 'const SOS_MAX = 8;', "const sosStand = { modus: 'start', text: '', quelle: '', erledigt: [] };"];
   for (const k of konst) if (!js74.includes(k)) return { fehler: 'Konstante fehlt: ' + k };
   const speicher = {};
   const ls = { getItem: k => (k in speicher ? speicher[k] : null), setItem: (k, v) => { speicher[k] = String(v); } };
   const els = {};
   const doc = { getElementById: id => els[id] || null };
   const api = new Function('localStorage', 'document', 'uiMulti', 'showToast', 'sosZeigen',
-    konst.join('\n') + '\n' + q.join('\n') + '\nreturn { sosLesen, sosNummer, sosNachricht, sosSmsUrl, sosWaUrl, sosInhalt, sosSpeichern, sosStand, SOS_KEY };')(ls, doc, t => t, () => {}, () => {});
+    konst.join('\n') + '\n' + q.join('\n') + '\nreturn { sosLesen, sosNummer, sosNachricht, sosSmsUrl, sosWaUrl, sosZiele, sosMerken, sosInhalt, sosSpeichern, sosStand, SOS_KEY };')(ls, doc, t => t, () => {}, () => {});
   return { api, speicher, els };
 }
 
@@ -8694,7 +8713,7 @@ test('I18N 2026-11-14-3 (ausgeführt): alle Texte des SOS-Blocks sind in en, fr,
     'Speichern nicht möglich (Speicher des Browsers voll oder gesperrt).', 'SOS-Nachricht gespeichert', 'Nachricht kopiert'];
   const fehler = [];
   for (const t of texte) if (!mob74.includes("'" + t + "'")) fehler.push('nicht in mobile.html: ' + t.slice(0, 40));
-  if (!mob74.includes('💬 iMessage/SMS · <span data-i18n-skip>')) fehler.push('Kanal-Knopf nicht sprachneutral');
+  if (!mob74.includes("const kanal = z => z.wa ? '🟢 WhatsApp' : '💬 iMessage/SMS';") || !mob74.includes('${kanal(z)} · <span data-i18n-skip>')) fehler.push('Kanal-Knopf nicht sprachneutral');   // seit 2026-11-15-1 über kanal()
   const DEUTSCH = /(?:^|[^\p{L}])(?:der|die|das|und|nicht|ist|ich|brauche|Hilfe|Position wird|Empfänger|Nachricht|Nummer|einrichten|gespeichert|Speichern|letzte|bekannte|unbekannt|wählen|tippen)(?:[^\p{L}]|$)/u;
   for (const l of SPR64) {
     const sb = i18nSandbox64(JSON.stringify(l)); sb.ladeWb(l);
@@ -8844,6 +8863,761 @@ test('CLAUDE-STANDARD (index + mobile): CLAUDE_STANDARD_MODELL und die Online-Mo
     if (/claude-sonnet-4-6|Claude Sonnet 4\.6/.test(h)) fehler.push(d + ': nennt noch 4.6');
   }
   return !fehler.length || fehler.join(' | ');
+});
+
+// =============================================
+console.log('\n=== 77. SOS „AN ALLE SENDEN" 2026-11-15-1 — ein Knopf führt durch alle Kanäle ===');
+// =============================================
+// Wunsch 15.11.: Steht ein Kontakt mit iMessage/SMS UND WhatsApp drin, soll die Nachricht über beide gehen.
+// Gleichzeitig geht nicht (iOS: eine App je Tipp, „Senden" tippt man selbst) — darum eine geführte Reihenfolge.
+function sos77(kontakte) {
+  const r = sos74(); if (r.fehler) return r;
+  r.speicher[r.api.SOS_KEY] = JSON.stringify({ text: 'Hilfe', kontakte });
+  r.api.sosStand.modus = 'bereit'; r.api.sosStand.text = 'Hilfe\n📍 1, 2'; r.api.sosStand.erledigt = [];
+  return r;
+}
+const alle77 = h => (h.match(/<a class="sos-knopf sos-alle" href="([^"]*)"([^>]*)>(.*?)<\/a>/s) || null);
+test('SOS AN ALLE (ausgeführt): Reihenfolge Nachrichten-App (alle Empfänger) → WhatsApp je Kontakt; der Knopf zeigt Schritt i/n und springt nach jedem Tipp zum nächsten Kanal; WhatsApp-Schritt öffnet in neuem Fenster; am Ende „Alle Kanäle geöffnet" + „Nochmal von vorn"', () => {
+  const r = sos77([{ name: 'A', nummer: '+442079460000', sms: true, wa: true }, { name: 'B', nummer: '+447700900000', sms: false, wa: true }]);
+  if (r.fehler) return r.fehler;
+  const z = r.api.sosZiele(r.api.sosLesen(), r.api.sosStand.text);
+  if (z.map(x => x.id).join('|') !== 'sms|wa:+442079460000|wa:+447700900000') return 'Ziele: ' + z.map(x => x.id).join('|');
+  let a = alle77(r.api.sosInhalt());
+  if (!a || !a[1].startsWith('sms:+442079460000&amp;body=') || a[2].includes('_blank') || !a[3].includes('1/3')) return 'Schritt 1: ' + (a && a[0]);
+  r.api.sosMerken(0);
+  a = alle77(r.api.sosInhalt());
+  if (!a || !a[1].startsWith('https://wa.me/442079460000?text=') || !a[2].includes('target="_blank" rel="noopener"') || !a[3].includes('2/3')) return 'Schritt 2: ' + (a && a[0]);
+  r.api.sosMerken(1); r.api.sosMerken(1);   // doppelt getippt zählt einmal
+  a = alle77(r.api.sosInhalt());
+  if (!a || !a[1].startsWith('https://wa.me/447700900000?text=') || !a[3].includes('3/3')) return 'Schritt 3: ' + (a && a[0]);
+  r.api.sosMerken(2);
+  const h = r.api.sosInhalt();
+  if (alle77(h)) return 'Knopf bleibt nach dem letzten Kanal stehen';
+  if (!h.includes('Alle Kanäle geöffnet') || !h.includes('(3/3)') || !h.includes("onclick=\"sosStand.erledigt=[];sosZeigen()\"")) return 'Abschluss fehlt';
+  if ((h.match(/class="sos-knopf[^"]*sos-erledigt"/g) || []).length !== 3) return 'Einzel-Knöpfe nicht als geöffnet markiert';
+  return true;
+});
+test('SOS AN ALLE (ausgeführt): nur EIN Kanal → kein „An alle"-Knopf (nichts Doppeltes); gleiche WhatsApp-Nummer zweimal eingetragen → nur einmal; Einzel-Tipp zählt für die Reihenfolge mit; Namen mit HTML maskiert', () => {
+  let r = sos77([{ name: 'A', nummer: '+442079460000', sms: true, wa: false }]);
+  if (r.fehler) return r.fehler;
+  if (alle77(r.api.sosInhalt()) || r.api.sosInhalt().includes('Oder einzeln:')) return 'Knopf bei nur einem Kanal';
+  r = sos77([{ name: '<b>x', nummer: '+442079460000', sms: false, wa: true }, { name: 'Zweit', nummer: '0044 20 7946 0000', sms: false, wa: true }, { name: 'C', nummer: '+447700900000', sms: true, wa: false }]);
+  const z = r.api.sosZiele(r.api.sosLesen(), r.api.sosStand.text);
+  if (z.length !== 2 || z[1].id !== 'wa:+442079460000') return 'Dubletten: ' + z.map(x => x.id).join('|');
+  r.api.sosMerken(0);   // wie ein Tipp auf den einzelnen Nachrichten-Knopf
+  const h = r.api.sosInhalt(), a = alle77(h);
+  if (!a || !a[1].startsWith('https://wa.me/442079460000') || !a[3].includes('2/2')) return 'Einzel-Tipp nicht mitgezählt: ' + (a && a[0]);
+  if (h.includes('<b>x')) return 'Name nicht maskiert';
+  return true;
+});
+test('SOS AN ALLE: neu gezeichnet wird erst NACH dem Tipp (der Link muss noch die App öffnen); Index statt Text im onclick; neue Nachricht und ✕ setzen die Runde zurück; Einzel-Knöpfe melden ihren Kanal; Knopf ≥ 64 px', () => {
+  if (!js74.includes('function sosAlleGetippt(i) { sosMerken(i); setTimeout(sosZeigen, 600); }')) return 'sosAlleGetippt()';
+  if (!js74.includes('onclick="sosAlleGetippt(${i})"') || !js74.includes('onclick="sosGetippt(this, ${i})"')) return 'onclick';
+  if (!js74.includes("function sosGetippt(a, i) { a.classList.add('sos-erledigt'); if (typeof i === 'number') sosMerken(i); }")) return 'sosGetippt()';
+  const f = fn72(js74, 'sosFertig');
+  if (!f || !f.includes('sosStand.erledigt = [];')) return 'neue Nachricht setzt nicht zurück';
+  if (!js74.includes("onclick=\"sosStand.modus='start';sosStand.erledigt=[];sosZeigen()\">✕</button>")) return '✕ setzt nicht zurück';
+  if (!/\.sos-knopf\.sos-alle \{[^}]*min-height: 64px;/.test(mob74)) return 'Knopf-Größe';
+  return true;
+});
+test('I18N 2026-11-15-1 (ausgeführt): die Texte von „An alle senden" sind in en, fr, es übersetzt — ohne deutsche Reste', () => {
+  if (!mob74) return 'mobile.html fehlt';
+  const texte = ['An alle senden', 'In der App „Senden“ tippen, hierher zurückkommen und wieder auf den Knopf — er springt zum nächsten Kanal.', 'Alle Kanäle geöffnet', 'Nochmal von vorn', 'Oder einzeln:'];
+  const fehler = [];
+  for (const t of texte) if (!mob74.includes("'" + t + "'")) fehler.push('nicht in mobile.html: ' + t.slice(0, 40));
+  const DEUTSCH = /(?:^|[^\p{L}])(?:alle|senden|tippen|zurück|wieder|Knopf|nächsten|geöffnet|Kanäle|einzeln|von vorn)(?:[^\p{L}]|$)/u;
+  for (const l of SPR64) {
+    const sb = i18nSandbox64(JSON.stringify(l)); sb.ladeWb(l);
+    const t = sb.ctx.DARK_I18N.t;
+    const falsch = texte.filter(s => { const r = t(s); return r === s || DEUTSCH.test(r); });
+    if (falsch.length) fehler.push(`${l}: ${falsch[0].slice(0, 40)} → ${t(falsch[0]).slice(0, 50)}`);
+  }
+  return !fehler.length || fehler.slice(0, 4).join(' | ');
+});
+
+// =============================================
+console.log('\n=== 78. WIKIPEDIA-QUELLEN UNTER DER ANTWORT 2026-11-15-3 ===');
+// =============================================
+// Rückmeldung 15.11.: „Bin mir nicht sicher, ob die Wikipedia-Abfrage funktioniert" — man sah nur die Plakette, nicht WAS gefunden wurde.
+const idx78 = loadFile('index.html') || '', mob78 = loadFile('mobile.html') || '';
+function api78() {
+  const namen = ['vorigeFrage', 'wikiQuellenListe', 'wikiQuellenHtml'];
+  const q = namen.map(n => fn72(idx78, n));
+  if (q.some(x => !x)) return null;
+  return new Function(q.join('\n') + '\nreturn { vorigeFrage, wikiQuellenListe, wikiQuellenHtml };')();
+}
+test('WIKI-QUELLEN (ausgeführt): Artikel als Links unter der Antwort — Titel maskiert, nur unverdächtige Pfade klickbar, höchstens 5; vorige Frage im Modul für Nachfragen', () => {
+  const a = api78(); if (!a) return 'Funktionen fehlen in index.html';
+  const h = a.wikiQuellenHtml([{ titel: 'Guillain–Barré syndrome', pfad: 'buch/A/Guillain%E2%80%93Barr%C3%A9_syndrome' }, { titel: '<img src=x onerror=alert(1)>', pfad: '../../etc' }, { titel: 'X', pfad: '/abs' }]);
+  if (!h.includes('data-artikel="buch/A/Guillain%E2%80%93Barr%C3%A9_syndrome"') || !h.includes('onclick="openWikipedia(this.dataset.artikel);return false">Guillain–Barré syndrome</a>')) return 'Link: ' + h;
+  if (h.includes('<img') || !h.includes('<span>&lt;img src=x onerror=alert(1)&gt;</span>')) return 'Titel nicht maskiert oder ../ als Link';
+  if ((h.match(/<a /g) || []).length !== 1) return 'Pfad mit ../ oder / am Anfang wurde klickbar';
+  if (a.wikiQuellenHtml(null) !== '' || a.wikiQuellenHtml([{ titel: '' }]) !== '') return 'leere Liste erzeugt HTML';
+  if (a.wikiQuellenListe(Array.from({ length: 9 }, (_, i) => ({ titel: 'T' + i, pfad: 'b/A/' + i }))).length !== 5) return 'mehr als 5 Quellen';
+  const msgs = [{ role: 'user', content: 'Was ist GBS?' }, { role: 'assistant', content: '…' }, { role: 'user', content: 'und die Quelle?' }];
+  if (a.vorigeFrage(msgs) !== 'Was ist GBS?' || a.vorigeFrage([msgs[0]]) !== '' || a.vorigeFrage([{ role: 'user', content: [] }, msgs[2]]) !== '') return 'vorigeFrage';
+  return true;
+});
+test('WIKI-QUELLEN: Mac und iPhone speichern die Artikel mit der Antwort und zeigen sie auch nach Neustart/Verlauf; Import prüft sie; openWikipedia(artikel) öffnet den Artikel (nur geprüfte Pfade)', () => {
+  const need = ["addMessage('assistant', reply, null, modelBadge, thisCtx, quellen);", "{ role: 'assistant', content: reply, model: activeModel, badge: modelBadge, quellen }",
+    "addMessage('assistant', reply, null, badge, thisCtx, wq);", "if (m.quellen) c.quellen = m.quellen;", "addMessage(m.role, verlaufText(m), null, m.badge || null, entry.ctx, m.quellen)",
+    "if (m.quellen != null) { const q = wikiQuellenListe(m.quellen); if (q.length) r.quellen = q; else delete r.quellen; }",
+    "const w = await sucheWiki(text, 3, vorigeFrage(msgs));", "{ ragContext, wikiQuellen }"];
+  const fi = need.filter(n => !idx78.includes(n));
+  if (fi.length) return 'index fehlt: ' + fi[0];
+  if ((idx78.match(/addMessage\(m\.role, m\.hadImage \? '📷 ' \+ text : text, null, m\.badge \|\| null, ctx, m\.quellen\);/g) || []).length !== 2) return 'index: Wiederherstellung ohne Quellen';
+  const needM = ["const w = await sucheWiki(lastUser.content, 3, vorigeFrage(msgs));", "appendMsgEl('assistant', reply, null, model + ragBadge, thisCtx, undefined, quellen);",
+    "{ role: 'assistant', content: reply, model, quellen }", "msg.model || null, ctx, false, msg.quellen);", '${wikiQuellenHtml(quellen)}'];
+  const fm = needM.filter(n => !mob78.includes(n));
+  if (fm.length) return 'mobile fehlt: ' + fm[0];
+  for (const [n, h] of [['index', idx78], ['mobile', mob78]]) {
+    if (!h.includes("const art = artikel ? wikiQuellenListe([{ titel: '-', pfad: artikel }])[0].pfad : '';") || !h.includes("if (art) url = url.replace(/\\/$/, '') + '/content/' + art;")) return n + ': openWikipedia(artikel)';
+    if (!h.includes(".wiki-quellen a {")) return n + ': Stil der Quellenzeile';
+  }
+  return true;
+});
+
+// =============================================
+console.log('\n=== 79. iPHONE-START OHNE MAC 2026-11-15-4: kurze Fristen im Service Worker ===');
+// =============================================
+// Rückmeldung 15.11.: Ohne Verbindung zum Mac braucht die iPhone-App „extrem lange" zum Start — schlecht im Notfall.
+// Ursache: i18n.js (im Kopf der Seite, hält das Zeichnen an) wurde ohne Frist beim Mac geholt.
+test('SW-START (ausgeführt, echte Zeiten): Mac hängt → Seite nach ≤ 2 s aus der Hülle, danach i18n.js SOFORT aus dem Speicher; Mac langsam → Datei nach ≤ 1,5 s aus dem Speicher; verspätete Antwort frischt die Hülle trotzdem auf', () => {
+  const srv = loadFile('server.py') || '';
+  const sw = srv.match(/SW_JS = "{3}([\s\S]*?)"{3}/);
+  if (!sw) return 'SW_JS fehlt';
+  const skript = `
+const quell = ${JSON.stringify(sw[1].replace('__VERSION__', 'test'))};
+const ablage = {};
+const kasten = name => ({ put: async (pfad, a) => { (ablage[name] = ablage[name] || new Map()).set(typeof pfad === 'string' ? pfad : pfad.url, a); }, match: async pfad => (ablage[name] || new Map()).get(pfad) });
+const horcher = {};
+let netz = 'an';   // 'an' | 'haengt' | 'spaet' (Antwort nach 2,6 s)
+const antwort = (pfad, text) => ({ ok: true, status: 200, type: 'basic', text: text + ' ' + pfad, clone() { return Object.assign({}, this); } });
+const ctx = {
+  self: { addEventListener: (n, f) => { horcher[n] = f; }, skipWaiting: async () => {}, clients: { claim: async () => {} } },
+  caches: { open: async name => kasten(name), keys: async () => Object.keys(ablage), delete: async n => { delete ablage[n]; } },
+  fetch: (anfrage) => {
+    const pfad = typeof anfrage === 'string' ? anfrage : new URL(anfrage.url).pathname;
+    if (netz === 'haengt') return new Promise(() => {});
+    if (netz === 'spaet') return new Promise(r => setTimeout(() => r(antwort(pfad, 'SPAET')), 2600));
+    return Promise.resolve(antwort(pfad, 'NETZ'));
+  },
+  URL, Promise, setTimeout, clearTimeout, Response: { error: () => ({ fehler: true }) }
+};
+require('vm').runInNewContext(quell, ctx);
+const warte = e => { let p; horcher.fetch(Object.assign(e, { respondWith: x => { p = x; }, waitUntil: () => {} })); return p; };
+const req = (pfad, mode) => ({ request: { url: 'https://macbook.local:8765' + pfad, mode: mode || 'navigate', method: 'GET' } });
+const mitZeit = async p => { const t = Date.now(); const r = await p; return [r, Date.now() - t]; };
+(async () => {
+  const f = [];
+  let w; horcher.install({ waitUntil: p => { w = p; } }); await w;
+  // 1. Mac hängt: Seite aus der Hülle nach ≤ ~2 s, dann i18n.js sofort
+  netz = 'haengt';
+  let [r, ms] = await mitZeit(warte(req('/mobile.html')));
+  if (!r || r.text !== 'NETZ /mobile.html') f.push('ohne Mac keine Hülle');
+  if (ms > 2600) f.push('Seite erst nach ' + ms + ' ms');
+  [r, ms] = await mitZeit(warte(req('/i18n.js', 'no-cors')));
+  if (!r || r.text !== 'NETZ /i18n.js') f.push('i18n.js nicht aus dem Speicher');
+  if (ms > 200) f.push('i18n.js erst nach ' + ms + ' ms (soll sofort)');
+  // 2. Mac wieder da → normal vom Mac
+  netz = 'an';
+  await warte(req('/mobile.html'));
+  // 3. Mac langsam (Antwort erst nach 2,6 s): Datei nach ≤ ~1,5 s aus dem Speicher …
+  netz = 'spaet';
+  [r, ms] = await mitZeit(warte(req('/i18n.js', 'no-cors')));
+  if (!r || r.text !== 'NETZ /i18n.js' || ms > 2000) f.push('langsamer Mac: i18n.js nach ' + ms + ' ms / ' + (r && r.text));
+  // … und die Seite nach ≤ ~2 s aus der Hülle; die verspätete Antwort landet danach in der Hülle
+  [r, ms] = await mitZeit(warte(req('/mobile.html')));
+  if (!r || r.text !== 'NETZ /mobile.html' || ms > 2600) f.push('langsamer Mac: Seite nach ' + ms + ' ms');
+  await new Promise(x => setTimeout(x, 1200));
+  const h = ablage['safari-assistant-huelle'];
+  if (!h || !h.get('/mobile.html') || h.get('/mobile.html').text !== 'SPAET /mobile.html') f.push('verspätete Seite frischt die Hülle nicht auf');
+  if (!h.get('/i18n.js') || h.get('/i18n.js').text !== 'SPAET /i18n.js') f.push('verspätete Datei frischt die Hülle nicht auf');
+  console.log(f.length ? 'FEHLER: ' + f.join(' | ') : 'OK');
+})().catch(e => console.log('FEHLER: ' + e.message));`;
+  const r = node72(skript);
+  return r === 'OK' || r || 'keine Ausgabe';
+});
+
+// =============================================
+console.log('\n=== 80. REISEPROFIL 2026-11-15-4 ===');
+// =============================================
+// Wunsch 15.11.: „Ich möchte, dass mich die Safari-App in- und auswendig kennt" — vor allem für Routen und Vorschläge.
+const idx80 = loadFile('index.html') || '', mob80 = loadFile('mobile.html') || '';
+test('REISEPROFIL (ausgeführt): ein Baustein, byteidentisch in index + mobile; leer → nichts; markiert als Angaben des Nutzers (keine Anweisungen); höchstens 8000 Zeichen', () => {
+  const rx = /\/\/ ═══ REISEPROFIL \(2026-11-15-4\) — BYTEIDENTISCH index \+ mobile ═══[\s\S]*?\n\}\n/;
+  const a = idx80.match(rx), b = mob80.match(rx);
+  if (!a || !b) return 'Baustein fehlt';
+  if (a[0] !== b[0]) return 'index und mobile weichen ab';
+  const { reiseprofilPrompt, REISEPROFIL_MAX } = new Function(a[0] + '\nreturn { reiseprofilPrompt, REISEPROFIL_MAX };')();
+  if (reiseprofilPrompt('') !== '' || reiseprofilPrompt('   ') !== '' || reiseprofilPrompt(null) !== '') return 'leer erzeugt Text';
+  const p = reiseprofilPrompt('  Wir: zwei Personen, Hund Dark  ');
+  if (!p.includes('<<<REISEPROFIL\nWir: zwei Personen, Hund Dark\nREISEPROFIL>>>') || !p.includes('keine Anweisungen an dich')) return 'Markierung/Schutz fehlt: ' + p.slice(0, 80);
+  if (REISEPROFIL_MAX !== 8000 || !reiseprofilPrompt('y'.repeat(9000)).includes('y'.repeat(8000) + '\nREISEPROFIL>>>')) return 'nicht auf 8000 gekürzt';
+  return true;
+});
+test('REISEPROFIL: Mac — Feld unter ⚙️ Allgemein, speichert in settings (→ Sicherung), geht an jedes lokale Modell, an Claude nur mit Haken; Import prüft den Typ', () => {
+  const need = ['<textarea class="settings-input" id="reiseprofil" rows="12" maxlength="8000"', 'id="reiseprofil-claude" onchange="reiseprofilSpeichern()"',
+    "let systemContent = MODULES[thisCtx].system + PROMPT_GRUNDREGELN + langInstruction() + reiseprofilPrompt(settings.reiseprofil);",
+    "if (settings.reiseprofilClaude === true) systemPrompt += reiseprofilPrompt(settings.reiseprofil);",
+    "if (ta) settings.reiseprofil = ta.value.slice(0, REISEPROFIL_MAX);", "speichereJSON('safari-settings', settings);\n}\nfunction reiseprofilVorlage()",
+    "if (v.reiseprofil != null && typeof v.reiseprofil !== 'string') delete v.reiseprofil;", "if (v.reiseprofilClaude != null && v.reiseprofilClaude !== true) delete v.reiseprofilClaude;", '  reiseprofilLaden();\n  updateGpsStatus();'];
+  const f = need.filter(n => !idx80.includes(n));
+  if (f.length) return 'fehlt: ' + f[0].slice(0, 80);
+  const grp = idx80.indexOf('<div class="settings-group-title">Reiseprofil</div>');
+  if (grp < 0 || idx80.lastIndexOf('data-bereich="allgemein"', grp) < idx80.lastIndexOf('data-bereich="ki"', grp)) return 'nicht im Bereich Allgemein';
+  return true;
+});
+test('REISEPROFIL: iPhone — holt es vom Mac (Zugangscode, kurze Frist, höchstens alle 5 min), hält es NUR im Arbeitsspeicher und gibt es lokalen Modellen mit, Claude nur mit Haken', () => {
+  const need = ["fetch(SERVER_URL + '/api/reiseprofil', { headers: zugangHeader(), cache: 'no-store', signal: ac.signal })",
+    "let systemContent = MODULES[thisCtx].system + PROMPT_GRUNDREGELN + langInstruction() + reiseprofilPrompt(reiseprofilMobil.text);",
+    "(reiseprofilMobil.claude ? reiseprofilPrompt(reiseprofilMobil.text) : '')", "if (Date.now() - reiseprofilMobil.geholt < 5 * 60 * 1000) return;",
+    "setTimeout(() => ac.abort(), 3000)", "if (macAntwortet && !zugangProblem) { ladeNotfallkarteMobil(); ladeReiseprofilMobil(); }"];
+  const f = need.filter(n => !mob80.includes(n));
+  if (f.length) return 'fehlt: ' + f[0].slice(0, 80);
+  const fn = fn72(mob80, 'ladeReiseprofilMobil') || '';
+  if (/localStorage|sessionStorage|indexedDB/.test(fn)) return 'Reiseprofil wird am iPhone gespeichert';
+  return true;
+});
+
+// =============================================
+console.log('\n=== 81. DOCK-SYMBOL 2026-11-15-4: natives Startprogramm statt Shell-Skript ===');
+// =============================================
+// Wunsch 15.11.: Klick auf das Dock-Symbol der laufenden App soll sie wieder nach vorn holen. Ein Shell-Skript als
+// Programmdatei kann das nicht (es empfängt die Dock-Ereignisse nicht) — app-starter.swift übernimmt das.
+const dep81 = loadFile('deploy.sh') || '', lau81 = loadFile('launcher_new.sh') || '', sw81 = loadFile('app-starter.swift') || '', bld81 = loadFile('build-app.sh') || '';
+test('DOCK (ausgeführt, deploy.sh-Block mit nachgebautem swiftc): übersetzt → Startprogramm ist die Programmdatei und launcher.sh liegt daneben; Übersetzung scheitert oder swiftc fehlt → das Skript bleibt die Programmdatei (wie bisher)', () => {
+  const a = dep81.indexOf('MACOS_DIR="$APP/Contents/MacOS"'), b = dep81.indexOf('# Offline-Bibliotheken (inkl. Lizenztexte)');
+  if (a < 0 || b < a) return 'Block in deploy.sh fehlt';
+  const block = dep81.slice(a, b);
+  const fs = require('fs'), os = require('os'), path = require('path'), cp = require('child_process');
+  const fehler = [];
+  for (const fall of ['gelingt', 'scheitert', 'fehlt']) {
+    const t = fs.mkdtempSync(path.join(os.tmpdir(), 'dock81-'));
+    const src = path.join(t, 'src'), app = path.join(t, 'X.app'), bin = path.join(t, 'bin');
+    fs.mkdirSync(src); fs.mkdirSync(path.join(app, 'Contents', 'MacOS'), { recursive: true }); fs.mkdirSync(bin);
+    fs.writeFileSync(path.join(src, 'launcher_new.sh'), '#!/bin/bash\necho skript\n');
+    fs.writeFileSync(path.join(src, 'app-starter.swift'), '// starter\n');
+    fs.writeFileSync(path.join(app, 'Contents', 'MacOS', 'X'), 'ALT');
+    if (fall !== 'fehlt') {
+      fs.writeFileSync(path.join(bin, 'swiftc'), fall === 'gelingt'
+        ? '#!/bin/sh\n# swiftc -O -o ZIEL QUELLE\nprintf "NATIV" > "$3"; chmod +x "$3"\n'
+        : '#!/bin/sh\necho "error: kaputt" >&2; exit 1\n');
+      fs.chmodSync(path.join(bin, 'swiftc'), 0o755);
+    }
+    // Nur die Werkzeuge, die der Block braucht — NICHT /usr/bin im Suchpfad: auf dem Mac liegt dort das echte swiftc
+    // (2026-11-15: so übersetzte der Fall „fehlt“ am Mac wirklich und der Test schlug fehl)
+    for (const w of ['cmp', 'cp', 'chmod', 'mv', 'rm', 'tail', 'file', 'grep', 'cat', 'sh']) {
+      const wo = cp.spawnSync('bash', ['-c', 'command -v ' + w], { encoding: 'utf8' }).stdout.trim();
+      if (wo && !fs.existsSync(path.join(bin, w))) fs.symlinkSync(wo, path.join(bin, w));
+    }
+    const sk = 'set -u\nSRC="' + src + '"\nAPP="' + app + '"\nEXE=X\nLAUNCHER_DST="$APP/Contents/MacOS/$EXE"\n' + block;
+    const env = Object.assign({}, process.env, { PATH: bin });
+    const bashPfad = cp.spawnSync('bash', ['-c', 'command -v bash'], { encoding: 'utf8' }).stdout.trim() || '/bin/bash';
+    const r = cp.spawnSync(bashPfad, ['-c', sk], { encoding: 'utf8', env });
+    const exe = fs.readFileSync(path.join(app, 'Contents', 'MacOS', 'X'), 'utf8');
+    const neben = fs.existsSync(path.join(app, 'Contents', 'MacOS', 'launcher.sh')) ? fs.readFileSync(path.join(app, 'Contents', 'MacOS', 'launcher.sh'), 'utf8') : '';
+    if (neben !== '#!/bin/bash\necho skript\n') fehler.push(fall + ': launcher.sh fehlt neben der Programmdatei');
+    if (fall === 'gelingt' && exe !== 'NATIV') fehler.push('gelingt: Programmdatei ist nicht das Startprogramm (' + exe.slice(0, 20) + ')');
+    if (fall !== 'gelingt' && exe !== '#!/bin/bash\necho skript\n') fehler.push(fall + ': Rückfall aufs Skript fehlt (' + exe.slice(0, 20) + ')');
+    if (fall === 'scheitert' && !/kaputt/.test(r.stdout)) fehler.push('scheitert: Fehlermeldung von swiftc wird nicht gezeigt');
+    if (fs.readdirSync(path.join(app, 'Contents', 'MacOS')).some(n => n.startsWith('.starter-neu') || n.endsWith('.neu') || n === '.launcher-neu')) fehler.push(fall + ': Zwischendatei liegen geblieben');
+    fs.rmSync(t, { recursive: true, force: true });
+  }
+  return !fehler.length || fehler.join(' | ');
+});
+test('DOCK: Startprogramm reagiert auf den Dock-Klick (Safari-Tab der App nach vorn, sonst Adresse öffnen), beendet beim „Beenden“ das Skript, endet mit dem Skript; nimmt nur eine lokale Adresse an; Skript legt die Adresse ab und endet mit dem Startprogramm', () => {
+  const need = ['func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool', 'func applicationWillTerminate(_ notification: Notification)',
+    'p.terminate()', '#selector(pruefeSkript)', 'Contents/MacOS/launcher.sh', 'umgebung["SAFARI_STARTER_PID"] = String(getpid())',
+    '"^http://(localhost|127\\\\.0\\\\.0\\\\.1):[0-9]{2,5}/[A-Za-z0-9._/-]*$"', 'NSWorkspace.shared.open(adresse)', 'withBundleIdentifier: "com.apple.Safari"', 'Library/Logs/Safari Assistant/app-adresse'];
+  const f = need.filter(n => !sw81.includes(n));
+  if (f.length) return 'app-starter.swift fehlt: ' + f[0];
+  if (/terminationHandler|DispatchQueue/.test(sw81)) return 'Closures über Threads (Übersetzungsrisiko) — Zeitgeber mit Selektor verwenden';
+  const needL = ['rm -f "$LOG_DIR/app-adresse"', "printf '%s\\n' \"$URL\" > \"$LOG_DIR/app-adresse\"", 'if [ -n "${SAFARI_STARTER_PID:-}" ]; then'];
+  const fl = needL.filter(n => !lau81.includes(n));
+  if (fl.length) return 'launcher_new.sh fehlt: ' + fl[0];
+  if (lau81.indexOf('trap cleanup SIGTERM SIGINT') > lau81.indexOf('if [ -n "${SAFARI_STARTER_PID:-}" ]; then')) return 'Wächter vor dem trap — Server bliebe beim Beenden liegen';
+  if (!bld81.includes('<key>NSAppleEventsUsageDescription</key>') || !dep81.includes("Add :NSAppleEventsUsageDescription string")) return 'Begründung für die Safari-Steuerung fehlt in der Info.plist';
+  return true;
+});
+
+// =============================================
+console.log('\n=== 82. WEBSUCHE: ORTSBEZUG, QUELLENREGELN, KÜRZUNG 2026-11-15-5 ===');
+// =============================================
+// Anlass 15.11.: Sicherheitslage „Kapstadt Flughafen“ — 27 Quellen inkl. Klickseiten und AA-Texten von 2019/2020, Antwort mitten im Satz abgeschnitten.
+const idx82 = loadFile('index.html') || '', mob82 = loadFile('mobile.html') || '';
+test('WEBSUCHE (ausgeführt): Baustein byteidentisch; Land → ISO-Code als user_location, Zeitzone nur afrikanisch; Sammelseiten gesperrt; Ablehnung von Ort/Sperrliste → ohne; Quellen: zitierte zuerst, Rest gezählt; Hinweis bei max_tokens/pause_turn', () => {
+  const rx = /\/\/ ═══ WEBSUCHE: ORTSBEZUG, QUELLENREGELN, KÜRZUNG \(2026-11-15-5\)[\s\S]*?\nfunction kuerzungsHinweis\(stopGrund\) \{[\s\S]*?\n\}\n/;
+  const a = idx82.match(rx), b = mob82.match(rx);
+  if (!a || !b) return 'Baustein fehlt';
+  if (a[0] !== b[0]) return 'index und mobile weichen ab';
+  const api = (tz) => new Function('Intl', 'uiMulti', a[0] + '\nreturn { suchWerkzeug, suchOrtEntfernen, quellenText, kuerzungsHinweis, LAND_ISO, get abgelehnt() { return suchOrtAbgelehnt; } };')(
+    { DateTimeFormat: () => ({ resolvedOptions: () => ({ timeZone: tz }) }) }, t => t);
+  let x = api('Africa/Johannesburg');
+  let w = x.suchWerkzeug('Südafrika');
+  if (JSON.stringify(w.user_location) !== '{"type":"approximate","country":"ZA","timezone":"Africa/Johannesburg"}') return 'Ort: ' + JSON.stringify(w.user_location);
+  if (!w.blocked_domains.includes('thetravel.com') || !w.blocked_domains.includes('zvei.org') || w.allowed_domains) return 'Sperrliste';
+  if (Object.keys(x.LAND_ISO).length !== 17) return 'nicht alle 16 Länder (+ Schreibweise Simbabwe)';
+  x = api('Europe/Berlin');
+  if (JSON.stringify(x.suchWerkzeug('Kenia').user_location) !== '{"type":"approximate","country":"KE"}') return 'europäische Zeitzone mitgeschickt';
+  if (x.suchWerkzeug('').user_location) return 'Ort ohne Land und ohne afrikanische Zeitzone';
+  w = x.suchWerkzeug('Kenia');
+  if (x.suchOrtEntfernen([w], 'max_tokens: too large')) return 'fremder Fehler entfernt etwas';
+  if (!x.suchOrtEntfernen([w], 'user_location.country: unsupported') || w.user_location || !x.abgelehnt) return 'Ort nicht entfernt';
+  if (x.suchWerkzeug('Kenia').user_location) return 'nach Ablehnung weiter mit Ort';
+  if (!x.suchOrtEntfernen([w], 'blocked_domains: invalid domain') || w.blocked_domains) return 'Sperrliste nicht entfernt';
+  const g = [{ title: 'A', url: 'https://a' }, { title: 'B', url: 'https://b' }, { title: 'C', url: 'https://c' }, { title: 'A', url: 'https://a' }];
+  let q = x.quellenText(g, [{ title: 'B', url: 'https://b' }, { title: 'B', url: 'https://b' }]);
+  if (!q.includes('Quellen (in der Antwort zitiert):\n1. B\n   https://b') || q.includes('https://a\n') || !q.includes('(+2 weitere Suchtreffer, nicht zitiert)')) return 'zitierte Quellen: ' + JSON.stringify(q);
+  q = x.quellenText(g, []);
+  if (!q.includes('Suchtreffer (nicht einzeln zitiert):') || (q.match(/https:\/\/a/g) || []).length !== 1) return 'ohne Zitate: ' + JSON.stringify(q);
+  if (x.quellenText([], []) !== '') return 'leer';
+  if (!x.kuerzungsHinweis('max_tokens').includes('Längengrenze') || !x.kuerzungsHinweis('pause_turn').includes('unterbrochen') || x.kuerzungsHinweis('end_turn') !== '') return 'Kürzungshinweis';
+  return true;
+});
+test('WEBSUCHE: Mac und iPhone nutzen den Baustein — Quellenregeln (Sicherheitslage + Ortsbezug), 4096 Tokens, Zitate und stop_reason aus dem Strom, Hinweis + Quellen an der Antwort', () => {
+  const nI = ["if (usesWebSearch) systemPrompt += SUCHE_QUELLENREGELN + (isSicherheit ? SUCHE_SICHERHEIT_REGELN : '');", '(usesWebSearch ? 4096 : 1024)',
+    "const tools = usesWebSearch ? [suchWerkzeug(landRW ? landRW.name : '')] : undefined;", "ev.delta.type === 'citations_delta'", 'if (ev.delta && ev.delta.stop_reason) stopGrund = ev.delta.stop_reason;',
+    'reply += kuerzungsHinweis(stopGrund) + quellenText(sources, zitiert);', 'if (suchOrtEntfernen(requestBody.tools, fehlerText)) continue;'];
+  const fi = nI.filter(n => !idx82.includes(n));
+  if (fi.length) return 'index fehlt: ' + fi[0];
+  const nM = ['if (isSicherheit) systemPrompt += SUCHE_QUELLENREGELN + SUCHE_SICHERHEIT_REGELN;', 'max_tokens: isSicherheit ? 4096 : 1024,', "body.tools = [suchWerkzeug(landM ? landM.name : '')];",
+    "ev.delta.type === 'citations_delta'", 'reply += kuerzungsHinweis(stopGrund) + quellenText(gefunden, zitiert);', 'if (suchOrtEntfernen(body.tools, fehlerText)) continue;'];
+  const fm = nM.filter(n => !mob82.includes(n));
+  if (fm.length) return 'mobile fehlt: ' + fm[0];
+  if (/max_uses: 5 \}\]/.test(idx82 + mob82)) return 'altes Suchwerkzeug ohne Ort/Sperrliste noch im Einsatz';
+  return true;
+});
+
+// =============================================
+console.log('\n=== 83. OHNE TOKENS: IN DEINER NÄHE, LAGE HIER, BOTSCHAFTEN, WARNGEBIETE AUTOMATISCH 2026-11-15-6 ===');
+// =============================================
+const idx83 = loadFile('index.html') || '', mob83 = loadFile('mobile.html') || '', srv83 = loadFile('server.py') || '', poi83 = loadFile('pois.html') || '';
+test('NÄHE (ausgeführt): Baustein byteidentisch; nur Meldungen mit Ort ≤ 250 km aus den letzten 14 Tagen, wichtige zuerst, dann nach Abstand; Nummern [n] in Liste und Prompt; Prompt nur aus den Meldungen; alte Zusammenfassung wird als veraltet erkannt; alles maskiert', () => {
+  const rx = /\/\/ ── IN DEINER NÄHE \(2026-11-15-6, BYTEIDENTISCH in index\.html und mobile\.html\) ──\n[\s\S]*?\/\/ ── ENDE IN DEINER NÄHE ──/;
+  const a = idx83.match(rx), b = mob83.match(rx);
+  if (!a || !b) return 'Baustein fehlt';
+  if (a[0] !== b[0]) return 'index und mobile weichen ab';
+  const km = idx83.match(/function kmAbstand\(lat1, lng1, lat2, lng2\) \{[\s\S]*?\n\}/);
+  if (!km) return 'kmAbstand fehlt';
+  const nachrichtHtml = (e) => `<M ${e._naehe ? e._naehe.name + '|' + Math.round(e._naehe.km) : ''}>${e.titel}</M>`;
+  const esc = t => String(t).replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0) + ';');
+  const x = new Function('nachrichtHtml', 'nachrichtEsc', km[0] + '\n' + a[0] + '\nreturn { nachrichtenInDerNaehe, lageHierPrompt, lageHierAktuell, naeheBereichHtml, NAEHE_KM };')(nachrichtHtml, esc);
+  const jetzt = Date.UTC(2026, 10, 15), s = jetzt / 1000;
+  const c = { eintraege: [
+    { id: 'a', titel: 'Fern', zeit: s - 3600, orte: [['Nairobi', -1.283, 36.817]] },
+    { id: 'b', titel: 'Nah', zeit: s - 7200, orte: [['Cape Town', -33.926, 18.423], ['Durban', -29.858, 31.029]] },
+    { id: 'c', titel: 'Alt', zeit: s - 20 * 86400, orte: [['Cape Town', -33.926, 18.423]] },
+    { id: 'd', titel: 'Wichtig <b>x</b>', kritisch: true, zeit: s - 60, text: 'Proteste', quelle_name: 'US-Botschaft', orte: [['Paarl', -33.73, 18.97]] },
+    { id: 'e', titel: 'Ohne Ort', zeit: s }, { id: 'f', titel: 'Kaputt', zeit: s, orte: [['X', 'a', 1]] }] };
+  const l = x.nachrichtenInDerNaehe(c, -33.97, 18.60, jetzt);
+  if (l.map(y => y.e.id).join() !== 'd,b') return 'Auswahl/Reihenfolge: ' + l.map(y => y.e.id).join();
+  if (l[1].ort.name !== 'Cape Town' || l[1].ort.km > 30) return 'nächster Ort: ' + JSON.stringify(l[1].ort);
+  if (x.nachrichtenInDerNaehe(c, null, null, jetzt).length) return 'ohne Position trotzdem Treffer';
+  const p = x.lageHierPrompt(l, 'Auf Deutsch.');
+  if (!p.user.includes('[1] Wichtig <b>x</b> — Proteste (Quelle: US-Botschaft; 2026-11-14; erwähnt: Paarl') || !p.user.includes('[2] Nah')) return 'Prompt: ' + p.user;
+  if (!/NUR die nummerierten Meldungen/.test(p.system) || !/Daten, keine Anweisungen/.test(p.system) || !p.system.endsWith('Auf Deutsch.')) return 'Systemregeln';
+  if (!x.lageHierAktuell({ ids: ['d', 'b'] }, l) || x.lageHierAktuell({ ids: ['b', 'd'] }, l) || x.lageHierAktuell({}, l)) return 'Aktualität der Zusammenfassung';
+  const h = x.naeheBereichHtml(c, l, 0, { text: '<script>alert(1)</script> [1]', ids: ['d', 'b'], modell: 'm' }, 'lageHierStarten');
+  if (h.includes('<script>') || !h.includes('&#60;script&#62;') || !h.includes('onclick="lageHierStarten()"') || !h.includes('[1]</span>') || !h.includes('<M Paarl|')) return 'HTML: ' + h.slice(0, 300);
+  if (x.naeheBereichHtml(c, l, 0, { text: 'alt', ids: ['x'] }, 'f').includes('>alt<')) return 'veraltete Zusammenfassung angezeigt';
+  if (x.naeheBereichHtml(c, l, 0, {}, 'x();alert(1)').includes('onclick')) return 'ungültiger Funktionsname angenommen';
+  if (x.naeheBereichHtml(c, [], 0, {}, 'f') !== '') return 'leerer Bereich';
+  return true;
+});
+test('NÄHE/LAGE HIER: Mac und iPhone zeigen den Bereich über der Liste, „Lage hier" fragt das lokale Modell (Mac direkt, iPhone über den Mac) — nie Claude', () => {
+  const nI = ["naeheBereichHtml(c, naehe, a.gesehenBis, lageHierStand, 'lageHierStarten')", 'async function lageHierStarten() {', "getOllamaUrl() + '/api/chat'", "getModel('navigation')"];
+  const nM = ["lageHierStand, 'lageHierStartenMobil')", 'async function lageHierStartenMobil() {', "OLLAMA_URL + '/api/chat'", "zugangHeader({ 'Content-Type': 'application/json' })", "effectiveModel('navigation')"];
+  const fi = nI.filter(n => !idx83.includes(n)), fm = nM.filter(n => !mob83.includes(n));
+  if (fi.length || fm.length) return 'fehlt: ' + (fi[0] || fm[0]);
+  for (const [name, q, start] of [['index', idx83, 'async function lageHierStarten() {'], ['mobile', mob83, 'async function lageHierStartenMobil() {']]) {
+    const f = q.slice(q.indexOf(start), q.indexOf('\n}\n', q.indexOf(start)));
+    if (/anthropic|x-api-key|claude/i.test(f.replace(/Claude-Tokens/g, ''))) return name + ': Lage hier ruft Claude';
+  }
+  return mob83.includes("(e._naehe ? `<span style=\"color:var(--accent4)\">📍") || 'Ortsmarke an der Meldung fehlt';
+});
+test('BOTSCHAFTEN + ORTE (Server): US-Botschaft je Land mit Titelfilter; /api/nachrichten liefert je Meldung die erwähnten Orte aus dem Offline-Verzeichnis', () => {
+  const need = ["'url': f'https://{c.lower()}.usembassy.gov/category/alert/feed/'", "'nur_titel': 'botschaft'",
+    "if quelle.get('nur_titel') == 'botschaft' and not BOTSCHAFT_WARNUNG_RE.search(titel):", 'def orte_in_meldung(text, laender, maximal=4):',
+    "orte=orte_in_meldung((e.get('titel') or '') + ' ' + (e.get('text') or ''), e.get('laender') or [])", 'ORTE_NAMEN_MIN_POP = 1000'];
+  const f = need.filter(n => !srv83.includes(n));
+  return !f.length || 'fehlt: ' + f[0];
+});
+test('WARNGEBIETE AUTOMATISCH: die Wache prüft alle 10 Min., ob Flächen zum Warntext passen (Nachziehen höchstens alle 6 h); Mac zeigt den Stand; iPhone behält die Flächen ohne Mac; keine Aufforderung mehr, das Skript von Hand zu starten', () => {
+  if (!srv83.includes("elif not WARNZONEN_STATE['laeuft'] and time.time() - WARNZONEN_STATE.get('geprueft', 0) >= 600:")) return 'Wache prüft die Flächen nicht';
+  if (!idx83.includes('${warnzonenStandHtml(c && c.warnzonen)}') || !idx83.includes('function warnzonenStandHtml(wz) {')) return 'Mac zeigt den Stand nicht';
+  for (const q of [idx83, mob83, poi83]) if (!q.includes('warnzonen: (j && j.warnzonen) || null };')) return 'Stand wird nicht gespeichert';
+  const m = ["const WARNZONEN_SPEICHER = 'safari-assistant-daten', WARNZONEN_PFAD = '/data/warnzonen.geojson';", '.put(WARNZONEN_PFAD, kopie)', '.match(WARNZONEN_PFAD)',
+    'WARNZONEN_AUS_SPEICHER = true;', "AbortSignal.timeout(8000)", 'auf dem iPhone gespeichert'];
+  const fm = m.filter(n => !mob83.includes(n));
+  if (fm.length) return 'iPhone: ' + fm[0];
+  if (/Einmalig mit Internet: <code>python3 fetch-warnzonen\.py<\/code>|Grenzen holen: <code>/.test(idx83 + poi83)) return 'alte Handstart-Anweisung noch da';
+  return true;
+});
+
+// =============================================
+console.log('\n=== 84. ORTS-KONTAKTE IM 🚨-BLATT 2026-11-21-1 — eigene Nummern je Ort, erscheinen im Umkreis ===');
+// =============================================
+// Wunsch 21.11.: lokale Sicherheitsdienste GPS-abhängig anzeigen. Kein mitgeliefertes Verzeichnis (gibt es nicht verlässlich,
+// Firmen kommen meist nur zu Kunden) — man trägt selbst ein, was vor Ort genannt wird. Testnummern aus dem britischen
+// Bereich für Film/Fernsehen (Ofcom 020 7946 0xxx) — keine echten Anschlüsse.
+const mob84 = loadFile('mobile.html');
+const js84 = mob84 ? mob84.slice(mob84.indexOf('<script>', mob84.lastIndexOf('</style>'))) : '';
+function ortsk84(pos) {
+  const namen = ['kmAbstand', 'nachrichtEsc', 'ortskNummer', 'ortskLesen', 'ortskNeueId', 'ortskDatum', 'ortskKm', 'ortskSortiert', 'ortskPosition', 'ortskEintrag',
+    'ortskBlockMobil', 'ortskZeigen', 'ortskEntwurfMerken', 'ortskInhalt', 'ortskNeu', 'ortskBearbeiten', 'ortskEditor', 'ortskSpeichern', 'ortskLoeschen'];
+  const q = namen.map(n => fn72(js84, n) || einzeiler72(js84, n));
+  const fehlt = namen.filter((n, i) => !q[i]);
+  if (fehlt.length) return { fehler: 'fehlt: ' + fehlt.join(',') };
+  const konst = ["const ORTSK_KEY = 'safari-mobile-ortskontakte';", 'const ORTSK_MAX = 60;', 'const ORTSK_RADIEN = [2, 5, 10, 25, 50, 100];',
+    "const ortskStand = { modus: 'start', id: '', loeschen: '', entwurf: null };"];
+  for (const k of konst) if (!js84.includes(k)) return { fehler: 'Konstante fehlt: ' + k };
+  const speicher = {}, toasts = [];
+  const ls = { getItem: k => (k in speicher ? speicher[k] : null), setItem: (k, v) => { speicher[k] = String(v); } };
+  const els = {};
+  const doc = { getElementById: id => els[id] || null };
+  const mSettings = pos ? { userLat: pos[0], userLng: pos[1], userLocationTime: Date.now() - (pos[2] || 0) * 60000 } : {};
+  const api = new Function('localStorage', 'document', 'uiMulti', 'showToast', 'mSettings',
+    konst.join('\n') + '\n' + q.join('\n') + '\nreturn { ortskNummer, ortskLesen, ortskKm, ortskSortiert, ortskInhalt, ortskBlockMobil, ortskZeigen, ortskNeu, ortskBearbeiten, ortskSpeichern, ortskLoeschen, ortskStand, ORTSK_KEY };')(
+    ls, doc, t => t, t => toasts.push(t), mSettings);
+  return { api, speicher, els, toasts, mSettings };
+}
+// Formularfelder wie im Browser (nur value/checked/textContent)
+function felder84(r, werte) {
+  for (const [id, v] of Object.entries(werte)) r.els[id] = typeof v === 'boolean' ? { checked: v, value: '' } : { value: String(v) };
+  r.els['ortsk-fehler'] = { textContent: '' };
+  r.els['ortsk-box'] = { innerHTML: '' };
+}
+const KAPSTADT84 = [-33.9249, 18.4241], CAMPS_BAY84 = [-33.9510, 18.3776], STELLENBOSCH84 = [-33.9321, 18.8602];
+
+test('ORTS-KONTAKTE (ausgeführt): Nummern mit „+"/„00" werden zu „+…", Landesformat („020 7946 0123", „10111") bleibt erlaubt; Buchstaben, „+0…", zu lange und leere Eingaben werden abgelehnt', () => {
+  const r = ortsk84(KAPSTADT84); if (r.fehler) return r.fehler;
+  const n = r.api.ortskNummer;
+  const gut = [['+44 20 7946 0000', '+442079460000'], ['0044 (20) 7946-0000', '+442079460000'], ['020 7946 0123', '02079460123'], ['10111', '10111'], ['020.7946.0123', '02079460123']];
+  for (const [ein, aus] of gut) if (n(ein) !== aus) return `${ein} → ${n(ein)} statt ${aus}`;
+  for (const schlecht of ['', null, '12', '+0 123 4567', '+44 20 SOS', 'javascript:alert(1)', '+4420794600001234567', '1234567890123456'])
+    if (n(schlecht) !== '') return `angenommen: ${schlecht} → ${n(schlecht)}`;
+  return true;
+});
+
+test('ORTS-KONTAKTE (ausgeführt): neu speichern legt den Kontakt an der GPS-Position ab; im Umkreis steht er mit tel:-Knopf, außerhalb nur „Nächster Eintrag … km"', () => {
+  const r = ortsk84(KAPSTADT84); if (r.fehler) return r.fehler;
+  r.api.ortskNeu();
+  felder84(r, { 'ortsk-name': 'Security Campingplatz', 'ortsk-nr': '+44 20 7946 0001', 'ortsk-notiz': 'kommt auch zu Gästen', 'ortsk-radius': '10' });
+  r.api.ortskSpeichern();
+  if (r.els['ortsk-fehler'].textContent) return 'Fehler: ' + r.els['ortsk-fehler'].textContent;
+  const d = JSON.parse(r.speicher[r.api.ORTSK_KEY] || '{}');
+  if (!d.kontakte || d.kontakte.length !== 1) return 'nicht gespeichert: ' + r.speicher[r.api.ORTSK_KEY];
+  const k = d.kontakte[0];
+  if (k.lat !== -33.9249 || k.lng !== 18.4241 || k.radius !== 10 || k.nummer !== '+44 20 7946 0001' || !/^k[a-z0-9]+$/.test(k.id) || !k.zeit) return 'Eintrag: ' + JSON.stringify(k);
+  if (r.api.ortskStand.modus !== 'start' || !r.toasts.some(t => /gespeichert/.test(t))) return 'kein Abschluss';
+  const hier = r.api.ortskInhalt();
+  if (!hier.includes('href="tel:+442079460001"') || !hier.includes('Security Campingplatz') || !hier.includes('kommt auch zu Gästen')) return 'im Umkreis nicht angezeigt';
+  if (hier.includes('nur mit SIM-Karte')) return 'Hinweis „nur mit SIM" bei +-Nummer';
+  // ~5 km weiter (Camps Bay) liegt noch im 10-km-Umkreis; Stellenbosch (~40 km) nicht mehr
+  const r2 = ortsk84(CAMPS_BAY84); r2.speicher[r2.api.ORTSK_KEY] = r.speicher[r.api.ORTSK_KEY];
+  if (!r2.api.ortskInhalt().includes('href="tel:+442079460001"')) return 'Camps Bay: nicht im Umkreis';
+  const r3 = ortsk84(STELLENBOSCH84); r3.speicher[r3.api.ORTSK_KEY] = r.speicher[r.api.ORTSK_KEY];
+  const weg = r3.api.ortskInhalt();
+  if (weg.includes('href="tel:') || !weg.includes('Für diesen Ort ist nichts gespeichert.') || !/Nächster Eintrag:[\s\S]*Security Campingplatz[\s\S]*\d+ km/.test(weg)) return 'Stellenbosch: ' + weg.slice(0, 300);
+  return true;
+});
+
+test('ORTS-KONTAKTE (ausgeführt): Landesformat bekommt den Hinweis „nur mit SIM-Karte dieses Landes"; mehrere Treffer stehen nach Abstand; Name/Nummer/Notiz werden maskiert und nicht übersetzt (data-i18n-skip)', () => {
+  const r = ortsk84(KAPSTADT84); if (r.fehler) return r.fehler;
+  r.speicher[r.api.ORTSK_KEY] = JSON.stringify({ v: 1, kontakte: [
+    { id: 'kfern', name: 'Fern', nummer: '020 7946 0123', notiz: '', lat: CAMPS_BAY84[0], lng: CAMPS_BAY84[1], radius: 10, zeit: 1 },
+    { id: 'knah', name: '<img src=x onerror=alert(1)>', nummer: '+44 20 7946 0002', notiz: '"><script>x</script>', lat: KAPSTADT84[0], lng: KAPSTADT84[1], radius: 2, zeit: 2 }] });
+  const h = r.api.ortskInhalt();
+  if (/<img|<script/.test(h)) return 'nicht maskiert';
+  if (!h.includes('&lt;img src=x onerror=alert(1)&gt;')) return 'Name fehlt';
+  if (h.indexOf('tel:+442079460002') < 0 || h.indexOf('tel:02079460123') < 0 || h.indexOf('tel:+442079460002') > h.indexOf('tel:02079460123')) return 'Reihenfolge nach Abstand falsch';
+  if (!h.includes('wählbar nur mit SIM-Karte dieses Landes')) return 'SIM-Hinweis fehlt';
+  if ((h.match(/data-i18n-skip/g) || []).length < 5) return 'Nutzertext ohne data-i18n-skip';
+  return true;
+});
+
+test('ORTS-KONTAKTE (ausgeführt): Fehler im Formular — ohne Name, unlesbare Nummer, ohne GPS → nichts gespeichert, Meldung im Formular', () => {
+  const r = ortsk84(KAPSTADT84); if (r.fehler) return r.fehler;
+  r.api.ortskNeu();
+  felder84(r, { 'ortsk-name': '', 'ortsk-nr': '+44 20 7946 0003', 'ortsk-notiz': '', 'ortsk-radius': '10' }); r.api.ortskSpeichern();
+  if (!/Namen/.test(r.els['ortsk-fehler'].textContent)) return 'ohne Name: ' + r.els['ortsk-fehler'].textContent;
+  felder84(r, { 'ortsk-name': 'X', 'ortsk-nr': 'Hilfe', 'ortsk-notiz': '', 'ortsk-radius': '10' }); r.api.ortskSpeichern();
+  if (!/Nummer nicht lesbar/.test(r.els['ortsk-fehler'].textContent)) return 'Nummer: ' + r.els['ortsk-fehler'].textContent;
+  if (r.speicher[r.api.ORTSK_KEY] !== undefined) return 'trotz Fehler gespeichert';
+  const o = ortsk84(null); o.api.ortskNeu();
+  if (!o.api.ortskInhalt().includes('Keine GPS-Position')) return 'Formular ohne GPS-Hinweis';
+  felder84(o, { 'ortsk-name': 'X', 'ortsk-nr': '+44 20 7946 0003', 'ortsk-notiz': '', 'ortsk-radius': '10' }); o.api.ortskSpeichern();
+  if (!/Keine GPS-Position/.test(o.els['ortsk-fehler'].textContent) || o.speicher[o.api.ORTSK_KEY] !== undefined) return 'ohne GPS gespeichert';
+  o.api.ortskStand.modus = 'start';
+  if (!o.api.ortskInhalt().includes('Keine GPS-Position — oben')) return 'Startansicht ohne GPS-Hinweis';
+  return true;
+});
+
+test('ORTS-KONTAKTE (ausgeführt): Bearbeiten behält den Ort (außer „Ort auf meine aktuelle Position setzen"), Löschen braucht zwei Tipps; alte Position (> 30 Min.) wird im Formular gewarnt', () => {
+  const r = ortsk84(STELLENBOSCH84); if (r.fehler) return r.fehler;
+  r.speicher[r.api.ORTSK_KEY] = JSON.stringify({ v: 1, kontakte: [{ id: 'kalt', name: 'Alt', nummer: '+44 20 7946 0004', notiz: '', lat: KAPSTADT84[0], lng: KAPSTADT84[1], radius: 10, zeit: 5 }] });
+  r.api.ortskBearbeiten('kalt');
+  const form = r.api.ortskInhalt();
+  if (!form.includes('value="Alt"') || !form.includes('id="ortsk-hier"') || !form.includes('-33.92490, 18.42410')) return 'Formular nicht vorbelegt';
+  felder84(r, { 'ortsk-name': 'Neu', 'ortsk-nr': '+44 20 7946 0005', 'ortsk-notiz': 'n', 'ortsk-radius': '25', 'ortsk-hier': false }); r.api.ortskSpeichern();
+  let k = JSON.parse(r.speicher[r.api.ORTSK_KEY]).kontakte;
+  if (k.length !== 1 || k[0].id !== 'kalt' || k[0].name !== 'Neu' || k[0].lat !== KAPSTADT84[0] || k[0].radius !== 25 || k[0].zeit !== 5) return 'bearbeitet: ' + JSON.stringify(k);
+  r.api.ortskBearbeiten('kalt');
+  felder84(r, { 'ortsk-name': 'Neu', 'ortsk-nr': '+44 20 7946 0005', 'ortsk-notiz': 'n', 'ortsk-radius': '25', 'ortsk-hier': true }); r.api.ortskSpeichern();
+  k = JSON.parse(r.speicher[r.api.ORTSK_KEY]).kontakte;
+  if (k[0].lat !== STELLENBOSCH84[0] || k[0].lng !== STELLENBOSCH84[1]) return 'Ort nicht neu gesetzt';
+  r.api.ortskStand.modus = 'alle'; r.api.ortskStand.loeschen = 'kalt';
+  if (!r.api.ortskInhalt().includes("ortskLoeschen('kalt')")) return 'Rückfrage fehlt';
+  r.els['ortsk-box'] = { innerHTML: '' }; r.api.ortskLoeschen('kalt');
+  if (JSON.parse(r.speicher[r.api.ORTSK_KEY]).kontakte.length !== 0) return 'nicht gelöscht';
+  const alt = ortsk84(KAPSTADT84.concat([45])); alt.api.ortskNeu();
+  if (!alt.api.ortskInhalt().includes('älter als 30 Minuten')) return 'keine Warnung bei alter Position';
+  return true;
+});
+
+test('ORTS-KONTAKTE (ausgeführt): kaputter Speicher stürzt nicht ab; ungültige Einträge (ohne Koordinaten/Nummer, fremde id, Radius) werden aussortiert bzw. auf 10 km gesetzt; Eingaben im Formular überleben ein Neuzeichnen', () => {
+  const r = ortsk84(KAPSTADT84); if (r.fehler) return r.fehler;
+  for (const kaputt of ['{', 'null', '[]', '{"kontakte":5}', '{"kontakte":[null,1,"x"]}']) {
+    r.speicher[r.api.ORTSK_KEY] = kaputt;
+    try { if (r.api.ortskLesen().length !== 0) return 'Einträge aus ' + kaputt; r.api.ortskInhalt(); } catch (e) { return 'Absturz bei ' + kaputt + ': ' + e.message; }
+  }
+  r.speicher[r.api.ORTSK_KEY] = JSON.stringify({ kontakte: [{ id: "a');alert(1);//", name: 'A', nummer: '+44 20 7946 0006', lat: 1, lng: 2, radius: 7 },
+    { name: 'B', nummer: 'abc', lat: 1, lng: 2 }, { name: 'C', nummer: '+44 20 7946 0007', lat: 'x', lng: 2 }, { name: 'D', nummer: '+44 20 7946 0008', lat: 95, lng: 2 }] });
+  const l = r.api.ortskLesen();
+  if (l.length !== 1 || l[0].id !== 'x0' || l[0].radius !== 10) return 'aussortiert: ' + JSON.stringify(l);
+  r.api.ortskNeu();
+  r.els['ortsk-name'] = { value: 'Halb getippt' }; r.els['ortsk-nr'] = { value: '+44' }; r.els['ortsk-notiz'] = { value: '' }; r.els['ortsk-radius'] = { value: '50' };
+  const neu = r.api.ortskBlockMobil();
+  if (!neu.includes('value="Halb getippt"') || !neu.includes('<option value="50" selected>')) return 'Entwurf verloren';
+  return true;
+});
+
+test('ORTS-KONTAKTE: renderNotruf zeigt den Block direkt unter den Landesnummern (danach Wachen aus OSM, Parks und Ranger, dann Reisewarnungen); CSS mit 16-px-Feldern und 44/56-px-Tippflächen; Hinweis, dass Firmen oft nur zu Kunden kommen; Manifest-Eintrag', () => {
+  if (!mob84.includes("  html += ortskBlockMobil();   // 2026-11-21-1: eigene Orts-Kontakte direkt unter den Landesnummern\n  html += nkoBlockMobil();     // 2026-11-21-2: Wachen und Dienste aus OpenStreetMap\n  html += parkBlockMobil();    // 2026-11-22-1: Parks und Ranger (recherchierte Liste mit Quellen)\n  html += reisewarnBlockMobil(land);")) return 'Einbindung fehlt';
+  for (const c of ['.ortsk-box input:not([type="checkbox"]), .ortsk-box textarea, .ortsk-box select {', 'font-size: 16px; }', '.ortsk-knopf { display: flex;', 'min-height: 56px;', '.ortsk-label { display: flex; align-items: center; gap: 8px; min-height: 44px;'])
+    if (!mob84.includes(c)) return 'CSS fehlt: ' + c;
+  if (!mob84.includes("uiMulti('Private Sicherheitsfirmen kommen oft nur zu eigenen Kunden.")) return 'Hinweis fehlt';
+  const man = JSON.parse(loadFile('features-manifest.json') || '{}');
+  const e = (man.features || []).find(f => f.file === 'mobile.html' && /2026-11-21-1/.test(f.name));
+  if (!e) return 'Manifest-Eintrag fehlt';
+  return e.contains.every(c => mob84.includes(c)) || 'Manifest passt nicht zum Code';
+});
+
+// =============================================
+console.log('\n=== 85. WACHEN UND DIENSTE AUS OPENSTREETMAP 2026-11-21-2 — fetch-notfallkontakte.py + 🚨-Blatt ===');
+// =============================================
+// Wunsch 21.11.: Nummern lokaler Stellen für alle Reiseländer. Amtliche Wachen-Listen gibt es nur in wenigen Ländern
+// (ZA, BW, MW auf Stationsebene) — darum OSM für alle 16, amtliche Listen vorerst nur als Rohabruf.
+// Testnummern: Ofcom-Bereich für Film/Fernsehen (020 7946 0xxx), keine echten Anschlüsse.
+const mob85 = loadFile('mobile.html'), srv85 = loadFile('server.py'), dep85 = loadFile('deploy.sh'), fnk85 = loadFile('fetch-notfallkontakte.py');
+const js85 = mob85 ? mob85.slice(mob85.indexOf('<script>', mob85.lastIndexOf('</style>'))) : '';
+function nko85(opt = {}) {
+  const namen = ['kmAbstand', 'nachrichtEsc', 'telHtml', 'ortskNummer', 'ortskKm', 'ortskPosition', 'nkoGueltig', 'ladeNotfallstellenMobil', 'nkoAuswahl', 'nkoBlockMobil', 'nkoZeigen', 'nkoInhalt'];
+  const q = namen.map(n => fn72(js85, n) || einzeiler72(js85, n));
+  const fehlt = namen.filter((n, i) => !q[i]);
+  if (fehlt.length) return { fehler: 'fehlt: ' + fehlt.join(',') };
+  const konst = ["const NKO_PFAD = '/data/notfallkontakte.json';", 'const NKO_RADIUS_KM = 100;',
+    "const NKO_ARTEN = { p: '🚓 Polizei', f: '🚒 Feuerwehr', r: '🦏 Ranger', s: '🛡 Sicherheitsfirma', a: '🚑 Rettungswache', w: '⚓ Seenotrettung' };",
+    "const nkoStand = { daten: null, ausSpeicher: false, laedt: false, versucht: false };"];
+  for (const k of konst) if (!js85.includes(k)) return { fehler: 'Konstante fehlt: ' + k };
+  const cache = opt.cache || {};
+  const caches = { open: async () => ({ match: async k => (k in cache ? { json: async () => JSON.parse(cache[k]) } : undefined), put: async (k, r) => { cache[k] = await r.text(); } }) };
+  const fetch = opt.fetch || (async () => { throw new Error('offline'); });
+  const els = { 'nko-box': { innerHTML: '' } };
+  const mSettings = opt.pos ? { userLat: opt.pos[0], userLng: opt.pos[1], userLocationTime: Date.now() } : {};
+  const api = new Function('caches', 'fetch', 'document', 'uiMulti', 'mSettings', 'aktivesLand', 'AbortSignal', 'SERVER_URL', 'WARNZONEN_SPEICHER',
+    konst.join('\n') + '\n' + q.join('\n') + '\nreturn { ladeNotfallstellenMobil, nkoAuswahl, nkoInhalt, nkoBlockMobil, nkoStand };')(
+    caches, fetch, { getElementById: id => els[id] || null }, t => t, mSettings, () => (opt.land ? { name: opt.land } : null),
+    { timeout: () => undefined }, 'https://127.0.0.1:8765', 'safari-assistant-daten');
+  return { api, cache, els, quelle: konst.join('\n') + '\n' + q.join('\n') };
+}
+const ANTWORT85 = (d) => ({ ok: true, clone() { const t = JSON.stringify(d); return { text: async () => t }; }, json: async () => d });
+const DATEN85 = { stand: '2026-11-21', k: [
+  [-26.2041, 28.0473, 'p', 'Wache ohne Nummer', '', 'ZA'],                        // 0 km
+  [-26.21, 28.06, 'p', 'Wache A', '+44 20 7946 0011', 'ZA'],                    // ~1 km
+  [-26.31, 28.12, 'p', 'Wache B', '020 7946 0012; 020 7946 0013', 'ZA'],        // ~13 km
+  [-26.41, 28.22, 'p', 'Wache C', '+44 20 7946 0014', 'ZA'],
+  [-26.46, 28.27, 'p', 'Wache D (4. Polizei)', '+44 20 7946 0015', 'ZA'],
+  [-26.22, 28.07, 's', '<img src=x onerror=alert(1)>', '+44 20 7946 0016', 'ZA'],
+  [-26.23, 28.08, 's', 'Security 2', '+44 20 7946 0017', 'ZA'],
+  [-26.24, 28.09, 's', 'Security 3 (zu viel)', '+44 20 7946 0018', 'ZA'],
+  [-26.61, 28.52, 'f', '', '+44 20 7946 0019', 'ZA'],
+  [-25.0, 25.0, 'p', 'weit weg', '+44 20 7946 0020', 'BW'],
+  [-26.21, 28.02, 'x', 'falsche Art', '+44 20 7946 0021', 'ZA'],
+  null, [1, 2], ['a', 'b', 'p', 'kaputt', '+44 20 7946 0022', 'ZA'],
+] };
+const POS85 = [-26.20406, 28.0473];   // Johannesburg (neutraler Testort)
+
+test('WACHEN (ausgeführt, python3): fetch-notfallkontakte.py — Arten, Nummer gesäubert, Dubletten (Knoten+Fläche), ohne Koordinaten/kaputt raus, Teil-Abruf behält andere Länder, Stand je Land, unbekanntes Land abgelehnt', () => {
+  let py;
+  try { py = require('child_process').execSync('command -v python3', { encoding: 'utf8' }).trim(); } catch (e) { console.log('    (python3 nicht gefunden — übersprungen)'); return true; }
+  const script = require('fs').readFileSync(path.join(__dirname, 'test-notfallkontakte.py'), 'utf8')
+    .replace('SKRIPT_PFAD', JSON.stringify(path.join(__dirname, 'fetch-notfallkontakte.py')));
+  try {
+    const out = require('child_process').execSync(py + ' -', { input: script, encoding: 'utf8', timeout: 60000 }).trim();
+    return out.split('\n').pop().startsWith('OK') || out.split('\n').pop();
+  } catch (e) { return ((e.stdout || '').toString().trim().split('\n').pop()) || e.message; }
+});
+
+test('WACHEN (ausgeführt): Auswahl — nur mit Nummer, nach Abstand, Polizei höchstens 3, andere Arten höchstens 2, nichts über 100 km, kaputte Einträge und fremde Arten übersprungen; nächste Wache ohne Nummer wird genannt', () => {
+  const r = nko85({ pos: POS85 }); if (r.fehler) return r.fehler;
+  const w = r.api.nkoAuswahl(DATEN85, POS85[0], POS85[1]);
+  const namen = w.liste.map(x => x.name);
+  if (namen.filter(n => /^Wache [A-D]/.test(n)).join(',') !== 'Wache A,Wache B,Wache C') return 'Polizei: ' + namen.join(',');
+  if (w.liste.filter(x => x.art === 's').length !== 2 || namen.includes('Security 3 (zu viel)')) return 'Sicherheitsfirmen: ' + namen.join(',');
+  if (namen.includes('weit weg') || namen.includes('falsche Art') || namen.includes('kaputt')) return 'falsch drin: ' + namen.join(',');
+  for (let i = 1; i < w.liste.length; i++) if (w.liste[i].d < w.liste[i - 1].d) return 'nicht nach Abstand';
+  if (!w.polizei || w.polizei.name !== 'Wache ohne Nummer') return 'nächste Wache: ' + JSON.stringify(w.polizei);
+  if (r.api.nkoAuswahl({ k: 5 }, 0, 0).liste.length !== 0) return 'kaputte Datei';
+  return true;
+});
+
+test('WACHEN (ausgeführt): Anzeige — 📞-Knopf mit erster Nummer, alle Nummern wählbar, Namen maskiert und data-i18n-skip, Hinweis „ungeprüft"/Landesnummer zuerst, Südafrika-Hinweis nur in Südafrika; ohne GPS/ohne Daten klare Sätze', () => {
+  const r = nko85({ pos: POS85, land: 'Südafrika' }); if (r.fehler) return r.fehler;
+  if (!r.api.nkoInhalt().includes('Wird geladen')) return 'vor dem Laden';
+  r.api.nkoStand.versucht = true;
+  if (!r.api.nkoInhalt().includes('fetch-notfallkontakte.py')) return 'ohne Daten kein Hinweis aufs Skript';
+  r.api.nkoStand.daten = DATEN85;
+  const h = r.api.nkoInhalt();
+  if (/<img/.test(h) || !h.includes('&lt;img src=x onerror=alert(1)&gt;')) return 'Name nicht maskiert';
+  if (!h.includes('class="sos-klein nko-anruf" href="tel:+442079460011"')) return '📞-Knopf fehlt';
+  if (!h.includes('href="tel:02079460012"') || !h.includes('href="tel:02079460013"') || !h.includes('href="tel:02079460012" aria-label')) return 'mehrere Nummern nicht einzeln wählbar';
+  if (!h.includes('Nächste Polizeiwache (ohne Nummer in OpenStreetMap):') || !h.includes('Wache ohne Nummer')) return 'Wache ohne Nummer fehlt';
+  if (!h.includes('Aus OpenStreetMap, ungeprüft.') || !h.includes('Stand 2026-11-21')) return 'Herkunft/Stand fehlt';
+  if (!h.includes('mehr als die Hälfte der angerufenen Polizeiwachen')) return 'Südafrika-Hinweis fehlt';
+  if ((h.match(/data-i18n-skip/g) || []).length < 8) return 'Nutzer-/OSM-Text ohne data-i18n-skip';
+  const na = nko85({ pos: POS85, land: 'Namibia' }); na.api.nkoStand.daten = DATEN85; na.api.nkoStand.versucht = true;
+  if (na.api.nkoInhalt().includes('mehr als die Hälfte')) return 'Südafrika-Hinweis außerhalb Südafrikas';
+  const o = nko85({}); o.api.nkoStand.daten = DATEN85; o.api.nkoStand.versucht = true;
+  if (!o.api.nkoInhalt().includes('Keine GPS-Position')) return 'ohne GPS';
+  const leer = nko85({ pos: [0, 0] }); leer.api.nkoStand.daten = DATEN85; leer.api.nkoStand.versucht = true;
+  if (!leer.api.nkoInhalt().includes('Im Umkreis von 100 km ist in OpenStreetMap keine Stelle')) return 'leerer Umkreis';
+  return true;
+});
+
+test('WACHEN (ausgeführt, eigener Node-Prozess): Laden — Mac liefert → Anzeige + Speicher; Mac weg → gespeicherter Stand („auf dem iPhone gespeichert"); gar nichts → „Noch keine Daten"; kaputte Antwort überschreibt den Speicher nicht', () => {
+  const r = nko85({ pos: POS85 }); if (r.fehler) return r.fehler;
+  const skript = `
+const QUELLE = ${JSON.stringify(r.quelle)};
+const DATEN = ${JSON.stringify(DATEN85)}, POS = ${JSON.stringify(POS85)};
+const ANTWORT = d => ({ ok: true, clone() { const t = JSON.stringify(d); return { text: async () => t }; }, json: async () => d });
+function bau(opt) {
+  const cache = opt.cache || {};
+  const caches = { open: async () => ({ match: async k => (k in cache ? { json: async () => JSON.parse(cache[k]) } : undefined), put: async (k, r) => { cache[k] = await r.text(); } }) };
+  const els = { 'nko-box': { innerHTML: '' } };
+  const mSettings = { userLat: POS[0], userLng: POS[1], userLocationTime: Date.now() };
+  const api = new Function('caches', 'fetch', 'document', 'uiMulti', 'mSettings', 'aktivesLand', 'AbortSignal', 'SERVER_URL', 'WARNZONEN_SPEICHER',
+    QUELLE + '\\nreturn { ladeNotfallstellenMobil, nkoStand };')(caches, opt.fetch || (async () => { throw new Error('offline'); }),
+    { getElementById: id => els[id] || null }, t => t, mSettings, () => null, { timeout: () => undefined }, 'https://127.0.0.1:8765', 'safari-assistant-daten');
+  return { api, cache, els };
+}
+(async () => {
+  const a = bau({ fetch: async () => ANTWORT(DATEN) }); await a.api.ladeNotfallstellenMobil();
+  if (!a.api.nkoStand.daten || a.api.nkoStand.ausSpeicher || !a.cache['/data/notfallkontakte.json']) return 'Mac → nicht gespeichert';
+  if (!a.els['nko-box'].innerHTML.includes('Wache A')) return 'Mac → nicht angezeigt';
+  const b = bau({ cache: { '/data/notfallkontakte.json': JSON.stringify(DATEN) } }); await b.api.ladeNotfallstellenMobil();
+  if (!b.api.nkoStand.ausSpeicher || !b.els['nko-box'].innerHTML.includes('auf dem iPhone gespeichert')) return 'Speicher ohne Mac';
+  const c = bau({}); await c.api.ladeNotfallstellenMobil();
+  if (c.api.nkoStand.daten || !c.api.nkoStand.versucht || !c.els['nko-box'].innerHTML.includes('Noch keine Daten')) return 'ohne alles';
+  const d = bau({ cache: { '/data/notfallkontakte.json': JSON.stringify(DATEN) }, fetch: async () => ANTWORT({ kaputt: 1 }) }); await d.api.ladeNotfallstellenMobil();
+  if (!d.api.nkoStand.daten || d.cache['/data/notfallkontakte.json'] !== JSON.stringify(DATEN)) return 'kaputte Antwort überschrieb den Speicher';
+  return 'OK';
+})().then(x => console.log(x), e => console.log('Absturz: ' + e.message));`;
+  const out = node72(skript);
+  return out === 'OK' || out;
+});
+
+test('WACHEN: Einbindung — 🚨 lädt beim Öffnen, Block nach den Orts-Kontakten; Server liefert die Datei aus (STATIK_DATEIEN), deploy.sh kopiert sie ins Bundle, Rohdateien der amtlichen Listen unter data/sources/ (nicht im Git); Manifest-Eintrag', () => {
+  if (!mob85.includes("  renderNotruf();\n  ladeNotfallstellenMobil();   // 2026-11-21-2")) return 'openNotruf lädt nicht';
+  if (!srv85.includes("'/data/notfallkontakte.json': '/data/notfallkontakte.json',")) return 'Server liefert nicht aus';
+  if (!dep85.includes('cp "$SRC/data/notfallkontakte.json" "$DST/data/"')) return 'deploy.sh kopiert nicht';
+  if (!/^data\/sources\/$/m.test(loadFile('.gitignore') || '')) return 'data/sources/ nicht in .gitignore';
+  if (!fnk85 || !/^# Safari Assistant — fetch-notfallkontakte\.py v\d{4}-\d{2}-\d{2}-\d+$/m.test(fnk85.split('\n').slice(0, 4).join('\n'))) return 'Versionsmarker im Skript';
+  const man = JSON.parse(loadFile('features-manifest.json') || '{}');
+  const e = (man.features || []).filter(f => /2026-11-21-2/.test(f.name));
+  if (e.length < 2) return 'Manifest-Einträge fehlen';
+  for (const f of e) { const q = loadFile(f.file); if (!q || !f.contains.every(c => q.includes(c))) return 'Manifest passt nicht: ' + f.file; }
+  return true;
+});
+
+// =============================================
+console.log('\n=== 86. PARKS UND RANGER 2026-11-22-1 — recherchierte Nummern mit Quelle, im 🚨-Blatt nach Park und Land ===');
+// =============================================
+// Wunsch 22.11.: Ranger-Kontakte bei Nationalparks. OSM liefert dafür nichts (0 von 295 Ranger-Posten mit Nummer).
+const mob86 = loadFile('mobile.html');
+const js86 = mob86 ? mob86.slice(mob86.indexOf('<script>', mob86.lastIndexOf('</style>'))) : '';
+function park86(opt = {}) {
+  const namen = ['kmAbstand', 'nachrichtEsc', 'telHtml', 'ortskNummer', 'ortskPosition', 'parkAuswahl', 'parkEintrag', 'parkBlockMobil'];
+  const q = namen.map(n => fn72(js86, n) || einzeiler72(js86, n));
+  const fehlt = namen.filter((n, i) => !q[i]);
+  if (fehlt.length) return { fehler: 'fehlt: ' + fehlt.join(',') };
+  const liste = js86.match(/const PARK_KONTAKTE = \[[\s\S]*?\n\];/), art = js86.match(/const PARK_ART = \{[^\n]*\};/),
+    iso = js86.match(/const LAND_ISO = \{[\s\S]*?\};/), gep = js86.match(/const PARK_GEPRUEFT = '[^']*';/);
+  if (!liste || !art || !iso || !gep) return { fehler: 'Konstanten fehlen' };
+  const mSettings = opt.pos ? { userLat: opt.pos[0], userLng: opt.pos[1], userLocationTime: Date.now() } : {};
+  const api = new Function('uiMulti', 'mSettings', 'aktivesLand', [gep[0], liste[0], art[0], iso[0]].concat(q).join('\n') +
+    '\nreturn { PARK_KONTAKTE, parkAuswahl, parkBlockMobil, LAND_ISO };')(t => t, mSettings, () => (opt.land ? { name: opt.land } : null));
+  return { api };
+}
+
+test('PARKS: jeder Eintrag vollständig — Land aus den 16, Art notruf/park/zentrale, Quelle https, erste Nummer wählbar, Bereich mit Mitte und Radius 1–250 km; „unbestaetigt" nur mit Hinweis; mindestens ein Notfall-Eintrag', () => {
+  const r = park86(); if (r.fehler) return r.fehler;
+  const laender = new Set(Object.values(r.api.LAND_ISO));
+  const nr = s => { const n = String(s).split(/[;,/]/)[0].trim().replace(/[\s()./-]/g, ''); return /^(\+[1-9]\d{6,14}|\d{3,15})$/.test(n.startsWith('00') ? '+' + n.slice(2) : n); };
+  for (const e of r.api.PARK_KONTAKTE) {
+    const w = e.park + ' / ' + e.stelle;
+    if (!laender.has(e.land)) return 'Land: ' + w;
+    if (!['notruf', 'park', 'zentrale'].includes(e.art)) return 'Art: ' + w;
+    if (!/^https:\/\/[^\s]+$/.test(e.quelle)) return 'Quelle: ' + w;
+    if (!nr(e.nummer)) return 'Nummer: ' + w;
+    if (e.ort !== null && !(Number.isFinite(e.ort.lat) && Number.isFinite(e.ort.lng) && e.ort.km >= 1 && e.ort.km <= 250)) return 'Bereich: ' + w;
+    if (e.unbestaetigt && !e.hinweis) return 'unbestätigt ohne Hinweis: ' + w;
+    if (!e.park || !e.stelle) return 'Name/Stelle leer';
+  }
+  if (!r.api.PARK_KONTAKTE.some(e => e.art === 'notruf' && !e.unbestaetigt)) return 'kein bestätigter Notfall-Eintrag';
+  return true;
+});
+
+test('PARKS (ausgeführt): im Krüger-Park stehen dessen Notfall- vor der Verwaltungsnummer; Johannesburg (kein Park mit Nummer, Südafrika hat nichts landesweit) → „Kein Park …"; Kenia → KWS landesweit; Sambia → „keine amtliche Nummer gefunden"; ohne GPS in Kenia trotzdem KWS', () => {
+  const kr = park86({ pos: [-24.0, 31.5], land: 'Südafrika' }); if (kr.fehler) return kr.fehler;
+  const h = kr.api.parkBlockMobil();
+  const a = h.indexOf('Emergency Call Centre'), b = h.indexOf('Verwaltung (Admin Office)');
+  if (a < 0 || b < 0 || a > b) return 'Krüger: Reihenfolge/fehlend';
+  if (!h.includes('href="tel:+27137354325"') || !h.includes('sanparks.org')) return 'Krüger: Anruf/Quelle';
+  const la = park86({ pos: [-26.2041, 28.0473], land: 'Südafrika' }).api.parkBlockMobil();
+  if (!la.includes('Kein Park mit hinterlegter Nummer in der Nähe.') || la.includes('tel:')) return 'Johannesburg: ' + la.slice(0, 200);
+  const ke = park86({ pos: [-1.29, 36.82], land: 'Kenia' }).api.parkBlockMobil();
+  if (!ke.includes('Kenya Wildlife Service') || !ke.includes('href="tel:0800597000"')) return 'Kenia';
+  if (ke.includes('Mount-Kenya-Nationalpark')) return 'Nairobi liegt nicht am Mount Kenya';
+  const zm = park86({ pos: [-15.4, 28.3], land: 'Sambia' }).api.parkBlockMobil();
+  if (!zm.includes('keine amtliche Nummer einer Parkbehörde gefunden')) return 'Sambia';
+  if (!park86({ land: 'Kenia' }).api.parkBlockMobil().includes('Kenya Wildlife Service')) return 'Kenia ohne GPS';
+  if (!park86({ pos: [-26.26, 31.87], land: 'Eswatini' }).api.parkBlockMobil().includes('Nicht auf einer amtlichen Seite bestätigt.')) return 'Eswatini: Warnung fehlt';
+  return true;
+});
+
+test('PARKS: Park-, Stellen- und Hinweistexte (deutsch) stehen in en, fr UND es im Wörterbuch; Nummern werden nicht übersetzt (data-i18n-skip)', () => {
+  const r = park86(); if (r.fehler) return r.fehler;
+  const DE = /[äöüß]|\b(und|nach|der|die|das|nur|bei|mit|für|ohne|Zentrale|Rezeption|Notf|Gebühren|Stand|Verwaltung|Parkverwaltung)\b|-Nationalpark/;
+  const texte = new Set();
+  for (const e of r.api.PARK_KONTAKTE) for (const t of [e.park, e.stelle, e.hinweis]) if (t && DE.test(t)) texte.add(t);
+  const fehlt = [];
+  for (const l of ['en', 'fr', 'es']) {
+    const wb = loadFile('i18n/' + l + '.js') || '';
+    for (const t of texte) if (!wb.includes(JSON.stringify(t) + ':')) fehlt.push(l + ': ' + t);
+  }
+  if (fehlt.length) return fehlt.length + ' fehlen, z. B. ' + fehlt[0];
+  if (!/<span data-i18n-skip>\$\{telHtml\(e\.nummer\)\}<\/span>/.test(js86)) return 'Nummer nicht von der Übersetzung ausgenommen';
+  return true;
+});
+
+test('PARKS: Einbindung — Block nach den Wachen aus OSM, offline (feste Liste in mobile.html), Herkunft im Kommentar; Manifest-Eintrag', () => {
+  if (!mob86.includes('  html += parkBlockMobil();    // 2026-11-22-1')) return 'Einbindung fehlt';
+  if (!mob86.includes('// ═══ PARKS UND RANGER (2026-11-22-1) ═══') || !mob86.includes('aus data/parks.geojson (OSM) berechnet')) return 'Kopfkommentar';
+  const man = JSON.parse(loadFile('features-manifest.json') || '{}');
+  const e = (man.features || []).find(f => f.file === 'mobile.html' && /2026-11-22-1/.test(f.name));
+  return (e && e.contains.every(c => mob86.includes(c))) || 'Manifest-Eintrag fehlt/passt nicht';
 });
 
 // =============================================

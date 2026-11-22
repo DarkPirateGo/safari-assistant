@@ -206,11 +206,50 @@ done
 EXE="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Contents/Info.plist" 2>/dev/null || true)"
 EXE="${EXE:-$(basename "$APP" .app)}"
 LAUNCHER_DST="$APP/Contents/MacOS/$EXE"
-if [ -f "$SRC/launcher_new.sh" ] && [ -d "$APP/Contents/MacOS" ]; then
-  if ! cmp -s "$SRC/launcher_new.sh" "$LAUNCHER_DST"; then
-    cp "$SRC/launcher_new.sh" "$LAUNCHER_DST" && chmod +x "$LAUNCHER_DST" && echo "✅ launcher_new.sh → Bundle (Contents/MacOS/$EXE) — beim nächsten App-Start aktiv"
+# 2026-11-15-4: Programmdatei ist jetzt ein kleines natives Startprogramm (app-starter.swift, mit swiftc übersetzt).
+# Es startet das Skript (Contents/MacOS/launcher.sh) und kann, was ein Skript nicht kann: Klick aufs Dock-Symbol holt
+# das App-Fenster nach vorn, „Beenden“ im Dock beendet Server und Ollama. Ohne swiftc oder bei einem Übersetzungsfehler
+# bleibt das Skript selbst die Programmdatei — wie bis 2026-11-15. Ersetzt wird immer per mv (eine laufende App
+# behält ihre alte Datei), nie durch Überschreiben an Ort und Stelle.
+MACOS_DIR="$APP/Contents/MacOS"
+if [ -f "$SRC/launcher_new.sh" ] && [ -d "$MACOS_DIR" ]; then
+  if ! cmp -s "$SRC/launcher_new.sh" "$MACOS_DIR/launcher.sh"; then
+    cp "$SRC/launcher_new.sh" "$MACOS_DIR/launcher.sh.neu" && chmod +x "$MACOS_DIR/launcher.sh.neu" \
+      && mv -f "$MACOS_DIR/launcher.sh.neu" "$MACOS_DIR/launcher.sh" && echo "✅ launcher_new.sh → Bundle (Contents/MacOS/launcher.sh)"
+  fi
+  STARTER_OK=0
+  if [ -f "$SRC/app-starter.swift" ] && command -v swiftc >/dev/null 2>&1; then
+    if cmp -s "$SRC/app-starter.swift" "$MACOS_DIR/.app-starter.swift" && [ -x "$LAUNCHER_DST" ] && file -b "$LAUNCHER_DST" | grep -q 'Mach-O'; then
+      STARTER_OK=1
+      echo "✅ Startprogramm im Bundle ist aktuell"
+    else
+      STARTER_TMP="$MACOS_DIR/.starter-neu"
+      echo "⏳ Übersetze das Startprogramm (app-starter.swift, dauert beim ersten Mal etwas) …"
+      if swiftc -O -o "$STARTER_TMP" "$SRC/app-starter.swift" 2>"$STARTER_TMP.log" && [ -x "$STARTER_TMP" ]; then
+        mv -f "$STARTER_TMP" "$LAUNCHER_DST" && cp "$SRC/app-starter.swift" "$MACOS_DIR/.app-starter.swift" && STARTER_OK=1 \
+          && echo "✅ Startprogramm → Contents/MacOS/$EXE — nach dem nächsten App-Start holt ein Klick aufs Dock-Symbol die App nach vorn"
+      else
+        echo "⚠️  Startprogramm ließ sich nicht übersetzen — es bleibt beim Startskript (Dock-Klick ohne Wirkung):"
+        tail -5 "$STARTER_TMP.log" 2>/dev/null
+        rm -f "$STARTER_TMP"
+      fi
+      rm -f "$STARTER_TMP.log"
+    fi
   else
-    echo "✅ Launcher im Bundle ist aktuell"
+    echo "ℹ️  Kein swiftc (Xcode-Befehlszeilenwerkzeuge: xcode-select --install) — es bleibt beim Startskript; ein Klick aufs Dock-Symbol holt die App dann nicht nach vorn"
+  fi
+  if [ "$STARTER_OK" != 1 ]; then
+    if ! cmp -s "$SRC/launcher_new.sh" "$LAUNCHER_DST"; then
+      cp "$SRC/launcher_new.sh" "$MACOS_DIR/.launcher-neu" && chmod +x "$MACOS_DIR/.launcher-neu" \
+        && mv -f "$MACOS_DIR/.launcher-neu" "$LAUNCHER_DST" && echo "✅ launcher_new.sh → Bundle (Contents/MacOS/$EXE) — beim nächsten App-Start aktiv"
+    else
+      echo "✅ Launcher im Bundle ist aktuell"
+    fi
+  fi
+  # Begründung für die einmalige Frage „Safari Assistant möchte Safari steuern“ (Tab der App nach vorn holen)
+  if [ -f "$APP/Contents/Info.plist" ] && ! /usr/libexec/PlistBuddy -c 'Print :NSAppleEventsUsageDescription' "$APP/Contents/Info.plist" >/dev/null 2>&1; then
+    /usr/libexec/PlistBuddy -c "Add :NSAppleEventsUsageDescription string Damit ein Klick aufs Dock-Symbol das offene Fenster der App in Safari nach vorn holt." "$APP/Contents/Info.plist" >/dev/null 2>&1 \
+      && echo "✅ Info.plist: Begründung für die Safari-Steuerung ergänzt"
   fi
 else
   echo "⚠️  Launcher nicht aktualisiert (launcher_new.sh oder Contents/MacOS fehlt)"
@@ -265,6 +304,13 @@ if [ -f "$SRC/data/klima.json" ]; then
   cp "$SRC/data/klima.json" "$DST/data/" && echo "✅ data/klima.json → Bundle ($(wc -c < "$SRC/data/klima.json") B)"
 else
   echo "ℹ️  data/klima.json fehlt — Regenzeit-Ebene ohne Daten. Einmalig mit Internet: python3 fetch-klima.py"
+fi
+# 2026-11-21-2: Notfall-Stellen (Polizei, Feuerwehr, Ranger, Sicherheitsfirmen) aus OSM für das 🚨-Blatt am iPhone
+if [ -f "$SRC/data/notfallkontakte.json" ]; then
+  mkdir -p "$DST/data"
+  cp "$SRC/data/notfallkontakte.json" "$DST/data/" && echo "✅ data/notfallkontakte.json → Bundle ($(( $(wc -c < "$SRC/data/notfallkontakte.json") / 1024 )) KB)"
+else
+  echo "ℹ️  data/notfallkontakte.json fehlt — 🚨 zeigt keine Wachen in der Nähe. Einmalig mit Internet: python3 fetch-notfallkontakte.py"
 fi
 
 echo ""

@@ -445,6 +445,22 @@ try:
                 f.append('U1: Notfallkarte geht über http ins WLAN: %r' % d)
             if anfrage('GET', '/api/notfallkarte', {'Origin': 'https://evil.example'})[0] != 403:
                 f.append('U1: fremde Seite darf die Notfallkarte abrufen')
+            # Reiseprofil fürs iPhone (2026-11-15-4): kommt aus safari-settings der Sicherung; Code, https und eigene Seite wie die Notfallkarte
+            einst = {'reiseprofil': 'Wir reisen zu zweit mit Hund. ' + 'x' * 9000, 'reiseprofilClaude': True, 'country': 'Namibia'}
+            post_roh('/api/sicherung', {'Origin': eigen}, dict(stand, daten=dict(stand['daten'], **{'safari-settings': _json.dumps(einst)})))
+            d = _json.loads(anfrage('GET', '/api/reiseprofil')[2].decode('utf-8'))
+            if not d.get('text', '').startswith('Wir reisen zu zweit mit Hund.') or len(d['text']) != 8000 or d.get('claude') is not True:
+                f.append('RP: Reiseprofil nicht wie gespeichert (gekürzt auf 8000, Claude-Haken): %r' % {k: (v[:40] if isinstance(v, str) else v) for k, v in d.items()})
+            if anfrage('GET', '/api/reiseprofil', ziel=port_wlan)[0] != 403:
+                f.append('RP: Reiseprofil aus dem WLAN ohne Zugangscode')
+            d = _json.loads(anfrage('GET', '/api/reiseprofil', mit_code, ziel=port_wlan)[2].decode('utf-8'))
+            if d.get('text') or d.get('grund') != 'nur_https':
+                f.append('RP: Reiseprofil geht über http ins WLAN')
+            if anfrage('GET', '/api/reiseprofil', {'Origin': 'https://evil.example'})[0] != 403:
+                f.append('RP: fremde Seite darf das Reiseprofil abrufen')
+            post_roh('/api/sicherung', {'Origin': eigen}, dict(stand, daten=dict(stand['daten'], **{'safari-settings': _json.dumps({'reiseprofil': ['kein', 'text'], 'reiseprofilClaude': 'ja'})})))
+            if _json.loads(anfrage('GET', '/api/reiseprofil')[2].decode('utf-8')) != {'text': '', 'claude': False}:
+                f.append('RP: ungültiges Reiseprofil (kein Text, Haken nicht true) wird weitergegeben')
     finally:
         m.SICHERUNG_DIR = alt_dir
 
@@ -530,6 +546,135 @@ try:
     # nie auf die Platte: weder Sicherung noch irgendeine Datei im Arbeitsordner kennt den Key
     if 'iphoneAnthropicKey' not in m._SICHERUNG_GEHEIM:
         f.append('K: Key fürs iPhone ginge in die Sicherung')
+    # ── 12. kiwix nur auf diesem Mac (2026-11-15-2) ─────────────────────────────────────────
+    # kiwix-serve 3.8.2 / libkiwix 14.2 lehnt „--address=127.0.0.1" ab („IP address is not available on this system"),
+    # nimmt aber ::1. Ein nachgebautes kiwix verhält sich genau so; geprüft wird der ECHTE start_kiwix().
+    if m.kiwix_url('/wiki/') != 'http://127.0.0.1:%d/wiki/' % m.KIWIX_PORT:
+        f.append('W: kiwix_url mit 127.0.0.1')
+    alt12 = (m.KIWIX_HOST, m.KIWIX_PORT, m.KIWIX_ROOT, m.KIWIX_NUR_LOKAL, m.KIWIX_PROC, m.find_kiwix_bin, m.find_kiwix_zims, m.lan_ip, m.LOG_DIR)
+    try:
+        m.KIWIX_HOST = '::1'
+        if m.kiwix_url('/wiki/x?y=1') != 'http://[::1]:%d/wiki/x?y=1' % m.KIWIX_PORT:
+            f.append('W: kiwix_url mit ::1 ohne eckige Klammern: ' + m.kiwix_url('/wiki/x?y=1'))
+        ipv6 = True
+        try:
+            t6 = socket.socket(socket.AF_INET6); t6.bind(('::1', 0)); t6.close()
+        except OSError:
+            ipv6 = False
+        if ipv6:
+            s0 = socket.socket(); s0.bind(('127.0.0.1', 0)); frei = s0.getsockname()[1]; s0.close()
+            attrappe = tmp / 'kiwix-serve'
+            attrappe.write_text(
+                '#!' + sys.executable + '\n'
+                'import sys, socket\n'
+                'from http.server import HTTPServer, BaseHTTPRequestHandler\n'
+                'a = sys.argv[1:]\n'
+                'if "--address=127.0.0.1" in a:\n'
+                '    print("ERROR: IP address is not available on this system: 127.0.0.1"); sys.exit(1)\n'
+                'port = int(a[a.index("--port") + 1])\n'
+                'class H(BaseHTTPRequestHandler):\n'
+                '    def do_GET(self):\n'
+                '        ok = self.path.startswith("/wiki/") or "--urlRootLocation" not in a\n'
+                '        self.send_response(200 if ok else 404); self.end_headers(); self.wfile.write(b"kiwix-6")\n'
+                '    def log_message(self, *x): pass\n'
+                'class S(HTTPServer):\n'
+                '    address_family = socket.AF_INET6 if "--address=::1" in a else socket.AF_INET\n'
+                'S(("::1" if "--address=::1" in a else "0.0.0.0", port), H).serve_forever()\n')
+            attrappe.chmod(0o755)
+            (tmp / 'test.zim').write_bytes(b'zim')
+            m.KIWIX_HOST, m.KIWIX_PORT, m.KIWIX_PROC = '127.0.0.1', frei, None
+            m.find_kiwix_bin = lambda: str(attrappe)
+            m.find_kiwix_zims = lambda: [tmp / 'test.zim']
+            m.lan_ip = lambda: '127.0.0.1'   # „WLAN-Adresse" für die Gegenprobe: kiwix auf ::1 darf dort NICHT annehmen
+            m.LOG_DIR = tmp
+            m.start_kiwix()
+            if not m.kiwix_laeuft():
+                f.append('W: start_kiwix startet das nachgebaute kiwix nicht')
+            elif (m.KIWIX_HOST, m.KIWIX_ROOT, m.KIWIX_NUR_LOKAL) != ('::1', '/wiki', True):
+                f.append('W: nach dem Start %r statt (::1, /wiki, True)' % ((m.KIWIX_HOST, m.KIWIX_ROOT, m.KIWIX_NUR_LOKAL),))
+            elif not m.kiwix_antwortet('/wiki/'):
+                f.append('W: kiwix auf ::1 antwortet über kiwix_url nicht')
+            if m.kiwix_im_wlan_erreichbar():
+                f.append('W: Gegenprobe meldet kiwix auf ::1 als im WLAN erreichbar')
+            if 'IP address is not available' not in (tmp / 'kiwix.log').read_text(errors='replace'):
+                f.append('W: der erste Versuch (127.0.0.1) wurde gar nicht unternommen')
+            m.stoppe_kiwix(); time.sleep(0.5)
+            # Rückfall auf alle Schnittstellen: die Gegenprobe muss „im WLAN erreichbar" erkennen, auch wenn der Aufruf anderes behauptet
+            m.find_kiwix_bin = lambda: str(attrappe)
+            attrappe.write_text(attrappe.read_text().replace('if "--address=127.0.0.1" in a:', 'if any(x.startswith("--address") for x in a):'))
+            m.KIWIX_HOST = '127.0.0.1'
+            m.start_kiwix()
+            if m.KIWIX_NUR_LOKAL or not m.kiwix_im_wlan_erreichbar():
+                f.append('W: kiwix auf allen Schnittstellen nicht als offen erkannt (NUR_LOKAL=%r)' % m.KIWIX_NUR_LOKAL)
+            m.stoppe_kiwix(); time.sleep(0.3)
+        else:
+            print('    (Hinweis: keine IPv6-Loopback in dieser Umgebung — Abschnitt 12 nur teilweise)')
+    finally:
+        try:
+            m.stoppe_kiwix()
+        except Exception:
+            pass
+        (m.KIWIX_HOST, m.KIWIX_PORT, m.KIWIX_ROOT, m.KIWIX_NUR_LOKAL, m.KIWIX_PROC, m.find_kiwix_bin, m.find_kiwix_zims, m.lan_ip, m.LOG_DIR) = alt12
+    # ── 13. Wiki-Suche: Artikeltext, Akzente, Nachfragen, Pfade (2026-11-15-3) ──────────────
+    html13 = ('<html><h1>Guillain–Barré syndrome</h1><table><tr><td>Other names Landry paralysis</td></tr></table>'
+              '<p>Short.</p><p>Guillain–Barré syndrome is a rapid-onset muscle weakness caused by the immune system damaging '
+              'the peripheral nervous system. Typically, both sides of the body are involved.</p>'
+              '<p>' + 'The initial symptoms are changes in sensation or pain often in the back along with muscle weakness. ' * 3 + '</p></html>')
+    t13 = m.wiki_artikeltext(html13)
+    if not t13.startswith('Guillain–Barré syndrome is a rapid-onset') or 'Other names' in t13 or 'Short.' in t13:
+        f.append('WS: Auszug beginnt nicht mit dem Artikeltext: %r' % t13[:80])
+    if m.wiki_artikeltext('<ul><li>Liste A</li><li>Liste B</li></ul>') != 'Liste A Liste B':
+        f.append('WS: ohne Absätze kein Rückfall auf die ganze Seite')
+    gesehen13 = {}
+    class _Antwort:
+        def __init__(self, txt): self.txt = txt
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self): return self.txt.encode()
+    alt_urlopen13 = m.urllib.request.urlopen
+    try:
+        import json as _j13
+        def _fake(req, timeout=None):
+            gesehen13['prompt'] = _j13.loads(req.data.decode())['prompt']
+            return _Antwort(_j13.dumps({'response': 'Guillain-Barré syndrome'}))
+        m.urllib.request.urlopen = _fake
+        r13 = m.wiki_suchbegriffe('was ist die zugehörige wikipediaquelle?', 'Was versteht man unter guillaume-barre Syndrom?')
+        if r13 != 'Guillain-Barré syndrome':
+            f.append('WS: Akzent geht verloren: %r' % r13)
+        pr = gesehen13.get('prompt', '')
+        if 'Previous question: Was versteht man unter guillaume-barre Syndrom?' not in pr or 'Correct misspelled names' not in pr:
+            f.append('WS: vorige Frage oder Schreibkorrektur fehlt im Prompt')
+        m.wiki_suchbegriffe('Malaria Symptome')
+        if 'Previous question' in gesehen13.get('prompt', ''):
+            f.append('WS: ohne vorige Frage trotzdem „Previous question" im Prompt')
+    finally:
+        m.urllib.request.urlopen = alt_urlopen13
+    # Pfade aus kiwix-Treffern: nur unverdächtige gehen als Link an die App
+    from http.server import HTTPServer as _HS13, BaseHTTPRequestHandler as _BH13
+    class _Kiwix13(_BH13):
+        def do_GET(self):
+            if '/search' in self.path:
+                body = ('<a href="/wiki/content/buch/A/Guillain%E2%80%93Barr%C3%A9_syndrome">GBS</a>'
+                        '<a href="/wiki/content/buch/A/x&quot;onmouseover=alert(1)">Böse</a>').encode()
+            else:
+                body = ('<p>' + 'Artikeltext über Nerven und Muskeln. ' * 12 + '</p>').encode()
+            self.send_response(200); self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body)
+        def log_message(self, *a): pass
+    k13 = _HS13(('127.0.0.1', 0), _Kiwix13)
+    threading.Thread(target=k13.serve_forever, kwargs={'poll_interval': 0.2}, daemon=True).start()
+    alt13 = (m.KIWIX_HOST, m.KIWIX_PORT, m.KIWIX_ROOT, m.wiki_buecher)
+    try:
+        m.KIWIX_HOST, m.KIWIX_PORT, m.KIWIX_ROOT = '127.0.0.1', k13.server_address[1], '/wiki'
+        m.wiki_buecher = lambda: ['buch']
+        q13 = m.wiki_suche('Guillain-Barré syndrome', 3)
+        pf = [q.get('pfad') for q in q13]
+        if not q13 or pf[0] != 'buch/A/Guillain%E2%80%93Barr%C3%A9_syndrome':
+            f.append('WS: Pfad des echten Treffers fehlt: %r' % pf)
+        if any(('"' in (p_ or '') or '<' in (p_ or '') or ' ' in (p_ or '')) for p_ in pf):
+            f.append('WS: verdächtiger Pfad geht an die App: %r' % pf)
+    finally:
+        (m.KIWIX_HOST, m.KIWIX_PORT, m.KIWIX_ROOT, m.wiki_buecher) = alt13
+        k13.shutdown(); k13.server_close()
 except Exception as e:
     f.append('Ausnahme: %s: %s' % (e.__class__.__name__, e))
 finally:

@@ -44,7 +44,7 @@ Safari Assistant is built for **one person on their own Mac**, with the browser 
 - A phone with the code can chat, read travel advisories, search synced documents and offline Wikipedia, read documents stored through the document API, load map tiles and search places. It cannot upload, delete, shut down or switch modes.
 - **Do not switch iPhone mode on in a Wi-Fi you do not trust.** Other devices in that network can see that something listens on port 8765 and can try to connect.
 - **Fallback without encryption:** if `openssl` is missing, if `SAFARI_OHNE_TLS=1` is set, or if the server had to bind `0.0.0.0` because the Mac's loopback interface is broken, iPhone mode runs over plain HTTP. The Settings page says so. The access code then crosses the Wi-Fi unencrypted.
-- **Offline Wikipedia:** Safari Assistant starts `kiwix-serve` on `127.0.0.1:8090` and serves it under `/wiki` on a **separate port** (the main port + 100, so 8865 by default; the next free one up to +109), with the same access code and TLS for the phone. A separate port is a separate browser origin: scripts inside ZIM content cannot read the app's storage. `/wiki` on the main port redirects there. Only if the installed kiwix-tools version rejects `--address` (the process exits at once) does Safari Assistant start it without that option, listening on all interfaces; the server log then says so. A slow start does not trigger this; Settings → Network & VPN then show a warning under the server status. It serves public Wikipedia content, read-only.
+- **Offline Wikipedia:** Safari Assistant starts `kiwix-serve` on `127.0.0.1:8090` and serves it under `/wiki` on a **separate port** (the main port + 100, so 8865 by default; the next free one up to +109), with the same access code and TLS for the phone. A separate port is a separate browser origin: scripts inside ZIM content cannot read the app's storage. `/wiki` on the main port redirects there. Some kiwix-tools versions reject `--address=127.0.0.1` (kiwix-serve 3.8.2 on macOS: "IP address is not available on this system"). Safari Assistant then tries `::1`, the IPv6 loopback, which is also reachable only from this Mac. Only if both fail does it start `kiwix-serve` without the option, listening on all interfaces; the server log then says so. Whether it is really limited to the Mac is checked from outside: the status counts as "this Mac only" only if `kiwix-serve` refuses a connection on the Mac's Wi-Fi address. Otherwise Settings → Network & VPN show a warning under the server status, with the macOS firewall as the remedy. It serves public Wikipedia content, read-only.
 - **Pages on the phone without the Mac:** over HTTPS, a service worker keeps a copy of `mobile.html`, the translation files and two images on the phone, so the page and its emergency content open when the Mac does not answer. API responses are never cached. If you choose to (⚙️ Settings → Data & backup, off by default), a copy of the Emergency Card is stored in the phone's site storage; it is delivered only over HTTPS and never contains the key-hiding-place field.
 
 ### The local certificate authority
@@ -97,7 +97,7 @@ There is no telemetry and no analytics. Every outbound request, when it happens 
 
 - A device in the Wi-Fi that has the access code can use everything the phone can use.
 - The access code is visible in the phone's home-screen URL (see above).
-- Very old kiwix-tools versions that reject `--address` make `kiwix-serve` listen on all interfaces (logged as a warning).
+- kiwix-tools versions that reject both `--address=127.0.0.1` and `--address=::1` make `kiwix-serve` listen on all interfaces (logged and shown as a warning).
 - The Content Security Policy does not restrict `script-src` yet, because the pages still use inline event handlers. See the [roadmap](docs/ROADMAP.md).
 - User data (uploaded documents, `rag-store.json`, the offline map) lives inside the app bundle. Moving it out is on the roadmap.
 
@@ -113,6 +113,10 @@ Environment variables start with `SAFARI_` and files with `~/.safari-assistant-`
 | `SAFARI_LAN=1` or `--lan` | Starts with iPhone mode already on. Development only |
 
 ---
+
+## Security fixes in 2026.11.1
+
+- **Offline Wikipedia readable from the Wi-Fi:** `kiwix-serve` 3.8.2 rejects `--address=127.0.0.1` on macOS, so Safari Assistant fell back to all interfaces and anyone in the same Wi-Fi could read the offline Wikipedia on port 8090 without the access code (public Wikipedia content, read-only; no app data). It now falls back to `::1` first and checks from outside whether the port is really closed to the network.
 
 ## Security fixes in 2026.11
 

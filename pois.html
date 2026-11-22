@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Safari Assistant pois.html v2026-11-14-5 -->
+<!-- Safari Assistant pois.html v2026-11-22-1 -->
 <html lang="de">
 <head>
 <meta charset="UTF-8">
@@ -358,7 +358,7 @@ if (typeof L === 'undefined') document.write('<script src="https://unpkg.com/lea
 <script src="vendor/leaflet.markercluster.js"></script>
 <script>if (typeof L !== 'undefined' && typeof L.markerClusterGroup !== 'function') document.write('<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" integrity="sha256-Hk4dIpcqOSb0hZjgyvFOP+cEmDXUKKNE/tT542ZbNQg=" crossorigin="anonymous"><\/script>');</script>
 <script>
-const APP_VERSION = 'v2026-11-14-5'; // Muss mit Versionsmarker in Zeile 2 übereinstimmen
+const APP_VERSION = 'v2026-11-22-1'; // Muss mit Versionsmarker in Zeile 2 übereinstimmen
 const TYPES = {
   water:    { icon:'💧', color:'#7eb8c9', bg:'#182027', label:'Wasserstelle' },
   camp:     { icon:'⛺', color:'#8fb87a', bg:'#1a2318', label:'Campingplatz' },
@@ -1587,7 +1587,8 @@ async function ladeReisewarnungen(serverUrl) {
   const res = await fetch(serverUrl + '/api/reisewarnungen', { cache: 'no-store', signal: AbortSignal.timeout(8000) });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const j = await res.json();
-  const c = { laender: (j && j.laender) || {}, status: (j && j.status) || {}, hinweis: (j && j.hinweis) || '', gespeichert: Date.now() };
+  const c = { laender: (j && j.laender) || {}, status: (j && j.status) || {}, hinweis: (j && j.hinweis) || '', gespeichert: Date.now(),
+    warnzonen: (j && j.warnzonen) || null };   // 2026-11-15-6: Stand der Gebietsflächen (automatisch nachgezogen)
   try { localStorage.setItem(REISEWARN_KEY, JSON.stringify(c)); } catch (e) {}
   return c;
 }
@@ -1917,7 +1918,7 @@ function reisewarnPopupHtml(p) {
     <div style="font-weight:700;color:#e07a5f">🛑 ${esc(p.land)} — ${esc(p.stufe)}</div>
     <div style="margin-top:3px;font-size:9px;color:#666">Auswärtiges Amt · Stand ${esc(p.stand || 'unbekannt')}</div>
     <div style="margin-top:4px;color:#333;white-space:pre-wrap;max-height:200px;overflow-y:auto">${esc(p.text)}</div>
-    <div style="margin-top:6px;font-size:9px;color:#888">Amtlicher Text, wörtlich. Für dieses Land liegen keine Gebietsgrenzen vor — die Landesfläche zeigt nur, DASS eine Warnung besteht. Grenzen holen: <code>python3 fetch-warnzonen.py</code>. Vor der Reiseentscheidung den Originaltext lesen${sicherLink(p.url) ? ': <a href="' + esc(sicherLink(p.url)) + '" target="_blank" rel="noopener">auswaertiges-amt.de ↗</a>' : ''}.</div>
+    <div style="margin-top:6px;font-size:9px;color:#888">Amtlicher Text, wörtlich. Für dieses Land liegen keine Gebietsgrenzen vor — die Landesfläche zeigt nur, DASS eine Warnung besteht. <span>Der Assistent holt die Grenzen selbst, sobald der Mac online ist</span>. Vor der Reiseentscheidung den Originaltext lesen${sicherLink(p.url) ? ': <a href="' + esc(sicherLink(p.url)) + '" target="_blank" rel="noopener">auswaertiges-amt.de ↗</a>' : ''}.</div>
   </div>`;
 }
 
@@ -1973,7 +1974,7 @@ function toggleReisewarnung() {
   if (!c) { zeigeKartenHinweis('🛑 Noch kein Abruf der Reisewarnungen — der Assistent holt sie automatisch, sobald Internet da ist (⚙️ Reisewarnungen → „Jetzt holen").'); return; }
   if (!gj.features.length) { zeigeKartenHinweis(`🛑 Keines der Routen-Länder hat derzeit eine (Teil-)Reisewarnung (Stand ${stand}).`); return; }
   if (zeigeWarnlage()) return;   // Position bekannt: die Lage dazu ist die wichtigere Meldung
-  zeigeKartenHinweis(`🛑 ${gebiete} gewarnte Gebiete als Fläche${laender ? `, ${laender} Länder nur als Landesfläche (Grenzen fehlen: python3 fetch-warnzonen.py)` : ''}, Stand ${stand} — Fläche antippen zeigt den amtlichen Satz.`);
+  zeigeKartenHinweis(`🛑 ${gebiete} gewarnte Gebiete als Fläche${laender ? `, ${laender} Länder nur als Landesfläche (Grenzen fehlen noch — der Assistent holt sie, sobald der Mac online ist)` : ''}, Stand ${stand} — Fläche antippen zeigt den amtlichen Satz.`);
 }
 
 async function ladeReisewarnEbene() {

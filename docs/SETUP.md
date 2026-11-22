@@ -273,6 +273,7 @@ The scripts refresh or regenerate these files. They need internet.
 | `fetch-orte.py` | GeoNames dumps | `data/orte.json` | |
 | `fetch-klima.py` | NASA POWER | `data/klima.json` | About 1000 requests, 15–40 minutes. Resumes after an interruption |
 | `fetch-warnzonen.py` | Overpass API | `data/warnzonen.geojson` | The server runs it automatically (see [What goes online](../README.md#what-goes-online)). `--vorrat` fetches the administrative boundaries of all 16 countries into `data/verwaltungsgebiete.geojson`, so new warning areas can later be drawn without internet |
+| `fetch-notfallkontakte.py` | Overpass API (`--amtlich`: saps.gov.za, police.gov.bw, police.gov.mw) | `data/notfallkontakte.json` | Police, fire, ranger, security, ambulance and sea-rescue stations for the 🚨 sheet on the iPhone. `--amtlich` also saves the official police-station lists of South Africa, Botswana and Malawi to `data/sources/notfall-amtlich/` (not used yet) |
 | `fauna-gbif-check.py` | GBIF | report and CSV | Maintainer tool: checks the curated wildlife data against GBIF records |
 
 Most scripts accept country codes to limit a run, for example `python3 fetch-pois.py NA BW`. `fetch-warnzonen.py` takes the German country names used in the app, for example `python3 fetch-warnzonen.py Kenia Mosambik`. Afterwards run `./deploy.sh` and restart Safari Assistant.

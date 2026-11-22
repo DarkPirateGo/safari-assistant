@@ -2,6 +2,38 @@
 
 All notable changes to Safari Assistant are documented here. Each page also carries an internal version marker on line 2 (`vYYYY-MM-DD-N`).
 
+## 2026.11.1 (November 2026)
+
+An update one week after 2026.11, written while the app is in use on the road in South Africa. Most of it is about getting help where you are: numbers you can call from the 🚨 sheet on the iPhone, news about the places around you, and a faster start of the iPhone page when the Mac is away. Internal versions v2026-11-15-1 to v2026-11-22-1.
+
+### New
+
+- **🛡 Local help here (iPhone 🚨 sheet).** Save numbers you are given on the road (campsite security, a security company a local recommends, a lodge) together with the GPS position and a radius of 2 to 100 km. Whenever you are within that radius again, they appear with a call button, nearest first; otherwise the sheet names the nearest saved entry and its distance. Numbers in national format are allowed and marked as working only with a local SIM. Up to 60 entries, stored only on the iPhone, offline.
+- **🚓 Stations and services nearby (iPhone 🚨 sheet).** New script `fetch-notfallkontakte.py` loads police, fire, ranger, security-company, ambulance and sea-rescue stations for all 16 countries from OpenStreetMap into `data/notfallkontakte.json`, which ships with this release (as of 22 November 2026). The sheet lists the nearest ones with a phone number within 100 km (and the nearest police station even without a number), kept on the iPhone for offline use. Only 158 of the 4,353 stations had a phone number, and none of the 295 ranger posts. `--amtlich` additionally saves the official police-station lists of South Africa, Botswana and Malawi for later use.
+- **🦏 Parks and rangers (iPhone 🚨 sheet).** 19 numbers of park offices and wildlife authorities in South Africa, Kenya, Uganda, Rwanda, Eswatini, Botswana and Namibia, taken from the operators' own websites, each with its source and the date it was checked (22 November 2026). Inside a park its numbers come first; two older numbers are marked as unconfirmed; for countries without an official number the sheet says so.
+- **📍 Near you and 🧭 Summarise the situation here (News, Mac and iPhone).** Items from the last 14 days that mention a place within 250 km of your position come first, with place and distance; places are recognised offline from the bundled place list. The local model can sum them up in at most five points with references — no Claude, no tokens.
+- **US embassy alerts as news sources.** The security alerts of the US embassies in all 16 countries (only alerts, not routine notices). 66 built-in sources instead of 50.
+- **Travel profile.** Settings → General → Travel profile: who travels, vehicle, route, travel style, dog, in your own words (up to 8,000 characters, with a template). Goes with every question to the local model, to Claude only if you tick it. The iPhone holds it in memory only.
+- **📣 Send to all (SOS).** With several channels, one button steps through Messages (all SMS recipients at once) and then each WhatsApp contact.
+- **Security Situation with location and source rules.** The web search gets the country of your GPS position, avoids a list of click-bait sites, prefers embassy notices and local media of the last 30 days, and lists the sources it actually cited (on the iPhone too). Longer answers (4,096 tokens) and a note when an answer was cut off.
+- **Wikipedia sources under the answer.** The articles found are listed under the answer and open in the offline Wikipedia; follow-up questions keep the topic, misspelt names are mapped to the English article title, and excerpts come from the article text instead of the whole page.
+- **Warning areas automatic and on the iPhone.** The server checks every 10 minutes whether the drawn areas still match the stored warning text and redraws them when needed; the iPhone keeps a copy for use without the Mac.
+- **Faster iPhone start without the Mac.** If the Mac does not answer, the page is there within about two seconds (before, the iPhone could wait until the connection gave up).
+- **Dock icon.** A small native starter (`app-starter.swift`, compiled by `deploy.sh` if the Xcode Command Line Tools are installed): clicking the Dock icon brings the app's tab to the front, Quit in the Dock stops the server. Without a compiler the app starts as before.
+
+### Security fixes
+
+- **Offline Wikipedia readable from the Wi-Fi:** `kiwix-serve` 3.8.2 rejects `--address=127.0.0.1` on macOS, so it fell back to all interfaces. It now uses `::1` first and checks from outside whether the port is closed to the network. See [SECURITY.md](SECURITY.md#security-fixes-in-2026111).
+
+### Fixed
+
+- The offline Wikipedia search asked `kiwix-serve` under the wrong path since 2026-09 and probably found nothing.
+
+### Not tested
+
+- The station and park numbers were not test-called. Station numbers from OpenStreetMap are unverified, and in a June 2026 survey in South Africa more than half of the police stations called did not answer: call the national number first.
+- The Dock starter has only been tested through its fallback; whether macOS asks for permission to control Safari depends on your settings.
+
 ## 2026.11 (November 2026)
 
 The second release, about five weeks after the first. It brings a redesigned interface, emergency features on the iPhone that work without the Mac, an automatic backup of your data on the Mac, a VPN check, news by topic, and a round of security fixes from an internal review.

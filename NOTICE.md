@@ -34,10 +34,11 @@ PolyForm Noncommercial does **not** cover the names and logos, the data files, t
 
 - `POIs/<Country>-osm.json` (one file per country), created by `fetch-pois.py` through the Overpass API
 - `data/parks.geojson` (simplified park and protected-area boundaries), created by `fetch-parks.py`
+- `data/notfallkontakte.json` (police, fire, ranger, security, ambulance and sea-rescue stations with position, name and phone number), created by `fetch-notfallkontakte.py`
 
 > Contains information from OpenStreetMap (© OpenStreetMap contributors), made available here under the Open Database License (ODbL) 1.0: https://opendatacommons.org/licenses/odbl/1-0/ . Individual contents: Database Contents License (DbCL) 1.0: https://opendatacommons.org/licenses/dbcl/1-0/ . https://www.openstreetmap.org/copyright
 
-These files are Derivative Databases. They are licensed to you under the ODbL 1.0, not under PolyForm Noncommercial. If you publicly use or redistribute them, modified or not, keep this notice, license your version under the ODbL and make the database (or the means to recreate it) available. `fetch-pois.py` and `fetch-parks.py` are the complete recipe.
+These files are Derivative Databases. They are licensed to you under the ODbL 1.0, not under PolyForm Noncommercial. If you publicly use or redistribute them, modified or not, keep this notice, license your version under the ODbL and make the database (or the means to recreate it) available. `fetch-pois.py`, `fetch-parks.py` and `fetch-notfallkontakte.py` are the complete recipe.
 
 ### GeoNames — CC BY 4.0
 

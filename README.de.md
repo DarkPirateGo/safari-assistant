@@ -53,14 +53,16 @@ Jedes Modul hat seinen eigenen System-Prompt, seinen eigenen Chat-Verlauf und se
 - Das Online-Modell wählst du unter ⚙️ Einstellungen → KI & Modelle → **Liste laden**; dabei fragt Safari Assistant bei Anthropic nach, welche Modelle dein Key nutzen kann. Dort lässt sich auch der Aufwand einstellen. Voreinstellung: `claude-sonnet-5-5`.
 - **Eigene Handbücher:** Lade PDFs hoch, etwa ein Werkstatthandbuch, ein Erste-Hilfe-Buch oder einen Reiseführer, und ordne sie einem Modul zu (braucht PyMuPDF, siehe [Schnellstart](#schnellstart)). Das Modul durchsucht sie offline und nennt Dokument, Kapitel und Seite.
 - **Fotos:** Hänge ein Foto an, etwa von einem Schild, einem Ersatzteil, einer Pflanze oder einem Tier, und frag danach. Bei den lokalen Modulen sieht sich das Modell das Foto auf deinem Mac an; nichts wird hochgeladen.
-- Außerdem können Module eine optionale Offline-Wikipedia durchsuchen und daraus zitieren.
+- Außerdem können Module eine optionale Offline-Wikipedia durchsuchen und daraus zitieren. Die gefundenen Artikel stehen unter der Antwort und öffnen sich mit einem Tipp in der Offline-Wikipedia.
+- **Reiseprofil:** ⚙️ Einstellungen → Allgemein → **Reiseprofil**: wer reist, Fahrzeug, Route und Termine, Reisestil, Hund, in deinen eigenen Worten (bis 8000 Zeichen; **Vorlage einfügen** gibt eine Gliederung). Es geht mit jeder Frage an das lokale Modell, an Claude nur, wenn du **Auch an Claude (online) mitgeben** anhakst (Standard aus). Gesundheitsdaten gehören in die Notfall-Karte, nicht hierher.
+- **Sicherheitslage** sucht mit dem Land deiner GPS-Position, schaut zuerst nach Botschaftshinweisen und Lokalmedien der letzten 30 Tage und listet unter der Antwort die Quellen, die sie tatsächlich zitiert hat.
 
 ### Offline-Karte
 
 - Vektorkarte aus deiner eigenen `karte.mbtiles` (einmal gebaut, siehe [docs/SETUP.md](docs/SETUP.md#6-offline-map), englisch) oder Online-Kacheln von OpenStreetMap.
 - 🌧️ **Regen:** Ebene mit den Regenzeiten und einer Zeitleiste Tag für Tag. Tippe auf eine Zelle, dann siehst du für den Monat Regen, Temperaturen, Luftfeuchte, Wind, Sonneneinstrahlung und die Malariasaison. Sie zeigt langjährige Mittelwerte, keine Vorhersage.
 - ℹ️ Wetter-Panel für deine Position; online und auf Anfrage eine 7-Tage-Vorhersage von Open-Meteo.
-- 🛑 **Warnung:** amtliche Reisewarnungen aus Deutschland, Großbritannien und den USA, automatisch abgerufen, sobald der Mac online ist, und offline lesbar. Gewarnte Distrikte werden als Flächen gezeichnet, und Safari Assistant sagt dir, ob deine Position in einer davon liegt.
+- 🛑 **Warnung:** amtliche Reisewarnungen aus Deutschland, Großbritannien und den USA, automatisch abgerufen, sobald der Mac online ist, und offline lesbar. Gewarnte Distrikte werden als Flächen gezeichnet, und Safari Assistant sagt dir, ob deine Position in einer davon liegt. Die Flächen werden automatisch nachgezogen, wenn sich ein Warntext ändert, und das iPhone behält eine Kopie für die Zeit ohne Mac.
 - 🦟 **Gefahren:** Gefahrenzonen (Malaria, Tsetse, Großwild, Krokodile), dazu die Grenzen der Nationalparks.
 - **Rund 90.000 Orte** aus OpenStreetMap liegen der App bei, eine Datei pro Land in `POIs/`, einmal auf der Karte importiert: Campingplätze, Tankstellen, Wasser, Werkstätten, Krankenhäuser, Tierärzte und Grenzposten. Deine eigenen GPX-, KML- und GeoJSON-Dateien lassen sich ebenfalls importieren.
 - Ortssuche offline; Straßensuche online nur, wenn du Enter drückst.
@@ -77,7 +79,8 @@ Jedes Modul hat seinen eigenen System-Prompt, seinen eigenen Chat-Verlauf und se
 ### Nachrichten nach Themen
 
 - 📰 **Nachrichten:** Meldungen aus RSS-Feeds, sortiert nach neun Themen — Sicherheit, Grenzen & Einreise, Treibstoff & Versorgung, Geld & Bargeld, Gesundheit, Naturereignisse & Wetter, Straßen & Fähren, Parks & Camps, Weitere Meldungen. Das Land, in dem du gerade bist, steht vorn; **Nur wichtige** zeigt Lagen wie geschlossene Grenzen, Ausgangssperren oder Zyklone.
-- Eingebaut sind 50 Quellen: GDACS, CDC und UK FCDO, je Land eine Zeitung (oder AllAfrica) und eine Stichwortsuche bei Google News. Jede lässt sich abschalten, eigene Feeds kommen unter **Quellen** dazu; **Prüfen** zeigt vorher, was ein Feed liefern würde.
+- Eingebaut sind 66 Quellen: GDACS, CDC und UK FCDO, die Sicherheitshinweise der US-Botschaften in allen 16 Ländern, je Land eine Zeitung (oder AllAfrica) und eine Stichwortsuche bei Google News. Jede lässt sich abschalten, eigene Feeds kommen unter **Quellen** dazu; **Prüfen** zeigt vorher, was ein Feed liefern würde.
+- **📍 In deiner Nähe:** Meldungen der letzten 14 Tage, die einen Ort im Umkreis von 250 km um deine Position nennen, stehen oben, jeweils mit Ort und Entfernung. **🧭 Lage hier zusammenfassen** lässt das lokale Modell sie in höchstens fünf Punkten zusammenfassen, jeder mit der Nummer seiner Meldung. Ohne Claude, ohne Tokens.
 - Der Mac holt die Feeds alle 6 Stunden, sobald er online ist; offline bleibt der letzte Stand lesbar, auch auf dem iPhone.
 
 ### Reisewerkzeuge
@@ -98,9 +101,12 @@ Checklisten, Dokumentenfristen, ein Wartungsplan (Vorlage für den Toyota HZJ78 
 `mobile.html` läuft auf einem iPhone im selben WLAN: dieselben Module, ein 🚨-Notfallblatt, 📰 Nachrichten und die Karte, alles über den Mac per HTTPS mit einem Zugangscode. Siehe [iPhone-Modus](#iphone-modus).
 
 - Ein schlichter Kopf: ⚙️ Einstellungen · der aktuelle Bereich (antippen, um Bereiche zu wechseln und die Werkzeuge zu öffnen) · 🚨 Notfall.
-- **🆘 Position senden:** Der erste Knopf im 🚨-Blatt holt eine frische GPS-Position und setzt sie unter deine vorbereitete Nachricht (Koordinaten, Genauigkeit, Uhrzeit, Karten-Link, Plus Code). Ein weiterer Tipp öffnet Nachrichten (iMessage oder SMS, das entscheidet das iPhone je Kontakt) oder WhatsApp mit allem ausgefüllt; dort tippst du **Senden**. Empfänger und Text legst du einmal fest, sie bleiben auf dem iPhone.
-- **Ohne den Mac:** War das iPhone einmal über HTTPS verbunden, startet die Seite auch, wenn der Mac schläft, zu ist oder nichts freigibt. Sofort-Protokolle, Notrufnummern, deine Position und SOS funktionieren, KI-Antworten nicht. Auf Wunsch liegt eine Kopie deiner Notfall-Karte auf dem iPhone (am Mac ⚙️ Einstellungen → Daten & Sicherung, Standard aus).
+- **🆘 Position senden:** Der erste Knopf im 🚨-Blatt holt eine frische GPS-Position und setzt sie unter deine vorbereitete Nachricht (Koordinaten, Genauigkeit, Uhrzeit, Karten-Link, Plus Code). Ein weiterer Tipp öffnet Nachrichten (iMessage oder SMS, das entscheidet das iPhone je Kontakt) oder WhatsApp mit allem ausgefüllt; dort tippst du **Senden**. Empfänger und Text legst du einmal fest, sie bleiben auf dem iPhone. Bei mehreren Kanälen führt ein großer Knopf **📣 An alle senden** nacheinander durch Nachrichten (alle SMS-Empfänger auf einmal) und dann durch jeden WhatsApp-Kontakt.
+- **Ohne den Mac:** War das iPhone einmal über HTTPS verbunden, startet die Seite auch, wenn der Mac schläft, zu ist oder nichts freigibt. Sofort-Protokolle, Notrufnummern, deine Position und SOS funktionieren, KI-Antworten nicht. Auf Wunsch liegt eine Kopie deiner Notfall-Karte auf dem iPhone (am Mac ⚙️ Einstellungen → Daten & Sicherung, Standard aus). Antwortet der Mac nicht, steht die Seite nach etwa zwei Sekunden.
 - **Claude-Key vom Mac:** iPhone ⚙️ → **Vom Mac holen** zeigt einen vierstelligen Code; der Mac zeigt Gerät, Adresse und denselben Code, und du erlaubst es dort. Auf Wunsch ein eigener Key nur fürs iPhone.
+- **🛡 Lokale Hilfe hier:** Nummern, die man dir unterwegs nennt (Security des Campingplatzes, eine Sicherheitsfirma, die ein Local empfiehlt, eine Lodge), speicherst du mit Ort und Umkreis. Bist du wieder in diesem Umkreis, stehen sie im 🚨-Blatt mit Anruf-Knopf. Nummern ohne Ländervorwahl sind als „nur mit SIM-Karte dieses Landes“ markiert. Nur auf dem iPhone gespeichert, funktioniert offline.
+- **🚓 Wachen und Dienste in der Nähe:** Polizei, Feuerwehr, Ranger-Posten, Sicherheitsfirmen, Rettungswachen und Seenotrettung mit Telefonnummer im Umkreis von 100 km, aus OpenStreetMap (mitgeliefert, Stand November 2026; auffrischen mit `python3 fetch-notfallkontakte.py`). Das iPhone hält sie offline vor. Ungeprüft, und im November 2026 hatten weniger als 4 % der Einträge eine Nummer.
+- **🦏 Parks und Ranger:** Nummern von Parkverwaltungen und Wildtierbehörden (etwa Krüger, Tafelberg, Kenya Wildlife Service, Uganda Wildlife Authority), von deren eigenen Websites übernommen, jede mit Quelle und Prüfdatum. Im Park stehen dessen Nummern zuerst. Wo keine amtliche Nummer zu finden war, sagt das Blatt das.
 
 ### Optional
 
@@ -210,7 +216,7 @@ git clone https://github.com/DarkPirateGo/safari-assistant.git && cd safari-assi
 ./build-app.sh     # erstellt ~/Desktop/Safari Assistant.app
 ```
 
-**3. Starten** per Doppelklick auf `Safari Assistant.app`. Der Starter startet Ollama, falls es noch nicht läuft, startet den Server und öffnet `http://localhost:8765` in deinem Browser. Kommt der Server nicht hoch, erscheint die Meldung „Safari Assistant startet nicht“. Die Logs liegen in `~/Library/Logs/Safari Assistant/`.
+**3. Starten** per Doppelklick auf `Safari Assistant.app`. Der Starter startet Ollama, falls es noch nicht läuft, startet den Server und öffnet `http://localhost:8765` in deinem Browser. Kommt der Server nicht hoch, erscheint die Meldung „Safari Assistant startet nicht“. Die Logs liegen in `~/Library/Logs/Safari Assistant/`. Ein Klick aufs Dock-Symbol holt den Browser-Tab der App nach vorn, **Beenden** im Dock stoppt den Server; beim ersten Mal fragt macOS, ob Safari Assistant Safari steuern darf. Dafür braucht `./deploy.sh` die Xcode Command Line Tools; ohne sie startet die App wie bisher.
 
 **Ohne App-Bundle:** Führe im Projektordner `python3 server.py` aus und öffne `http://localhost:8765`. Ollama muss dann schon laufen.
 
@@ -220,6 +226,8 @@ Was die beiden Skripte tun:
 - `build-app.sh` erstellt `~/Desktop/Safari Assistant.app` mit Server, Daten und Bibliotheken. Ein erneuter Aufruf aktualisiert das Bundle an Ort und Stelle. Deine Daten im Bundle werden nie gelöscht: hochgeladene Dokumente, `rag-store.json`, `karte.mbtiles`, `fonts/` und `data/warnzonen.geojson`.
 
 **Aktualisieren:** `git pull && ./deploy.sh`, dann Safari Assistant neu starten.
+
+**Notfall-Stellen (optional):** Die Stellen fürs 🚨-Blatt am iPhone sind mitgeliefert. Auffrischen aus OpenStreetMap: `python3 fetch-notfallkontakte.py` mit Internet (ein paar Minuten), danach `./deploy.sh`.
 
 **PDF-Dokumente (optional):** Installiere PyMuPDF für das Python, mit dem der Server läuft. Für die aus dem Finder gestartete App ist das `/usr/bin/python3 -m pip install --user pymupdf`. Starte Safari Assistant neu. Scheitert ein Upload trotzdem, nennt die Fehlermeldung den genauen Interpreter.
 
@@ -256,7 +264,7 @@ Offline verlässt nichts den Mac. Mit Verbindung ist das hier alles, was Safari 
 |---|---|---|---|
 | Reisewarnungen | Ab 20 s nach dem Start: immer wenn der Cache älter als 12 h ist, neuer Versuch alle 15 min | Auswärtiges Amt, UK FCDO, US State Department. Keine persönlichen Daten | Noch kein Schalter ([Roadmap](docs/ROADMAP.md)) |
 | Flächen der Warngebiete | Nach einem Abruf der Reisewarnungen, wenn sich ein Warntext geändert hat oder noch keine Flächen existieren (höchstens alle 6 h) | Overpass API (OpenStreetMap). Keine persönlichen Daten | `SAFARI_OHNE_WARNZONEN_AUTO=1` |
-| Nachrichten (RSS) | Ab 60 s nach dem Start: immer wenn der letzte Abruf älter als 6 h ist (`SAFARI_NACHRICHTEN_H`), neuer Versuch frühestens nach 30 min; dazu **Jetzt holen**, **Prüfen** und eine neue eigene Quelle | Die eingeschalteten Quellen: gdacs.org, cdc.gov, gov.uk, je Land eine Zeitung bzw. allafrica.com, news.google.com (Ländername und Suchbegriffe) und deine eigenen Feeds. Keine persönlichen Daten | Quellen abschalten (📰 Nachrichten → Quellen) |
+| Nachrichten (RSS) | Ab 60 s nach dem Start: immer wenn der letzte Abruf älter als 6 h ist (`SAFARI_NACHRICHTEN_H`), neuer Versuch frühestens nach 30 min; dazu **Jetzt holen**, **Prüfen** und eine neue eigene Quelle | Die eingeschalteten Quellen: gdacs.org, cdc.gov, gov.uk, die US-Botschaft jedes Landes (`<land>.usembassy.gov`), je Land eine Zeitung bzw. allafrica.com, news.google.com (Ländername und Suchbegriffe) und deine eigenen Feeds. Keine persönlichen Daten | Quellen abschalten (📰 Nachrichten → Quellen) |
 | Wechselkurse | Wenn die Notfall-Karte (Mac) oder das 🚨-Notfallblatt (Handy) geöffnet wird | open.er-api.com. Keine Position | Noch kein Schalter ([Roadmap](docs/ROADMAP.md)) |
 | Kartenkacheln | Solange die Karte Online-Kacheln zeigt; das ist der Standard, bis es eine Offline-`karte.mbtiles` gibt. Mit Offline-Karte laden bei jedem Öffnen der Karte noch einige Übersichtskacheln, bevor sie umschaltet | tile.openstreetmap.org. Die Kacheln verraten das Gebiet, das du dir ansiehst | Offline-Karte bauen |
 | Glyphen für Kartenbeschriftungen | Nur wenn `karte.mbtiles` existiert, aber der Ordner `fonts/` dazu fehlt | fonts.openmaptiles.org | `setup-offline-karte.sh` installiert `fonts/` |
@@ -264,9 +272,9 @@ Offline verlässt nichts den Mac. Mit Verbindung ist das hier alles, was Safari 
 | Ortssuche | Nur wenn du in der Kartensuche Enter drückst | nominatim.openstreetmap.org. Der Suchtext | Tippen ohne Enter sucht nur offline |
 | Wetter-Panel | Nur wenn du auf der Karte **Heute** oder **🌐 laden** klickst | api.open-meteo.com. Position, auf etwa 1 km gerundet | Nicht klicken |
 | VPN-Prüfung | Solange eine Seite von Safari Assistant offen ist (Mac oder iPhone), etwa einmal pro Minute (30 s bis 15 min, einstellbar), und bei **Jetzt prüfen** | www.cloudflare.com (`/cdn-cgi/trace`), ersatzweise api.ipify.org / api6.ipify.org: deine öffentliche Adresse. stat.ripe.net: das Netz zu dieser Adresse. captive.apple.com: Prüfung auf eine WLAN-Anmeldeseite. ipv4/ipv6.am.i.mullvad.net nur, wenn die Mullvad-Bestätigung eingeschaltet ist. Keine Position, nichts Persönliches außer der Adresse, die jede Webseite sieht | ⚙️ Einstellungen → Netz & VPN → **Ausschalten** |
-| Anthropic | Mit API-Key: wenn du das Modul Claude oder Sicherheitslage nutzt oder auf dem Mac das Modul Wetter & Regenzeiten, und bei **Testen** / **Liste laden** in den Einstellungen. Am iPhone sprechen Claude und Sicherheitslage Anthropic direkt vom Telefon aus an | api.anthropic.com. Der Key, deine Frage, ein angehängtes Foto, der Chat-Kontext und, falls gespeichert, deine Position (±100 m) | Key löschen |
+| Anthropic | Mit API-Key: wenn du das Modul Claude oder Sicherheitslage nutzt oder auf dem Mac das Modul Wetter & Regenzeiten, und bei **Testen** / **Liste laden** in den Einstellungen. Am iPhone sprechen Claude und Sicherheitslage Anthropic direkt vom Telefon aus an | api.anthropic.com. Der Key, deine Frage, ein angehängtes Foto, der Chat-Kontext und, falls gespeichert, deine Position (±100 m); für die Websuche außerdem das Land dieser Position; dein Reiseprofil nur, wenn du **Auch an Claude (online) mitgeben** angehakt hast | Key löschen |
 | SOS-Nachricht | Nur wenn du im 🚨-Blatt einen Senden-Knopf und danach in Nachrichten oder WhatsApp **Senden** tippst | Deine Empfänger, über Nachrichten (iMessage/SMS) oder WhatsApp: dein Text und deine Position | Nicht senden |
-| Einmalige Skripte | Nur wenn du sie ausführst | `deploy.sh` → unpkg.com (nur fehlende `vendor/`-Dateien; mit `DEPLOY_LIZENZEN=1` auch raw.githubusercontent.com für die originalen Lizenztexte). `fetch-*.py` → Overpass, GeoNames, NASA POWER. `fauna-gbif-check.py` → GBIF. Kartenbau → GitHub, Geofabrik sowie die Ozean- und Natural-Earth-Dateien, die Planetiler herunterlädt | Nicht ausführen |
+| Einmalige Skripte | Nur wenn du sie ausführst | `deploy.sh` → unpkg.com (nur fehlende `vendor/`-Dateien; mit `DEPLOY_LIZENZEN=1` auch raw.githubusercontent.com für die originalen Lizenztexte). `fetch-*.py` → Overpass, GeoNames, NASA POWER; `fetch-notfallkontakte.py --amtlich` außerdem saps.gov.za, police.gov.bw und police.gov.mw. `fauna-gbif-check.py` → GBIF. Kartenbau → GitHub, Geofabrik sowie die Ozean- und Natural-Earth-Dateien, die Planetiler herunterlädt | Nicht ausführen |
 | Ollama | Für Safari Assistant nie | Der Starter startet Ollama mit `OLLAMA_NO_CLOUD=1`, falls es nicht läuft. Ein Ollama, das du selbst gestartet hast, behält seine eigenen Einstellungen | – |
 
 Keine Telemetrie, keine Analyse-Tools, keine Schriften von Google.
@@ -281,6 +289,7 @@ Safari Assistant gibt Ratschläge zu Medizin, Schlangenbissen, Fahrzeugreparatur
 - Prüfe alles, was dir schaden könnte, an einem gedruckten Handbuch, an der Offline-Wikipedia oder mit einem Menschen. Safari Assistant kann keine Hilfe rufen; nimm ein echtes Notfall-Kommunikationsgerät mit.
 - **Keine Medikamentendosen**, mit Absicht. Die Prompts weisen das Modell an, keine Dosen zu nennen oder zu erfinden und auf einen Arzt, einen Tierarzt oder den Beipackzettel zu verweisen.
 - Die **Notrufnummern** wurden im September 2026 geprüft. Prüfe sie vor der Abreise.
+- **Wachen aus OpenStreetMap** tragen Freiwillige ein, sie sind ungeprüft, und Wachen-Nummern sind oft nicht besetzt: Bei einer Erhebung im Juni 2026 in Südafrika war mehr als die Hälfte der angerufenen Polizeiwachen nicht erreichbar. Zuerst die Landesnummer wählen. Die **Parknummern** wurden am 22. November 2026 mit den Websites der Betreiber abgeglichen; zwei ältere sind als unbestätigt markiert. Gebührenfreie 0800-Nummern gehen meist nur mit SIM-Karte des Landes.
 - Die **Sofort-Protokolle** auf Englisch, Französisch und Spanisch sind Übersetzungen des deutschen Texts und noch nicht von Erste-Hilfe-Fachleuten gegengelesen.
 - Die **Spalte Botschaften nennt deutsche Botschaften**, für deutsche Staatsangehörige. Alle anderen wenden sich an ihre eigene Botschaft oder ihr Konsulat.
 - Die **Flächen der Reisewarnungen** sind eine automatische Auslegung des amtlichen Texts, keine amtlichen Grenzen. Es gilt immer der amtliche Text; jeder Eintrag verlinkt darauf.
@@ -289,7 +298,7 @@ Safari Assistant gibt Ratschläge zu Medizin, Schlangenbissen, Fahrzeugreparatur
 - Mit dem **leichten Profil** kommen auch medizinische und Notfall-Antworten vom kleinen Modell `gemma4:e4b`. Macs mit weniger als 36 GB sind mit Safari Assistant nicht getestet; siehe [Welches Modell auf welchem Mac](#welches-modell-auf-welchem-mac).
 - **SOS** bereitet eine Nachricht vor; es verschickt sie nicht und ist kein Rettungsdienst. SMS braucht Mobilfunkempfang, iMessage und WhatsApp brauchen Internet. Das Senden an mehrere SMS-Empfänger auf einmal nutzt ein Link-Format von iOS, das Apple nicht dokumentiert: einmal an die eigene Nummer testen.
 - Die **VPN-Prüfung** zeigt, was sie gemessen hat, höchstens ein, zwei Minuten alt; zwischen zwei Prüfungen kann ein VPN abbrechen.
-- Die System-Prompts sind nicht übersetzt. Sie sind für deutschsprachige Reisende geschrieben: Die Botschaftsnummern zum Beispiel sind deutsche, und das Modul Sprachen gibt die Aussprache für deutsche Leser an. Die Antworten kommen trotzdem in der Sprache, die du wählst. Das Modul Mechanik und der Wartungsplan zielen auf ein einziges Fahrzeug. Ein Reiseprofil steht auf der [Roadmap](docs/ROADMAP.md) (englisch). Wechselkurse rechnen mit EUR als Basiswährung.
+- Die System-Prompts sind nicht übersetzt. Sie sind für deutschsprachige Reisende geschrieben: Die Botschaftsnummern zum Beispiel sind deutsche, und das Modul Sprachen gibt die Aussprache für deutsche Leser an. Die Antworten kommen trotzdem in der Sprache, die du wählst. Das Modul Mechanik und der Wartungsplan zielen auf ein einziges Fahrzeug. Eigene Reisedaten gehören ins **Reiseprofil**; ein strukturiertes Profil (Fahrzeug, Staatsangehörigkeit für die Botschaftsspalte) steht auf der [Roadmap](docs/ROADMAP.md) (englisch). Wechselkurse rechnen mit EUR als Basiswährung.
 - Die System-Prompts verlangen vom Modell, Unsicherheit zu benennen und früh zu sagen, wenn professionelle Hilfe nötig ist. Das senkt das Risiko; es beseitigt es nicht.
 
 ---
