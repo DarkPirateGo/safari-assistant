@@ -17,9 +17,9 @@ Para Macs con Apple Silicon. En inglés, alemán, francés y español. Gratis pa
 > - **Estado:** el autor lo usa en un viaje overland desde noviembre de 2026. Probado en un Mac (Apple Silicon, 36 GB) y un iPhone.
 
 <p align="center">
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/en/chat-dark.png"><img src="docs/img/en/chat-light.png" width="250" alt="Un chat con uno de los módulos de Safari Assistant"></picture>
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/en/map-dark.png"><img src="docs/img/en/map-light.png" width="250" alt="El mapa sin conexión de Safari Assistant"></picture>
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/en/emergency-dark.png"><img src="docs/img/en/emergency-light.png" width="250" alt="La vista de emergencia de Safari Assistant"></picture>
+<img src="docs/img/en/chat-dark.png" width="250" alt="Un chat con uno de los módulos de Safari Assistant">
+<img src="docs/img/en/map-dark.png" width="250" alt="El mapa sin conexión de Safari Assistant">
+<img src="docs/img/en/emergency-dark.png" width="250" alt="La vista de emergencia de Safari Assistant">
 </p>
 <p align="center"><sub>Vista de ejemplo con datos de muestra ·
 <a href="https://darkpiratego.github.io/safari-assistant/">Sitio web</a></sub></p>

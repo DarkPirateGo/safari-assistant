@@ -17,9 +17,9 @@ For Macs with Apple Silicon. In English, German, French and Spanish. Free for no
 > - **Status:** in use by the author on an overland trip since November 2026. Tested on one Mac (Apple Silicon, 36 GB) and one iPhone.
 
 <p align="center">
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/en/chat-dark.png"><img src="docs/img/en/chat-light.png" width="250" alt="A chat with one of Safari Assistant's modules"></picture>
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/en/map-dark.png"><img src="docs/img/en/map-light.png" width="250" alt="Safari Assistant's offline map"></picture>
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/en/emergency-dark.png"><img src="docs/img/en/emergency-light.png" width="250" alt="Safari Assistant's emergency view"></picture>
+<img src="docs/img/en/chat-dark.png" width="250" alt="A chat with one of Safari Assistant's modules">
+<img src="docs/img/en/map-dark.png" width="250" alt="Safari Assistant's offline map">
+<img src="docs/img/en/emergency-dark.png" width="250" alt="Safari Assistant's emergency view">
 </p>
 <p align="center"><sub>Example view with sample data ·
 <a href="https://darkpiratego.github.io/safari-assistant/">Website</a></sub></p>

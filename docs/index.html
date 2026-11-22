@@ -244,21 +244,18 @@ footer p{margin:0 0 .6em;max-width:72ch}
         <div class="row">
           <figure>
             <div class="frame"><picture>
-              <source media="(prefers-color-scheme: light)" srcset="img/en/chat-light.png">
               <img src="img/en/chat-dark.png" width="250" alt="Screenshot of a chat with one of Safari Assistant’s modules" loading="lazy" decoding="async">
             </picture></div>
             <figcaption>Chat</figcaption>
           </figure>
           <figure>
             <div class="frame"><picture>
-              <source media="(prefers-color-scheme: light)" srcset="img/en/map-light.png">
               <img src="img/en/map-dark.png" width="250" alt="Screenshot of Safari Assistant’s offline map" loading="lazy" decoding="async">
             </picture></div>
             <figcaption>Map</figcaption>
           </figure>
           <figure>
             <div class="frame"><picture>
-              <source media="(prefers-color-scheme: light)" srcset="img/en/emergency-light.png">
               <img src="img/en/emergency-dark.png" width="250" alt="Screenshot of Safari Assistant’s emergency view" loading="lazy" decoding="async">
             </picture></div>
             <figcaption>Emergency</figcaption>
@@ -272,7 +269,8 @@ footer p{margin:0 0 .6em;max-width:72ch}
   <section id="what" aria-labelledby="what-title">
     <div class="wrap">
       <h2 id="what-title">What it does</h2>
-      <p class="read intro">Safari Assistant runs on your Mac and opens in your browser. It covers 16 countries:
+      <p class="read intro">Safari Assistant runs on your Mac and opens in your browser; with the Xcode Command Line
+      Tools installed, its Dock icon brings the app to the front. It covers 16 countries:
       Angola, Botswana, Burundi, Eswatini, Ethiopia, Kenya, Lesotho, Malawi, Mozambique, Namibia,
       Rwanda, South Africa, Tanzania, Uganda, Zambia and Zimbabwe.</p>
 
@@ -298,11 +296,15 @@ footer p{margin:0 0 .6em;max-width:72ch}
           </ul>
           <p class="group">Online, optional</p>
           <ul class="dash">
-            <li><strong>Security Situation — Live</strong>: current security situation, with web search</li>
+            <li><strong>Security Situation — Live</strong>: current security situation for the country of your GPS
+            position, with web search; it prefers embassy notices and local media of the last 30 days, avoids
+            click-bait sites and lists the sources it cited</li>
             <li><strong>Claude — Online AI</strong>: general online assistant, with web search</li>
           </ul>
           <p>One setting, Settings → <strong>Global Model</strong>, switches every local module to another
           model; <a href="#mac">which model fits your Mac</a>.</p>
+          <p><strong>Travel profile:</strong> describe once who travels, the vehicle, the route and your travel style,
+          in your own words. The local modules take it into account; Claude only if you allow it.</p>
           <p class="small">* On the Mac, Weather &amp; Rainy Seasons goes online via Claude when an API key is stored.</p>
         </div>
       </div>
@@ -317,7 +319,7 @@ footer p{margin:0 0 .6em;max-width:72ch}
             <li><strong>Photos:</strong> attach a photo of a sign, a part, a plant or an animal and ask about it.
             With the local modules, the model looks at it on your Mac; nothing is uploaded.</li>
             <li><strong>Offline Wikipedia</strong>, optional, via <code>kiwix-serve</code>: modules search it and
-            cite it, also from the iPhone.</li>
+            list the articles they used under the answer, also on the iPhone.</li>
           </ul>
         </div>
       </div>
@@ -332,7 +334,8 @@ footer p{margin:0 0 .6em;max-width:72ch}
             <li>Weather panel for your position; when online and on request, a 7-day forecast from Open-Meteo.</li>
             <li><strong>Warnings:</strong> official travel warnings from Germany, the UK and the US, fetched automatically
             whenever the Mac is online and readable offline. Warned districts are drawn as areas, and Safari Assistant
-            tells you whether your position is inside one; the full texts are under <strong>Travel Advisories</strong>.</li>
+            tells you whether your position is inside one; the full texts are under <strong>Travel Advisories</strong>.
+            The areas are checked against the warning texts every 10 minutes, and the iPhone keeps a copy.</li>
             <li><strong>Hazards:</strong> hazard zones (malaria, tsetse, big game, crocodiles), plus national
             park boundaries.</li>
             <li><strong>About 90,000 places</strong> from OpenStreetMap ship with the app, one file per country, imported
@@ -365,8 +368,10 @@ footer p{margin:0 0 .6em;max-width:72ch}
         <div>
           <p>On an iPhone in the same Wi-Fi you get the same modules, an emergency sheet, the news and the map, all
           through the Mac over HTTPS with an access code. <strong>🆘 Send position</strong> puts a fresh GPS fix under
-          your own prepared message and opens iMessage/SMS or WhatsApp; you tap Send. Once connected over HTTPS,
-          the iPhone keeps its emergency content (protocols, numbers, your position) even when the Mac is asleep or closed.
+          your own prepared message and opens iMessage/SMS or WhatsApp; you tap Send. With several channels,
+          <strong>📣 Send to all</strong> steps through them one by one. Once connected over HTTPS,
+          the iPhone keeps its emergency content (protocols, numbers, your position) even when the Mac is asleep or closed;
+          if the Mac does not answer, the page is there within about two seconds.
           The emergency sheet also shows <strong>local help</strong> you saved for a place, police, fire and ranger
           stations with a number from OpenStreetMap, and park and wildlife-authority numbers with their source.
           The iPhone mode is off after every start and
